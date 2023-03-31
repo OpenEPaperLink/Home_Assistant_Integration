@@ -1,6 +1,35 @@
 # OpenEPaperLink integration for Home Assistant
-<h1>This project is work in Progress</h1>
+
+⚠️⚠️⚠️This project is work in Progress and any update might break your existing Automations or Sensors ⚠️⚠️⚠️
+
 Home assistant Integration for the <a href="https://github.com/jjwbruijn/OpenEPaperLink">OpenEPaperLink</a> project
+
+## Functionality
+
+### Sensors
+
+(nearly)All information of the connected esls gets exposed under the open_epaper_link domain. THIS WILL CHANGE IN FUTURE RELEASE 
+Only the information of the WebSocket is used at the moment
+
+### Services
+
+At the moment 2 services are exposed
+
+#### Download Image
+
+Download an image from the provided url and if required, resized it for the esl it should be dislayed on.
+
+This requires that the esl has checked in once before fo home assistatant knows the hardware type of it so if this service fail, wait 10 to 20 minutes
+
+#### 5 Line Display
+
+Displays 5(or upt to 10) Lines of text on a small 1.54" esls. If a text line contaions a newline, it will be split in 2 lines
+
+## Todo
+
+- Each esl should be added as a propper device with battery information and to be automatically restored in case of a reboot of ha. 
+- The service description should be improved to contaion "" around the macs to
+- more services should be added
 
 ## Installation
 
@@ -40,3 +69,5 @@ If the above My button doesn’t work, you can also perform the following steps 
 * In the bottom right, click on the  Add Integration button.
 * From the list, search and select “OpenEPaperLink”.
 * Follow the instruction on screen to complete the set up.
+
+
