@@ -1,6 +1,6 @@
 # OpenEPaperLink integration for Home Assistant
 
-⚠️⚠️⚠️This project is work in Progress and any update might break your existing Automations or Sensors ⚠️⚠️⚠️
+⚠️This project is work in Progress and any update might break your existing Automations or Sensors ⚠️
 
 Home assistant Integration for the <a href="https://github.com/jjwbruijn/OpenEPaperLink">OpenEPaperLink</a> project
 
