@@ -60,16 +60,6 @@ def getres(hwtype):
        return size1
    if hwtype == "2":
        return size2
-#test image generator function
-def genimg(inp):
-   img = Image.new('RGB', (296, 128), color = (255, 255, 255)) 
-   d = ImageDraw.Draw(img)
-   d.text((10,10), inp, fill=(255,0,0))
-   buf = io.BytesIO()
-   img.save(buf, format='JPEG')
-   byte_im = buf.getvalue()
-   #img.save('img.jpg')
-   return byte_im
 #5 line text generator for 1.54 esls
 def gen5line(line1,line2,line3,line4,line5,border,format1,format2,format3,format4,format5):
    w = 152
