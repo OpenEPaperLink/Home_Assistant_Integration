@@ -1,5 +1,6 @@
  {
   "config": {
+    "step": {
       "user": {
         "title": "Host or IP of the OpenEPaperLink AP",
         "data": {
@@ -7,4 +8,5 @@
         }
       }
     }
+  }
 }
