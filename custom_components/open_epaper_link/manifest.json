@@ -9,5 +9,5 @@
   "issue_tracker": "https://github.com/jonasniesner/open_epaper_link_homeassistant/issues",
   "requirements": [],
   "config_flow": true,
-  "version": "0.1.2"
+  "version": "0.1.4"
 }
