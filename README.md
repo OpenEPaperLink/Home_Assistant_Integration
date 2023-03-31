@@ -30,7 +30,7 @@ Displays 5(or upt to 10) Lines of text on a small 1.54" esls. If a text line con
 - Each esl should be added as a propper device with battery information and to be automatically restored in case of a reboot of ha. 
 - The service description should be improved to contaion "" around the macs to
 - more services should be added
-
+- add service for calendar display
 ## Installation
 
 ### If you use [HACS](https://hacs.xyz/):
