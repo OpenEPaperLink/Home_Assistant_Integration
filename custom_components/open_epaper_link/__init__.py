@@ -10,13 +10,6 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[str] = []
 
 def setup(hass, config):
-    #callback for the test service
-    async def teststervice(call) -> None:
-        mac = call.data.get("mac", "000000000000")
-        text = call.data.get("text", "")
-        ip = hass.states.get(DOMAIN + ".ip").state
-        imgbuff = genimg(text)
-        result = await hass.async_add_executor_job(uploadimg,imgbuff,mac,ip)
     #callback for the image downlaod service
     async def dlimg(call) -> None:
         mac = call.data.get("mac", "000000000000")
@@ -45,7 +38,6 @@ def setup(hass, config):
         imgbuff = gen5line(line1,line2,line3,line4,line5,border,format1,format2,format3,format4,format5)
         result = await hass.async_add_executor_job(uploadimg,imgbuff,mac,ip)
     #register the services
-    hass.services.register(DOMAIN, "set_tosensor", teststervice)
     hass.services.register(DOMAIN, "dlimg", dlimg)
     hass.services.register(DOMAIN, "lines5", lines5service)
     #error haneling needs to be improved
