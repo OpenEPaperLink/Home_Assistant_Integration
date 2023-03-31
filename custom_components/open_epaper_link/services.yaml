@@ -1,0 +1,99 @@
+set_tosensor:
+  name: Set Entity
+  description: Sets an ESL to display the Information of one Sensor.
+  fields:
+    mac:
+      name: Mac
+      description: Mac of the ESL to display the information on
+      required: true
+      example: "\"0282E15E3B15\""
+    text:
+      name: Text
+      description: Text to display
+      required: true
+      example: "\"Test Text\""
+
+dlimg:
+  name: Download Image
+  description: Downloads an image from the web and sends it to an ESL. If it does not fit, the image will be resized
+  fields:
+    mac:
+      name: Mac
+      description: Mac of the ESL to display the information on
+      required: true
+      example: '"026DC7653B18"'
+    url:
+      name: Url
+      description: Url of the image to download
+      required: true
+      example: https://morgenwirdes.de/api/v3/esl1.php?plz=84051
+    rotation:
+      name: Rotation
+      description: Rotation to be applied to the image in degrees
+      required: false
+      example: 0
+      
+lines5:
+  name: 5 Line Display
+  description: Sets an ESL to display 5 lines of text, only for 1.54
+  fields:
+    mac:
+      name: Mac
+      description: Mac of the ESL to display the information on
+      required: true
+      example: '"000000200000"'
+    line1:
+      name: Line 1
+      description: Line 1 of text to display, 1 new line is allowed
+      required: true
+      example: Test
+    line2:
+      name: Line 2
+      description: Line 2 of text to display, 1 new line is allowed
+      required: true
+      example: waylongertext
+    line3:
+      name: Line 3
+      description: Line 3 of text to display, 1 new line is allowed
+      required: true
+      example: '"Test\\nText"'
+    line4:
+      name: Line 4
+      description: Line 4 of text to display, 1 new line is allowed
+      required: true
+      example: left
+    line5:
+      name: Line 5
+      description: Line 5 of text to display, 1 new line is allowed
+      required: true
+      example: right
+    border:
+      name: Border
+      description: Colour of the border
+      required: false
+      example: r
+    format1:
+      name: Format string 1
+      description: Format string for the first row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      required: false
+      example: mbbw
+    format2:
+      name: Format string 2
+      description: Format string for the second row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      required: false
+      example: mwwb
+    format3:
+      name: Format string 3
+      description: Format string for the third row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      required: false
+      example: mbbw
+    format4:
+      name: Format string 4
+      description: Format string for the fourth row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      required: false
+      example: lrwb
+    format5:
+      name: Format string 5
+      description: Format string for the fith row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      required: false
+      example: rbrr
