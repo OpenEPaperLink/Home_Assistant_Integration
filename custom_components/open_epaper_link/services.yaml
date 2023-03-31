@@ -1,25 +1,10 @@
-set_tosensor:
-  name: Set Entity
-  description: Sets an ESL to display the Information of one Sensor.
-  fields:
-    mac:
-      name: Mac
-      description: Mac of the ESL to display the information on
-      required: true
-      example: "\"0282E15E3B15\""
-    text:
-      name: Text
-      description: Text to display
-      required: true
-      example: "\"Test Text\""
-
 dlimg:
   name: Download Image
   description: Downloads an image from the web and sends it to an ESL. If it does not fit, the image will be resized
   fields:
     mac:
       name: Mac
-      description: Mac of the ESL to display the information on
+      description: Mac of the ESL to display the information on  THE MAC HAS TO BE IN QUOTATION MARKS
       required: true
       example: '"026DC7653B18"'
     url:
@@ -35,11 +20,11 @@ dlimg:
       
 lines5:
   name: 5 Line Display
-  description: Sets an ESL to display 5 lines of text, only for 1.54
+  description: Sets an ESL to display 5 lines of text, only for 1.54", you can double a line by addidng a newline char to your text
   fields:
     mac:
       name: Mac
-      description: Mac of the ESL to display the information on
+      description: Mac of the ESL to display the information on  THE MAC HAS TO BE IN QUOTATION MARKS
       required: true
       example: '"000000200000"'
     line1:
@@ -56,7 +41,7 @@ lines5:
       name: Line 3
       description: Line 3 of text to display, 1 new line is allowed
       required: true
-      example: '"Test\\nText"'
+      example: '"Test Text"'
     line4:
       name: Line 4
       description: Line 4 of text to display, 1 new line is allowed
