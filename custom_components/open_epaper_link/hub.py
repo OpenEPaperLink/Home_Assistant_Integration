@@ -85,7 +85,7 @@ class Hub:
         print("Connection lost")
         print("Waiting 300 seconds")
         time.sleep(300)
-        self.establish_connection(self)
+        self.establish_connection()
     #we could do smething here
     def on_open(self,ws) -> None:
         time.sleep(1)
