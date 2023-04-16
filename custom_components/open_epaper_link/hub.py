@@ -30,17 +30,14 @@ class Hub:
         self.online = True
     #parses websocket messages
     def on_message(self,ws, message) -> None:
-        print(message)
         data = json.loads(message)
         if 'sys' in data:
             sys = data.get('sys')
             systime = sys.get('currtime')
-            #self._hass.bus.fire("eslmsg", {"sys": sys})
-            self._hass.states.set(DOMAIN + ".lastsl", systime)
-            self._hass.states.set(DOMAIN + ".ip", self._host)
+            self._hass.states.set(DOMAIN + ".lastsl", systime,{"icon": "mdi:clock-outline","friendly_name": "Last Syslog MSG","should_poll": False})
+            self._hass.states.set(DOMAIN + ".ip", self._host,{"icon": "mdi:ip","friendly_name": "AP IP","should_poll": False})
         elif 'tags' in data:
             tag = data.get('tags')[0]
-            #self._hass.bus.fire("eslmsg", {"tag": tag})
             tagmac = tag.get('mac')
             lastseen = tag.get('lastseen')
             nextupdate = tag.get('nextupdate')
@@ -53,25 +50,23 @@ class Hub:
             hwType = tag.get('hwType')
             contentMode = tag.get('contentMode')
             #this needs to be improved
-            self._hass.states.set(DOMAIN + "." + tagmac + "lastseen", lastseen)
-            self._hass.states.set(DOMAIN + "." + tagmac + "nextupdate", nextupdate)
-            self._hass.states.set(DOMAIN + "." + tagmac + "nextcheckin", nextcheckin)
-            self._hass.states.set(DOMAIN + "." + tagmac + "lqi", LQI)
-            self._hass.states.set(DOMAIN + "." + tagmac + "rssi", RSSI)
-            self._hass.states.set(DOMAIN + "." + tagmac + "temperature", temperature)
-            self._hass.states.set(DOMAIN + "." + tagmac + "batterymv", batteryMv)
-            self._hass.states.set(DOMAIN + "." + tagmac + "pending", pending)
-            self._hass.states.set(DOMAIN + "." + tagmac + "hwtype", hwType)
-            self._hass.states.set(DOMAIN + "." + tagmac + "contentMode", contentMode)
+            self._hass.states.set(DOMAIN + "." + tagmac + "lastseen", lastseen,{"icon": "mdi:clock-outline","friendly_name": "Last seen","should_poll": False})
+            self._hass.states.set(DOMAIN + "." + tagmac + "nextupdate", nextupdate,{"icon": "mdi:clock-outline","friendly_name": "Next Update","should_poll": False})
+            self._hass.states.set(DOMAIN + "." + tagmac + "nextcheckin", nextcheckin,{"icon": "mdi:clock-outline","friendly_name": "Next Checkin","should_poll": False})
+            self._hass.states.set(DOMAIN + "." + tagmac + "lqi", LQI,{"icon": "mdi:network-strength-1","friendly_name": "Link quality index","should_poll": False})
+            self._hass.states.set(DOMAIN + "." + tagmac + "rssi", RSSI,{"icon": "mdi:network-strength-1","friendly_name": "RSSI","device_class": "signal_strength","unit_of_measurement": "dB","should_poll": False})
+            self._hass.states.set(DOMAIN + "." + tagmac + "temperature", temperature,{"icon": "mdi:thermometer","friendly_name": "Temperature","device_class": "temperature","unit_of_measurement": "°C","should_poll": False})
+            self._hass.states.set(DOMAIN + "." + tagmac + "battery", batteryMv / 1000,{"icon": "mdi:battery","friendly_name": "Battery Voltage","device_class": "voltage","unit_of_measurement": "V","should_poll": False})
+            self._hass.states.set(DOMAIN + "." + tagmac + "pending", pending,{"icon": "mdi:fullscreen","friendly_name": "Pending content","should_poll": False})
+            self._hass.states.set(DOMAIN + "." + tagmac + "hwtype", hwType,{"icon": "mdi:fullscreen","friendly_name": "Hardware Type","should_poll": False})
+            self._hass.states.set(DOMAIN + "." + tagmac + "contentMode", contentMode,{"icon": "mdi:fullscreen","friendly_name": "Content mode","should_poll": False})
             #maintains a list of all tags, new entetys should be generated here
             if tagmac not in self.esls:
                 self.esls.append(tagmac)
         elif 'errMsg' in data:
             ermsg = data.get('errMsg');
-            #self._hass.bus.fire("eslmsg", {"error": ermsg})
         elif 'logMsg' in data:
             logmsg = data.get('logMsg');
-            #self._hass.bus.fire("eslmsg", {"error": logmsg})
         else:
             _LOGGER.warning("Unknown msg")
             _LOGGER.warning(data)
