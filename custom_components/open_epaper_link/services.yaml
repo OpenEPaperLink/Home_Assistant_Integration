@@ -82,3 +82,58 @@ lines5:
       description: Format string for the fith row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
       required: false
       example: rbrr
+      
+lines4:
+  name: 4 Line Display
+  description: Sets an ESL to display 4 lines of text, only for 2.9", you can double a line by addidng a newline char to your text
+  fields:
+    mac:
+      name: Mac
+      description: Mac of the ESL to display the information on  THE MAC HAS TO BE IN QUOTATION MARKS
+      required: true
+      example: '"028327803B1D"'
+    line1:
+      name: Line 1
+      description: Line 1 of text to display, 1 new line is allowed
+      required: true
+      example: Test
+    line2:
+      name: Line 2
+      description: Line 2 of text to display, 1 new line is allowed
+      required: true
+      example: waylongertext
+    line3:
+      name: Line 3
+      description: Line 3 of text to display, 1 new line is allowed
+      required: true
+      example: '"Test Text"'
+    line4:
+      name: Line 4
+      description: Line 4 of text to display, 1 new line is allowed
+      required: true
+      example: left
+    border:
+      name: Border
+      description: Colour of the border
+      required: false
+      example: r
+    format1:
+      name: Format string 1
+      description: Format string for the first row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      required: false
+      example: mbbw
+    format2:
+      name: Format string 2
+      description: Format string for the second row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      required: false
+      example: mwwb
+    format3:
+      name: Format string 3
+      description: Format string for the third row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      required: false
+      example: mbbw
+    format4:
+      name: Format string 4
+      description: Format string for the fourth row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      required: false
+      example: lrwb
