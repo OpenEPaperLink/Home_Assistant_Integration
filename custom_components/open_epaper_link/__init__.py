@@ -37,9 +37,25 @@ def setup(hass, config):
         ip = hass.states.get(DOMAIN + ".ip").state
         imgbuff = gen5line(line1,line2,line3,line4,line5,border,format1,format2,format3,format4,format5)
         result = await hass.async_add_executor_job(uploadimg,imgbuff,mac,ip)
+    #callback for the 4 line service
+    async def lines4service(call) -> None:
+        mac = call.data.get("mac", "000000000000")
+        line1 = call.data.get("line1", "")
+        line2 = call.data.get("line2", "")
+        line3 = call.data.get("line3", "")
+        line4 = call.data.get("line4", "")
+        border = call.data.get("border", "w")
+        format1 = call.data.get("format1", "mwwb")
+        format2 = call.data.get("format2", "mwwb")
+        format3 = call.data.get("format3", "mwwb")
+        format4 = call.data.get("format4", "mwwb")
+        ip = hass.states.get(DOMAIN + ".ip").state
+        imgbuff = gen4line(line1,line2,line3,line4,border,format1,format2,format3,format4)
+        result = await hass.async_add_executor_job(uploadimg,imgbuff,mac,ip)
     #register the services
     hass.services.register(DOMAIN, "dlimg", dlimg)
     hass.services.register(DOMAIN, "lines5", lines5service)
+    hass.services.register(DOMAIN, "lines4", lines4service)
     #error haneling needs to be improved
     return True
         
