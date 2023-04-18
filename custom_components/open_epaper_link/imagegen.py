@@ -18,6 +18,7 @@ red = (255, 0, 0)
 white = (255, 255, 255)
 black = (0, 0, 0)
 splitth = 147
+splitth2 = 280
 size0 = [152,152]
 size1 = [296,128]
 size2 = [400,300]
@@ -87,6 +88,30 @@ def gen5line(line1,line2,line3,line4,line5,border,format1,format2,format3,format
    byte_im = buf.getvalue()
    #img.save('img.png')
    return byte_im
+def gen4line(line1,line2,line3,line4,border,format1,format2,format3,format4):
+   w = 296
+   h = 128
+   img = Image.new('RGB', (w, h), color = white)
+   d = ImageDraw.Draw(img)
+   #we dont want interpolation
+   d.fontmode = "1"
+   #border
+   d.rectangle([(0, 0), (w - 2,h - 2)], fill = chartocol(border))
+   #text backgrounds
+   d.rectangle([(2, 2), (292,32)], fill = chartocol(format1[1]), outline = chartocol(format1[2]))
+   d.rectangle([(2, 33), (292,63)], fill = chartocol(format2[1]), outline = chartocol(format2[2]))
+   d.rectangle([(2, 64), (292,94)], fill = chartocol(format3[1]), outline = chartocol(format3[2]))
+   d.rectangle([(2, 95), (292,124)], fill = chartocol(format4[1]), outline = chartocol(format4[2]))
+   #text lines
+   d =  textgen2(d,line1,chartocol(format1[3]),format1[0],2)
+   d =  textgen2(d,line2,chartocol(format2[3]),format2[0],33)
+   d =  textgen2(d,line3,chartocol(format3[3]),format3[0],64)
+   d =  textgen2(d,line4,chartocol(format4[3]),format4[0],95)
+   buf = io.BytesIO()
+   img.save(buf, format='JPEG', quality=95)
+   byte_im = buf.getvalue()
+   #img.save('img.png')
+   return byte_im
 #handels Text alignment
 def textgen(d,text,col,just,yofs):
    x = 76
@@ -100,6 +125,23 @@ def textgen(d,text,col,just,yofs):
        d.text((x,8 + yofs), split1, fill=col, anchor=just+"m", font=rbm)
        d.text((x,22 + yofs),split2, fill=col, anchor=just+"m", font=rbm)
    elif d.textlength(text, font=ppb) < splitth:
+       d.text((x,15 + yofs), text, fill=col, anchor=just+"m", font=ppb)
+   else:
+       d.text((x,15 + yofs), text, fill=col, anchor=just+"m", font=rbm)
+   return d
+#handels Text alignment
+def textgen2(d,text,col,just,yofs):
+   x = 148
+   if just == "l":
+       x = 3
+   if just == "r":
+       x = 290
+   if "\n" in text:
+       split1 = text.split("\n")[0]
+       split2 = text.split("\n")[1]
+       d.text((x,8 + yofs), split1, fill=col, anchor=just+"m", font=rbm)
+       d.text((x,22 + yofs),split2, fill=col, anchor=just+"m", font=rbm)
+   elif d.textlength(text, font=ppb) < splitth2:
        d.text((x,15 + yofs), text, fill=col, anchor=just+"m", font=ppb)
    else:
        d.text((x,15 + yofs), text, fill=col, anchor=just+"m", font=rbm)
