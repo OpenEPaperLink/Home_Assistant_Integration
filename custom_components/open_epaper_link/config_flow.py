@@ -13,7 +13,7 @@ DATA_SCHEMA = vol.Schema({("host"): str})
 async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
     if len(data["host"]) < 3:
         raise InvalidHost
-    hub = Hub(hass, data["host"])
+    hub = Hub(hass, data["host"],"")
     result = await hub.test_connection()
     if not result:
         raise CannotConnect
