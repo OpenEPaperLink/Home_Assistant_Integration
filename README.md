@@ -13,7 +13,7 @@ Only the information of the WebSocket is used at the moment
 
 ### Services
 
-At the moment 2 services are exposed
+At the moment 3 services are exposed
 
 #### Download Image
 
@@ -25,9 +25,13 @@ This requires that the esl has checked in once before fo home assistatant knows 
 
 Displays 5(or upt to 10) Lines of text on a small 1.54" esls. If a text line contaions a newline, it will be split in 2 lines
 
+#### 4 Line Display
+
+Displays 4(or upt to 8) Lines of text on a 2.9" esls. If a text line contaions a newline, it will be split in 2 lines
+
 ## Todo
 
-- Each esl should be added as a propper device with battery information and to be automatically restored in case of a reboot of ha. 
+- Switch Entity should be added
 - The service description should be improved to contaion "" around the macs to
 - more services should be added
 - add service for calendar display
