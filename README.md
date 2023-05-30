@@ -1,15 +1,15 @@
 # OpenEPaperLink integration for Home Assistant
 
-⚠️This project is work in Progress and any update might break your existing Automations or Sensors ⚠️
-
 Home assistant Integration for the <a href="https://github.com/jjwbruijn/OpenEPaperLink">OpenEPaperLink</a> project
+
+Feature Request for new Display Types are welcome!
 
 ## Functionality
 
 ### Sensors
 
-(nearly)All information of the connected esls gets exposed under the open_epaper_link domain. THIS WILL CHANGE IN FUTURE RELEASE 
-Only the information of the WebSocket is used at the moment
+Every sensor of the tags is exposed in Home assistant.
+Every tag and the AP is exposed as a device.
 
 ### Services
 
@@ -35,6 +35,7 @@ Displays 4(or upt to 8) Lines of text on a 2.9" esls. If a text line contaions a
 - The service description should be improved to contaion "" around the macs to
 - more services should be added
 - add service for calendar display
+-
 ## Installation
 
 ### If you use [HACS](https://hacs.xyz/):
