@@ -2,7 +2,7 @@
 
 Home assistant Integration for the <a href="https://github.com/jjwbruijn/OpenEPaperLink">OpenEPaperLink</a> project
 
-Feature Request for new Display Types are welcome!
+Feature Request and code contributons are welcome are welcome!
 
 ## Functionality
 
@@ -29,13 +29,6 @@ Displays 5(or upt to 10) Lines of text on a small 1.54" esls. If a text line con
 
 Displays 4(or upt to 8) Lines of text on a 2.9" esls. If a text line contaions a newline, it will be split in 2 lines
 
-## Todo
-
-- Switch Entity should be added
-- The service description should be improved to contaion "" around the macs to
-- more services should be added
-- add service for calendar display
--
 ## Installation
 
 ### If you use [HACS](https://hacs.xyz/):
