@@ -18,7 +18,7 @@ from .const import DOMAIN
 _LOGGER: Final = logging.getLogger(__name__)
 #Hub class for handeling communication
 class Hub:
-    #the init function starts the tread for all other communication
+    #the init function starts the thread for all other communication
     def __init__(self, hass: HomeAssistant, host: str,cfgenty: str) -> None:
         self._host = host
         self._cfgenty = cfgenty
@@ -93,7 +93,7 @@ class Hub:
             self.data[tagmac]["wakeupReason"] = wakeupReason
             self.data[tagmac]["capabilities"] = capabilities
             self.data[tagmac]["hashv"] = hashv
-            #maintains a list of all tags, new entetys should be generated here
+            #maintains a list of all tags, new entities should be generated here
             if tagmac not in self.esls:
                 self.esls.append(tagmac)
                 loop = self.eventloop
@@ -116,7 +116,7 @@ class Hub:
         print("Waiting 300 seconds")
         time.sleep(300)
         self.establish_connection()
-    #we could do smething here
+    #we could do something here
     def on_open(self,ws) -> None:
         time.sleep(1)
     #starts the websocket
@@ -128,7 +128,7 @@ class Hub:
     #we should do more here
     async def test_connection(self) -> bool:
         return True
-    #reload is reqired to add new entitys
+    #reload is reqired to add new entities
     async def reloadcfgett(self) -> bool:
         await self._hass.config_entries.async_unload_platforms(self._cfgenty, ["sensor"])
         await self._hass.config_entries.async_forward_entry_setups(self._cfgenty, ["sensor"])

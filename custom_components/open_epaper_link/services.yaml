@@ -20,7 +20,7 @@ dlimg:
       
 lines5:
   name: 5 Line Display
-  description: Sets an ESL to display 5 lines of text, only for 1.54", you can double a line by addidng a newline char to your text
+  description: Sets an ESL to display 5 lines of text, only for 1.54", you can double a line by adding a newline char to your text
   fields:
     mac:
       name: Mac
@@ -54,38 +54,38 @@ lines5:
       example: right
     border:
       name: Border
-      description: Colour of the border
+      description: Color of the border
       required: false
       example: r
     format1:
       name: Format string 1
-      description: Format string for the first row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      description: Format string for the first row. Char 1 is for the text alignment, char 2 is for the background color, char 3 is for the border color and char 4 is for the text color
       required: false
       example: mbbw
     format2:
       name: Format string 2
-      description: Format string for the second row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      description: Format string for the second row. Char 1 is for the text alignment, char 2 is for the background color, char 3 is for the border color and char 4 is for the text color
       required: false
       example: mwwb
     format3:
       name: Format string 3
-      description: Format string for the third row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      description: Format string for the third row. Char 1 is for the text alignment, char 2 is for the background color, char 3 is for the border color and char 4 is for the text color
       required: false
       example: mbbw
     format4:
       name: Format string 4
-      description: Format string for the fourth row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      description: Format string for the fourth row. Char 1 is for the text alignment, char 2 is for the background color, char 3 is for the border color and char 4 is for the text color
       required: false
       example: lrwb
     format5:
       name: Format string 5
-      description: Format string for the fith row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      description: Format string for the fifth row. Char 1 is for the text alignment, char 2 is for the background color, char 3 is for the border color and char 4 is for the text color
       required: false
       example: rbrr
       
 lines4:
   name: 4 Line Display
-  description: Sets an ESL to display 4 lines of text, only for 2.9", you can double a line by addidng a newline char to your text
+  description: Sets an ESL to display 4 lines of text, only for 2.9", you can double a line by adding a newline char to your text
   fields:
     mac:
       name: Mac
@@ -114,26 +114,26 @@ lines4:
       example: left
     border:
       name: Border
-      description: Colour of the border
+      description: Color of the border
       required: false
       example: r
     format1:
       name: Format string 1
-      description: Format string for the first row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      description: Format string for the first row. Char 1 is for the text alignment, char 2 is for the background color, char 3 is for the border color and char 4 is for the text color
       required: false
       example: mbbw
     format2:
       name: Format string 2
-      description: Format string for the second row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      description: Format string for the second row. Char 1 is for the text alignment, char 2 is for the background color, char 3 is for the border color and char 4 is for the text color
       required: false
       example: mwwb
     format3:
       name: Format string 3
-      description: Format string for the third row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      description: Format string for the third row. Char 1 is for the text alignment, char 2 is for the background color, char 3 is for the border color and char 4 is for the text color
       required: false
       example: mbbw
     format4:
       name: Format string 4
-      description: Format string for the fourth row char 1 is text allignment char 2 are for the backgrounf and char 4 is for the text colour
+      description: Format string for the fourth row. Char 1 is for the text alignment, char 2 is for the background color, char 3 is for the border color and char 4 is for the text color
       required: false
       example: lrwb
