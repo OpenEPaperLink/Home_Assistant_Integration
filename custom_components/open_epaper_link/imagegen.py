@@ -13,7 +13,7 @@ rbmp = os.path.join(os.path.dirname(__file__), 'rbm.ttf')
 ppbp = os.path.join(os.path.dirname(__file__), 'ppb.ttf')
 rbm = ImageFont.truetype(rbmp, 11)
 ppb = ImageFont.truetype(ppbp, 23)
-#colour definitions for picture generation
+#color definitions for picture generation
 red = (255, 0, 0)
 white = (255, 255, 255)
 black = (0, 0, 0)
@@ -67,7 +67,7 @@ def gen5line(line1,line2,line3,line4,line5,border,format1,format2,format3,format
    h = 152
    img = Image.new('RGB', (w, h), color = white)
    d = ImageDraw.Draw(img)
-   #we dont want interpolation
+   #we don't want interpolation
    d.fontmode = "1"
    #border
    d.rectangle([(0, 0), (w - 1,h - 1)], fill = white, outline = chartocol(border))
@@ -93,7 +93,7 @@ def gen4line(line1,line2,line3,line4,border,format1,format2,format3,format4):
    h = 128
    img = Image.new('RGB', (w, h), color = white)
    d = ImageDraw.Draw(img)
-   #we dont want interpolation
+   #we don't want interpolation
    d.fontmode = "1"
    #border
    d.rectangle([(0, 0), (w - 2,h - 2)], fill = chartocol(border))
@@ -112,7 +112,7 @@ def gen4line(line1,line2,line3,line4,border,format1,format2,format3,format4):
    byte_im = buf.getvalue()
    #img.save('img.png')
    return byte_im
-#handels Text alignment
+#handles Text alignment
 def textgen(d,text,col,just,yofs):
    x = 76
    if just == "l":
@@ -129,7 +129,7 @@ def textgen(d,text,col,just,yofs):
    else:
        d.text((x,15 + yofs), text, fill=col, anchor=just+"m", font=rbm)
    return d
-#handels Text alignment
+#handles Text alignment
 def textgen2(d,text,col,just,yofs):
    x = 148
    if just == "l":
@@ -146,7 +146,7 @@ def textgen2(d,text,col,just,yofs):
    else:
        d.text((x,15 + yofs), text, fill=col, anchor=just+"m", font=rbm)
    return d
-#converts a char to a colour
+#converts a char to a color
 def chartocol(c):
     if c == "r":
         return red
@@ -154,7 +154,7 @@ def chartocol(c):
         return white    
     if c == "b":
         return black
-#upload an immage to the tag
+#upload an image to the tag
 def uploadimg(img,mac,ip):
    url = "http://" + ip + "/imgupload"
    mp_encoder = MultipartEncoder(
