@@ -23,11 +23,29 @@ This requires that the esl has checked in once before fo Home Assistant knows th
 
 #### 5 Line Display
 
-Displays 5 (or up to 10) lines of text on a small 1.54" esl. If a text line contains a newline, it will be split in 2 lines.
+Displays 5 (or up to 10) lines of text on a small 1.54" esl. If a text line contains a newline (\n), it will be split in 2 lines.
 
 #### 4 Line Display
 
 Displays 4 (or up to 8) lines of text on a 2.9" esl. If a text line contains a newline, it will be split in 2 lines.
+
+#### Example Service Call
+Go to Developer Tools, Services, select the OpenEPaperLink: 4 Line Display service and paste the below in to the YAML editor. Replace the sensor names in curly brackets with values from your own system. Note that floats work better when rounded and that all numbers work better when converted to strings.
+
+```
+service: open_epaper_link.lines4 
+data: 
+  mac: 0000021EDE313B15 
+  line1: " Time: {{ states('sensor.time') | string }} " 
+  line2: " LR Temp: {{ state_attr('climate.living_room_2','current_temperature') | string }} C " 
+  line3: " Yest. Elec {{ state_attr('sensor.electricity_yesterday_previous_accumulative_consumption','total') | round(2) | string }} kWh " 
+  line4: "Car: {{ states('sensor.car_state_of_charge') | int | string }} % / {{ ((states('sensor.id_3_pro_performance_range')) | float / 1.609344) | int | string }} miles  {{ states('sensor.bins') }}  " 
+  border: r 
+  format1: mbbw 
+  format2: mrbw 
+  format3: lbrw 
+  format4: mwrb <br>
+```
 
 ## Installation
 
