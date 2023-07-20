@@ -32,6 +32,7 @@ Displays 4 (or up to 8) lines of text on a 2.9" esl. If a text line contains a n
 #### Example Service Call
 Go to Developer Tools, Services, select the OpenEPaperLink: 4 Line Display service and paste the below in to the YAML editor. Replace the sensor names in curly brackets with values from your own system. Note that floats work better when rounded and that all numbers work better when converted to strings.
 
+```
 service: open_epaper_link.lines4 <br>
 data: <br>
   mac: 0000021EDE313B15 <br>
@@ -44,6 +45,7 @@ data: <br>
   format2: mrbw <br>
   format3: lbrw <br>
   format4: mwrb <br>
+```
 
 ## Installation
 
