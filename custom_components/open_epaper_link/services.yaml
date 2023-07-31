@@ -17,7 +17,37 @@ dlimg:
       description: Rotation to be applied to the image in degrees
       required: false
       example: 0
-      
+
+drawcustom:
+  name: Draw Custom Image
+  description: Draws a custom image
+  fields:
+    mac:
+      name: Mac
+      description: Mac of the ESL to display the information on  THE MAC HAS TO BE IN QUOTATION MARKS
+      required: true
+      example: '"0000021DBB093411"'
+    width:
+      name: width of image
+      description: With of image
+      required: true
+      example: 400
+    height:
+      name: height
+      description: height of image
+      required: true
+      example: 300
+    payload:
+      name: Payload
+      description: payload to draw
+      required: true
+      example: 
+    background:
+      name: Backgroundcolor
+      description: black, white, red
+      required: true
+      example: white
+
 lines5:
   name: 5 Line Display
   description: Sets an ESL to display 5 lines of text, only for 1.54", you can double a line by adding a newline char to your text
