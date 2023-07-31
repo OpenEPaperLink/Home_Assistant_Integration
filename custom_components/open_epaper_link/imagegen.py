@@ -3,7 +3,8 @@ from __future__ import annotations
 import io
 import logging
 import os
-
+from pprint import pformat
+import json
 import requests
 from PIL import Image, ImageDraw, ImageFont
 from requests_toolbelt.multipart.encoder import MultipartEncoder
@@ -68,6 +69,22 @@ def getres(hwtype):
     if hwtype == "2":
         return size2
 
+
+# custom image generator
+def customimage(payload,width,height,background):
+    img = Image.new('RGB', (width, height), color=background)
+    d = ImageDraw.Draw(img)
+    d.fontmode = "1"
+
+    for element in payload:
+        font_file = os.path.join(os.path.dirname(__file__), 'ppb.ttf')
+        font = ImageFont.truetype(font_file, element['size'])
+        d.text((element['x'],  element['y']), element['value'], fill=element['color'], font=font)
+
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG', quality=95)
+    byte_im = buf.getvalue()
+    return byte_im
 
 # 5 line text generator for 1.54 esls
 def gen5line(line1, line2, line3, line4, line5, border, format1, format2, format3, format4, format5):

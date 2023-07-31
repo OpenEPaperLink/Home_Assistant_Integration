@@ -1,10 +1,9 @@
- {
+{
   "config": {
     "step": {
       "user": {
-        "title": "Host or IP of the OpenEPaperLink AP",
         "data": {
-          "host": "Host"
+          "host": "[%key:common::config_flow::data::host%]"
         }
       }
     }

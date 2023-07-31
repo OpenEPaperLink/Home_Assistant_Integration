@@ -11,6 +11,17 @@ _LOGGER = logging.getLogger(__name__)
 
 def setup(hass, config):
     # callback for the image downlaod service
+    async def drawcustomservice(call) -> None:
+        mac = call.data.get("mac", "000000000000")
+        payload = call.data.get("payload", "")
+        width = call.data.get("width", "")
+        height = call.data.get("height", "")
+        background = call.data.get("background","white")
+        ip = hass.states.get(DOMAIN + ".ip").state
+        imgbuff = customimage(payload,width,height,background)
+        result = await hass.async_add_executor_job(uploadimg, imgbuff, mac, ip)
+
+    # callback for the image downlaod service
     async def dlimg(call) -> None:
         mac = call.data.get("mac", "000000000000")
         url = call.data.get("url", "")
@@ -59,6 +70,8 @@ def setup(hass, config):
     hass.services.register(DOMAIN, "dlimg", dlimg)
     hass.services.register(DOMAIN, "lines5", lines5service)
     hass.services.register(DOMAIN, "lines4", lines4service)
+    hass.services.register(DOMAIN, "drawcustom", drawcustomservice)
+
     # error haneling needs to be improved
     return True
 
