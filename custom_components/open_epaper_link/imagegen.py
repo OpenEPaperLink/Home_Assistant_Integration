@@ -71,7 +71,7 @@ def getres(hwtype):
 
 
 # custom image generator
-def customimage(payload,width,height,background):
+def customimage(payload,width,height,background,mac):
     img = Image.new('RGB', (width, height), color=background)
     d = ImageDraw.Draw(img)
     d.fontmode = "1"
@@ -81,6 +81,7 @@ def customimage(payload,width,height,background):
             font_file = os.path.join(os.path.dirname(__file__), element['font'])
             font = ImageFont.truetype(font_file, element['size'])
             d.text((element['x'],  element['y']), element['value'], fill=element['color'], font=font)
+       
         if element["type"] == "icon":
             # ttf from https://github.com/Templarian/MaterialDesign-Webfont/blob/master/fonts/materialdesignicons-webfont.ttf
             font_file = os.path.join(os.path.dirname(__file__), 'materialdesignicons-webfont.ttf')
@@ -100,6 +101,7 @@ def customimage(payload,width,height,background):
 
     buf = io.BytesIO()
     img.save(buf, format='JPEG', quality=95)
+    img.save(os.path.join(os.path.dirname(__file__),mac,'.jpg'))
     byte_im = buf.getvalue()
     return byte_im
 

@@ -18,7 +18,7 @@ def setup(hass, config):
         height = call.data.get("height", "")
         background = call.data.get("background","white")
         ip = hass.states.get(DOMAIN + ".ip").state
-        imgbuff = customimage(payload,width,height,background)
+        imgbuff = customimage(payload,width,height,background,mac)
         result = await hass.async_add_executor_job(uploadimg, imgbuff, mac, ip)
 
     # callback for the image downlaod service
