@@ -71,8 +71,14 @@ def getres(hwtype):
 
 
 # custom image generator
-def customimage(payload,width,height,background,mac):
-    img = Image.new('RGB', (width, height), color=background)
+def customimage(payload,width,height,background,mac,rotate):
+
+    if rotate != "0":
+        img = Image.new('RGB', (height, width), color=background)
+    else:
+        img = Image.new('RGB', (width, height), color=background)
+
+
     d = ImageDraw.Draw(img)
     d.fontmode = "1"
 
@@ -98,10 +104,13 @@ def customimage(payload,width,height,background,mac):
             font = ImageFont.truetype(font_file, element['size'])
             d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=element['color'], font=font)
 
+    if rotate != 0:
+        img = img.rotate(rotate, expand=True)
+
 
     buf = io.BytesIO()
     img.save(buf, format='JPEG', quality=95)
-    img.save(os.path.join(os.path.dirname(__file__),mac,'.jpg'))
+    img.save(os.path.join(os.path.dirname(__file__), mac + '.jpg'))
     byte_im = buf.getvalue()
     return byte_im
 

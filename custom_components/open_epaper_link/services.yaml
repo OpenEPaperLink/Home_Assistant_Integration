@@ -47,6 +47,11 @@ drawcustom:
       description: black, white, red
       required: true
       example: white
+    rotate:
+      name: rotate
+      description: 0, 90, 180, 270
+      required: false
+      example: 90
 
 lines5:
   name: 5 Line Display
