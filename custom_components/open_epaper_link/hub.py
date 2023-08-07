@@ -120,7 +120,14 @@ class Hub:
             if tagmac not in self.esls:
                 self.esls.append(tagmac)
                 loop = self.eventloop
-                asyncio.run_coroutine_threadsafe(self.reloadcfgett(),loop)
+                asyncio.run_coroutine_threadsafe(self.reloadcfgett(),loop)            
+            #fire event with the wakeup reason
+            lut = {0: "TIMED",1: "BOOT",2: "GPIO",3: "NFC",252: "FIRSTBOOT",253: "NETWORK_SCAN",254: "WDT_RESET"}
+            event_data = {
+                "device_id": tagmac,
+                "type": lut[wakeupReason],
+            }
+            self._hass.bus.async_fire(DOMAIN + "_event", event_data)
         elif 'errMsg' in data:
             ermsg = data.get('errMsg');
         elif 'logMsg' in data:
