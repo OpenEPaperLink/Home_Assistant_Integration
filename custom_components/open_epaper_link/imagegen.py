@@ -59,7 +59,6 @@ def downloadimg(url, hwtype, rotate):
     # img.save('img.png')
     return byte_im
 
-
 # hw type to size converter
 def getres(hwtype):
     if hwtype == "0":
@@ -71,8 +70,20 @@ def getres(hwtype):
 
 
 # custom image generator
-def customimage(payload,width,height,background):
-    img = Image.new('RGB', (width, height), color=background)
+def customimage(payload,width,height,background,mac,rotate):
+
+    if rotate == 0:
+        img = Image.new('RGB', (width, height), color=background)
+    elif rotate == 90:
+        img = Image.new('RGB', (height, width), color=background)
+    elif rotate == 180:
+        img = Image.new('RGB', (width, height), color=background)
+    elif rotate == 270:
+        img = Image.new('RGB', (height, width), color=background)
+    else:
+        img = Image.new('RGB', (width, height), color=background)
+
+
     d = ImageDraw.Draw(img)
     d.fontmode = "1"
 
@@ -81,6 +92,7 @@ def customimage(payload,width,height,background):
             font_file = os.path.join(os.path.dirname(__file__), element['font'])
             font = ImageFont.truetype(font_file, element['size'])
             d.text((element['x'],  element['y']), element['value'], fill=element['color'], font=font)
+       
         if element["type"] == "icon":
             # ttf from https://github.com/Templarian/MaterialDesign-Webfont/blob/master/fonts/materialdesignicons-webfont.ttf
             font_file = os.path.join(os.path.dirname(__file__), 'materialdesignicons-webfont.ttf')
@@ -97,9 +109,11 @@ def customimage(payload,width,height,background):
             font = ImageFont.truetype(font_file, element['size'])
             d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=element['color'], font=font)
 
+    img = img.rotate(rotate, expand=True)
 
     buf = io.BytesIO()
     img.save(buf, format='JPEG', quality=95)
+    img.save(os.path.join(os.path.dirname(__file__), mac + '.jpg'))
     byte_im = buf.getvalue()
     return byte_im
 

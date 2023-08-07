@@ -93,7 +93,7 @@ class Hub:
             ver = tag.get('ver')
             #required for automations
             self._hass.states.set(DOMAIN + "." + tagmac + "hwtype", hwType,{"icon": "mdi:fullscreen","friendly_name": "Hardware Type","should_poll": False})
-            hwmap = {0: "1.54″ BWR",1: "2.9″ BWR",2: "4.2″ BWR",17: "2.9″ BWR NFC",17: "2.9″ BWR NFC",240: "Segmented UK"}
+            hwmap = {0: "1.54″ BWR",1: "2.9″ BWR",2: "4.2″ BWR",5: "7.4″ BWR", 17: "2.9″ BWR NFC",17: "2.9″ BWR NFC",240: "Segmented UK"}
             self.data[tagmac] = dict()
             self.data[tagmac]["temperature"] = temperature
             self.data[tagmac]["rssi"] = RSSI
