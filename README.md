@@ -46,6 +46,33 @@ data:
   format3: lbrw 
   format4: mwrb <br>
 ```
+##### Example for drawcustom 
+(Get your Icon Names from: https://pictogrammers.com/library/mdi/)
+```
+service: open_epaper_link.drawcustom
+data:
+  mac: 0000028DF056743A
+  width: 640
+  height: 384
+  background: white
+  rotate: 270
+  payload:
+    - type: text
+      value: "Hello World!"
+      font: "ppb.ttf"
+      x: 0
+      "y": 0
+      size: 40
+      color: red
+    - type: icon
+      value: account-cowboy-hat
+      x: 60
+      y: 120
+      size: 120
+      color: red
+```
+
+
 
 ## Installation
 
