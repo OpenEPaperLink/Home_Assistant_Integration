@@ -59,7 +59,6 @@ def downloadimg(url, hwtype, rotate):
     # img.save('img.png')
     return byte_im
 
-
 # hw type to size converter
 def getres(hwtype):
     if hwtype == "0":
@@ -73,7 +72,13 @@ def getres(hwtype):
 # custom image generator
 def customimage(payload,width,height,background,mac,rotate):
 
-    if rotate != "0":
+    if rotate == 0:
+        img = Image.new('RGB', (width, height), color=background)
+    elif rotate == 90:
+        img = Image.new('RGB', (height, width), color=background)
+    elif rotate == 180:
+        img = Image.new('RGB', (width, height), color=background)
+    elif rotate == 270:
         img = Image.new('RGB', (height, width), color=background)
     else:
         img = Image.new('RGB', (width, height), color=background)
@@ -104,9 +109,7 @@ def customimage(payload,width,height,background,mac,rotate):
             font = ImageFont.truetype(font_file, element['size'])
             d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=element['color'], font=font)
 
-    if rotate != 0:
-        img = img.rotate(rotate, expand=True)
-
+    img = img.rotate(rotate, expand=True)
 
     buf = io.BytesIO()
     img.save(buf, format='JPEG', quality=95)
