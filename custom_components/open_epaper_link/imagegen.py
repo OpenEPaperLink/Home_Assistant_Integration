@@ -91,7 +91,7 @@ def customimage(payload,width,height,background,mac,rotate):
         if element["type"] == "text":
             font_file = os.path.join(os.path.dirname(__file__), element['font'])
             font = ImageFont.truetype(font_file, element['size'])
-            d.text((element['x'],  element['y']), element['value'], fill=element['color'], font=font)
+            d.text((element['x'],  element['y']), str(element['value']), fill=element['color'], font=font)
        
         if element["type"] == "icon":
             # ttf from https://github.com/Templarian/MaterialDesign-Webfont/blob/master/fonts/materialdesignicons-webfont.ttf
@@ -134,11 +134,11 @@ def gen5line(line1, line2, line3, line4, line5, border, format1, format2, format
     d.rectangle([(1, 91), (150, 120)], fill=chartocol(format4[1]), outline=chartocol(format4[2]))
     d.rectangle([(1, 121), (150, 150)], fill=chartocol(format5[1]), outline=chartocol(format5[2]))
     # text lines
-    d = textgen(d, line1, chartocol(format1[3]), format1[0], 0)
-    d = textgen(d, line2, chartocol(format2[3]), format2[0], 30)
-    d = textgen(d, line3, chartocol(format3[3]), format3[0], 60)
-    d = textgen(d, line4, chartocol(format4[3]), format4[0], 90)
-    d = textgen(d, line5, chartocol(format5[3]), format5[0], 120)
+    d = textgen(d, str(line1), chartocol(format1[3]), format1[0], 0)
+    d = textgen(d, str(line2), chartocol(format2[3]), format2[0], 30)
+    d = textgen(d, str(line3), chartocol(format3[3]), format3[0], 60)
+    d = textgen(d, str(line4), chartocol(format4[3]), format4[0], 90)
+    d = textgen(d, str(line5), chartocol(format5[3]), format5[0], 120)
     buf = io.BytesIO()
     img.save(buf, format='JPEG', quality=95)
     byte_im = buf.getvalue()
@@ -161,10 +161,10 @@ def gen4line(line1, line2, line3, line4, border, format1, format2, format3, form
     d.rectangle([(2, 64), (292, 94)], fill=chartocol(format3[1]), outline=chartocol(format3[2]))
     d.rectangle([(2, 95), (292, 124)], fill=chartocol(format4[1]), outline=chartocol(format4[2]))
     # text lines
-    d = textgen2(d, line1, chartocol(format1[3]), format1[0], 2)
-    d = textgen2(d, line2, chartocol(format2[3]), format2[0], 33)
-    d = textgen2(d, line3, chartocol(format3[3]), format3[0], 64)
-    d = textgen2(d, line4, chartocol(format4[3]), format4[0], 95)
+    d = textgen2(d, str(line1), chartocol(format1[3]), format1[0], 2)
+    d = textgen2(d, str(line2), chartocol(format2[3]), format2[0], 33)
+    d = textgen2(d, str(line3), chartocol(format3[3]), format3[0], 64)
+    d = textgen2(d, str(line4), chartocol(format4[3]), format4[0], 95)
     buf = io.BytesIO()
     img.save(buf, format='JPEG', quality=95)
     byte_im = buf.getvalue()
