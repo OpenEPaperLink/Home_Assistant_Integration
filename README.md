@@ -46,6 +46,12 @@ data:
   format3: lbrw 
   format4: mwrb <br>
 ```
+
+If a template with a numeric sensor value still does not work, try appending a non-numeric string (can't be a blank string or just a space) e.g.
+```
+" {{  (states('sensor.car_range') | float / 1.609344 ) | int }} mi "
+```
+
 ##### Example for drawcustom 
 (Get your Icon Names from: https://pictogrammers.com/library/mdi/)
 ```
