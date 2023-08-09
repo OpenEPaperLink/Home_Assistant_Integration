@@ -52,8 +52,10 @@ If a template with a numeric sensor value still does not work, try appending a n
 " {{  (states('sensor.car_range') | float / 1.609344 ) | int }} mi "
 ```
 
-##### Example for drawcustom 
-(Get your Icon Names from: https://pictogrammers.com/library/mdi/)
+#### drawcustom
+This Service call draws a image local in home assistant, and will send it to the EPaper AP afterwards.
+
+Example Call:
 ```
 service: open_epaper_link.drawcustom
 data:
@@ -78,6 +80,7 @@ data:
       color: red
 ```
 
+Supported payload types, see [drawcustom payload types](docs/drawcustom/supported_types.md)
 
 
 ## Installation
