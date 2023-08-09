@@ -83,15 +83,74 @@ def customimage(payload,width,height,background,mac,rotate):
     else:
         img = Image.new('RGB', (width, height), color=background)
 
+    pos_y = 0
 
     d = ImageDraw.Draw(img)
     d.fontmode = "1"
 
     for element in payload:
+        if element["type"] == "line":
+            img_line = ImageDraw.Draw(img)  
+            img_line.line([(element['x_start'],element['y_start']),(element['x_end'],element['y_end'])],fill = 'red', width=4)
+        
+        if element["type"] == "rectangle":
+            img_rect = ImageDraw.Draw(img)  
+            img_rect.rectangle([(element['x_start'],element['y_start']),(element['x_end'],element['y_end'])],fill = element['fill'], outline=element['outline'], width=element['width'])
+
         if element["type"] == "text":
+
+            if not "size" in element:
+                size = 20
+            else: 
+                size = element['size']  
+
+            if not "font" in element:
+                font = "ppb.ttf"
+            else: 
+                font = element['font']                
+
+            font_file = os.path.join(os.path.dirname(__file__), font)
+            font = ImageFont.truetype(font_file, size)
+           
+            if not "y" in element:
+                if not "y_padding" in element:
+                    akt_pos_y = pos_y + 10
+                else: 
+                    akt_pos_y = pos_y + element['y_padding']
+            else:
+                akt_pos_y = element['y']
+
+            if not "color" in element:
+                color = "black"
+            else: 
+                color = element['color']
+            
+            if not "anchor" in element:
+                anchor = "lt"
+            else: 
+                anchor = element['anchor']
+
+
+
+            d.text((element['x'],  akt_pos_y), str(element['value']), fill=color, font=font, anchor=anchor)
+            pos_y = akt_pos_y
+
+        if element["type"] == "multiline":
             font_file = os.path.join(os.path.dirname(__file__), element['font'])
             font = ImageFont.truetype(font_file, element['size'])
-            d.text((element['x'],  element['y']), str(element['value']), fill=element['color'], font=font)
+            lst = element['value'].split(element["delimiter"])
+
+            if not "start_y" in element:
+                pos = pos_y + + element['y_padding']
+            else:
+                pos = element['start_y']
+
+            for elem in lst:
+                d.text((element['x'], pos ), elem, fill=element['color'], font=font)
+                pos = pos + element['offset_y']
+            
+            pos_y = pos
+
        
         if element["type"] == "icon":
             # ttf from https://github.com/Templarian/MaterialDesign-Webfont/blob/master/fonts/materialdesignicons-webfont.ttf
@@ -134,11 +193,11 @@ def gen5line(line1, line2, line3, line4, line5, border, format1, format2, format
     d.rectangle([(1, 91), (150, 120)], fill=chartocol(format4[1]), outline=chartocol(format4[2]))
     d.rectangle([(1, 121), (150, 150)], fill=chartocol(format5[1]), outline=chartocol(format5[2]))
     # text lines
-    d = textgen(d, str(line1), chartocol(format1[3]), format1[0], 0)
-    d = textgen(d, str(line2), chartocol(format2[3]), format2[0], 30)
-    d = textgen(d, str(line3), chartocol(format3[3]), format3[0], 60)
-    d = textgen(d, str(line4), chartocol(format4[3]), format4[0], 90)
-    d = textgen(d, str(line5), chartocol(format5[3]), format5[0], 120)
+    d = textgen(d, line1, chartocol(format1[3]), format1[0], 0)
+    d = textgen(d, line2, chartocol(format2[3]), format2[0], 30)
+    d = textgen(d, line3, chartocol(format3[3]), format3[0], 60)
+    d = textgen(d, line4, chartocol(format4[3]), format4[0], 90)
+    d = textgen(d, line5, chartocol(format5[3]), format5[0], 120)
     buf = io.BytesIO()
     img.save(buf, format='JPEG', quality=95)
     byte_im = buf.getvalue()
