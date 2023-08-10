@@ -29,7 +29,7 @@ drawcustom:
       name: Payload
       description: payload to draw
       required: true
-      example: 
+      example: look into supported_types.md for examples
     background:
       name: Backgroundcolor
       description: black, white, red
