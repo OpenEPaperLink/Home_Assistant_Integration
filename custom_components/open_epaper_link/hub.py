@@ -92,15 +92,34 @@ class Hub:
             ch = tag.get('ch')
             ver = tag.get('ver')
             #required for automations
-            self._hass.states.set(DOMAIN + "." + tagmac + "hwtype", hwType,{"icon": "mdi:fullscreen","friendly_name": "Hardware Type","should_poll": False})
-            hwmap = {0: "1.54″ BWR",1: "2.9″ BWR",2: "4.2″ BWR",5: "7.4″ BWR", 17: "2.9″ BWR NFC",17: "2.9″ BWR NFC",240: "Segmented UK"}
+           
+            hwmap = {
+                0: ["1.54″ BWR",152,152],
+                1: ["2.9″ BWR",296, 128],
+                2: ["4.2″ BWR",400, 300],
+                3: ["2.9″ BWR",168, 384],
+                4: ["7.4″ BWR",800, 480],
+                5: ["7.4″ BWR",640, 384],
+                6: ["2.13″ BWR",212,104],
+                7: ["3.5″ BWR",184, 384],
+            }
+
+            self._hass.states.set(DOMAIN + "." + tagmac, hwType,{
+                "icon": "mdi:fullscreen",
+                "friendly_name": tagmac,
+                "should_poll": False,
+                "hwtype": hwType,
+                "hwstring": hwmap[hwType][0],
+                "width": hwmap[hwType][1],
+                "height": hwmap[hwType][2],
+                })
             self.data[tagmac] = dict()
             self.data[tagmac]["temperature"] = temperature
             self.data[tagmac]["rssi"] = RSSI
             self.data[tagmac]["battery"] = batteryMv
             self.data[tagmac]["lqi"] = LQI
             self.data[tagmac]["hwtype"] = hwType
-            self.data[tagmac]["hwstring"] = hwmap[hwType]
+            self.data[tagmac]["hwstring"] = hwmap[hwType][0]
             self.data[tagmac]["contentmode"] = contentMode
             self.data[tagmac]["lastseen"] = lastseen
             self.data[tagmac]["nextupdate"] = nextupdate

@@ -59,6 +59,7 @@ class IPSensor(SensorEntity):
             "model": "esp32",
             "manufacturer": "OpenEpaperLink",
         }
+
     def update(self) -> None:
         self._attr_native_value = self._hub.data["ap"]["ip"]
 
@@ -458,6 +459,7 @@ class HWTypeSensor(SensorEntity):
     def device_info(self) -> DeviceInfo:
         return {
             "identifiers": {(DOMAIN, self._eslid)},
+            "name": self.name,
         }
     def update(self) -> None:
         eslid = self._eslid
