@@ -6,7 +6,6 @@ target:
   entity_id:
     - open_epaper_link.0000028DF056743B
 data:
-  mac: 0000028DF056743A
   width: 640
   height: 384
   background: white
