@@ -5,22 +5,27 @@ from homeassistant.core import HomeAssistant
 from . import hub
 from .const import DOMAIN
 import logging
+import pprint
 
 _LOGGER = logging.getLogger(__name__)
 
 
 def setup(hass, config):
     # callback for the image downlaod service
-    async def drawcustomservice(call) -> None:
-        mac = call.data.get("mac", "000000000000")
-        payload = call.data.get("payload", "")
-        width = call.data.get("width", "")
-        height = call.data.get("height", "")
-        rotate = call.data.get("rotate", "0")
-        background = call.data.get("background","white")
-        ip = hass.states.get(DOMAIN + ".ip").state
-        imgbuff = customimage(payload,width,height,background,mac,rotate)
-        result = await hass.async_add_executor_job(uploadimg, imgbuff, mac, ip)
+    async def drawcustomservice(service: ServiceCall) -> None:
+        # mac = call.data.get("mac", "000000000000")
+        # payload = call.data.get("payload", "")
+        # width = call.data.get("width", "")
+        # height = call.data.get("height", "")
+        # rotate = call.data.get("rotate", "0")
+        # background = call.data.get("background","white")
+        ip = hass.states.get(DOMAIN + ".ip").state 
+        entity_ids = service.data.get("entity_id")
+        for entity_id in entity_ids:
+            _LOGGER.info("Called entity_id: %s" % (entity_id))
+            imgbuff = customimage(entity_id, service, hass)
+            id = entity_id.split(".")
+            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip)
 
     # callback for the image downlaod service
     async def dlimg(call) -> None:
