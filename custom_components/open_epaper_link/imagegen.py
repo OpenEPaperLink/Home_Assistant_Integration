@@ -75,16 +75,22 @@ def customimage(entity_id, service, hass):
     payload = service.data.get("payload", "")
     rotate = service.data.get("rotate", "0")
     background = service.data.get("background","white")
+
     width = hass.states.get(entity_id).attributes['width']
     height = hass.states.get(entity_id).attributes['height']
+
     if rotate == 0:
         img = Image.new('RGB', (width, height), color=background)
+    
     elif rotate == 90:
         img = Image.new('RGB', (height, width), color=background)
+    
     elif rotate == 180:
         img = Image.new('RGB', (width, height), color=background)
+
     elif rotate == 270:
         img = Image.new('RGB', (height, width), color=background)
+
     else:
         img = Image.new('RGB', (width, height), color=background)
 
@@ -172,10 +178,7 @@ def customimage(entity_id, service, hass):
             font = ImageFont.truetype(font_file, element['size'])
             d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=element['color'], font=font)
 
-
-    if "rotate" in element: 
-        img = img.rotate(rotate, expand=True)
-
+    img = img.rotate(rotate, expand=True)
     buf = io.BytesIO()
     img.save(buf, format='JPEG', quality=95)
     img.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'))
