@@ -40,7 +40,7 @@ class Hub:
         self.online = True
     #parses websocket messages
     def on_message(self,ws, message) -> None:
-        data = json.loads(message)
+        data =  json.loads('{' + message.split("{", 1)[-1])
         if 'sys' in data:
             sys = data.get('sys')
             systime = sys.get('currtime')
