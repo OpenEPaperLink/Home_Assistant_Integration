@@ -2,6 +2,9 @@ With drawcustom you can create a image in HomeAssistant and send the rendered im
 The basic service call, looks like this:
 ```
 service: open_epaper_link.drawcustom
+target:
+  entity_id:
+    - open_epaper_link.0000028DF056743B
 data:
   mac: 0000028DF056743A
   width: 640
