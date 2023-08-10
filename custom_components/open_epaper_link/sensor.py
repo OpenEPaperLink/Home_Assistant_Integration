@@ -481,7 +481,7 @@ class BatteryPercentageSensor(SensorEntity):
         }
     def update(self) -> None:
         eslid = self._eslid
-        bperc = ((self._hub.data[eslid]["battery"] / 1000) - 2.30) * 200
+        bperc = ((self._hub.data[eslid]["battery"] / 1000) - 2.20) * 250
         if bperc > 100:
             bperc = 100
         if bperc < 0:
