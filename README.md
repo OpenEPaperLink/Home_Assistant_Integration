@@ -58,10 +58,10 @@ This Service call draws a image local in home assistant, and will send it to the
 Example Call:
 ```
 service: open_epaper_link.drawcustom
+target:
+  entity_id:
+    - open_epaper_link.0000021EC9EC743A
 data:
-  mac: 0000028DF056743A
-  width: 640
-  height: 384
   background: white
   rotate: 270
   payload:
