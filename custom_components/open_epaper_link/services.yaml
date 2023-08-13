@@ -1,12 +1,10 @@
 dlimg:
   name: Download Image
   description: Downloads an image from the web and sends it to an ESL. If it does not fit, the image will be resized
+  target:
+    entity:
+      domain: open_epaper_link
   fields:
-    mac:
-      name: Mac
-      description: Mac of the ESL to display the information on  THE MAC HAS TO BE IN QUOTATION MARKS
-      required: true
-      example: '"026DC7653B18"'
     url:
       name: Url
       description: Url of the image to download
@@ -44,12 +42,10 @@ drawcustom:
 lines5:
   name: 5 Line Display
   description: Sets an ESL to display 5 lines of text, only for 1.54", you can double a line by adding a newline char to your text
+  target:
+    entity:
+      domain: open_epaper_link
   fields:
-    mac:
-      name: Mac
-      description: Mac of the ESL to display the information on  THE MAC HAS TO BE IN QUOTATION MARKS
-      required: true
-      example: '"000000200000"'
     line1:
       name: Line 1
       description: Line 1 of text to display, 1 new line is allowed
@@ -105,16 +101,14 @@ lines5:
       description: Format string for the fifth row. Char 1 is for the text alignment, char 2 is for the background color, char 3 is for the border color and char 4 is for the text color
       required: false
       example: rbrr
-      
+
 lines4:
   name: 4 Line Display
   description: Sets an ESL to display 4 lines of text, only for 2.9", you can double a line by adding a newline char to your text
+  target:
+    entity:
+      domain: open_epaper_link
   fields:
-    mac:
-      name: Mac
-      description: Mac of the ESL to display the information on  THE MAC HAS TO BE IN QUOTATION MARKS
-      required: true
-      example: '"028327803B1D"'
     line1:
       name: Line 1
       description: Line 1 of text to display, 1 new line is allowed
