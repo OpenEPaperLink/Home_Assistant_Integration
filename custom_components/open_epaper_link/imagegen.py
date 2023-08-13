@@ -316,15 +316,16 @@ def textgen2(d, text, col, just, yofs):
 
 
 # upload an image to the tag
-def uploadimg(img, mac, ip):
+def uploadimg(img, mac, ip, dither=False):
     url = "http://" + ip + "/imgupload"
     mp_encoder = MultipartEncoder(
         fields={
             'mac': mac,
-            'dither': "0",
+            'dither': "1" if dither else "0",
             'image': ('image.jpg', img, 'image/jpeg'),
         }
     )
     response = requests.post(url, headers={'Content-Type': mp_encoder.content_type}, data=mp_encoder)
     if response.status_code != 200:
         _LOGGER.warning(response.status_code)
+
