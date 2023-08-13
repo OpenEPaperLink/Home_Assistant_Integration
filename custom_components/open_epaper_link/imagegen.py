@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import logging
 import os
-from pprint import pformat
+import pprint
 import json
 import requests
 from PIL import Image, ImageDraw, ImageFont
@@ -16,16 +16,24 @@ rbmp = os.path.join(os.path.dirname(__file__), 'rbm.ttf')
 ppbp = os.path.join(os.path.dirname(__file__), 'ppb.ttf')
 rbm = ImageFont.truetype(rbmp, 11)
 ppb = ImageFont.truetype(ppbp, 23)
+
 # color definitions for picture generation
-red = (255, 0, 0)
-white = (255, 255, 255)
-black = (0, 0, 0)
+color_palette = [
+    255, 255, 255,  # white
+    0, 0, 0,        # black
+    255, 0, 0       # red
+]
+
+white = 0
+black = 1
+red = 2
+
+
 splitth = 147
 splitth2 = 280
 size0 = [152, 152]
 size1 = [296, 128]
 size2 = [400, 300]
-
 
 # img downloader
 def downloadimg(url, hwtype, rotate):
@@ -68,33 +76,49 @@ def getres(hwtype):
     if hwtype == "2":
         return size2
 
+# converts a color name to the corresponding color index for the palette
+def getIndexColor(color):
+    color_str = str(color)
+    if color_str == "black":
+        return black
+    elif color_str == "red":
+        return red
+    else:
+        return white
+
+# converts a char to a color
+def chartocol(c):
+    if c == "r":
+        return red
+    if c == "w":
+        return white
+    if c == "b":
+        return black
 
 # custom image generator
 def customimage(entity_id, service, hass):
         
     payload = service.data.get("payload", "")
     rotate = service.data.get("rotate", "0")
-    background = service.data.get("background","white")
+    background = getIndexColor(service.data.get("background","white"))
 
     width = hass.states.get(entity_id).attributes['width']
     height = hass.states.get(entity_id).attributes['height']
 
     if rotate == 0:
-        img = Image.new('RGB', (width, height), color=background)
-    
+        img = Image.new('P', (width, height), color=background)
     elif rotate == 90:
-        img = Image.new('RGB', (height, width), color=background)
-    
+        img = Image.new('P', (height, width), color=background)
     elif rotate == 180:
-        img = Image.new('RGB', (width, height), color=background)
-
+        img = Image.new('P', (width, height), color=background)
     elif rotate == 270:
-        img = Image.new('RGB', (height, width), color=background)
-
+        img = Image.new('P', (height, width), color=background)
     else:
-        img = Image.new('RGB', (width, height), color=background)
+        img = Image.new('P', (width, height), color=background)
 
     pos_y = 0
+
+    img.putpalette(color_palette)
 
     d = ImageDraw.Draw(img)
     d.fontmode = "1"
@@ -102,11 +126,11 @@ def customimage(entity_id, service, hass):
     for element in payload:
         if element["type"] == "line":
             img_line = ImageDraw.Draw(img)  
-            img_line.line([(element['x_start'],element['y_start']),(element['x_end'],element['y_end'])],fill = 'red', width=4)
+            img_line.line([(element['x_start'],element['y_start']),(element['x_end'],element['y_end'])],fill = red, width=4)
         
         if element["type"] == "rectangle":
             img_rect = ImageDraw.Draw(img)  
-            img_rect.rectangle([(element['x_start'],element['y_start']),(element['x_end'],element['y_end'])],fill = element['fill'], outline=element['outline'], width=element['width'])
+            img_rect.rectangle([(element['x_start'],element['y_start']),(element['x_end'],element['y_end'])],fill = getIndexColor(element['fill']), outline=getIndexColor(element['outline']), width=element['width'])
 
         if element["type"] == "text":
 
@@ -118,7 +142,7 @@ def customimage(entity_id, service, hass):
             if not "font" in element:
                 font = "ppb.ttf"
             else: 
-                font = element['font']                
+                font = element['font']
 
             font_file = os.path.join(os.path.dirname(__file__), font)
             font = ImageFont.truetype(font_file, size)
@@ -141,9 +165,7 @@ def customimage(entity_id, service, hass):
             else: 
                 anchor = element['anchor']
 
-
-
-            d.text((element['x'],  akt_pos_y), str(element['value']), fill=color, font=font, anchor=anchor)
+            d.text((element['x'],  akt_pos_y), str(element['value']), fill=getIndexColor(color), font=font, anchor=anchor)
             pos_y = akt_pos_y
 
         if element["type"] == "multiline":
@@ -157,7 +179,7 @@ def customimage(entity_id, service, hass):
                 pos = element['start_y']
 
             for elem in lst:
-                d.text((element['x'], pos ), elem, fill=element['color'], font=font)
+                d.text((element['x'], pos ), elem, fill=getIndexColor(element['color']), font=font)
                 pos = pos + element['offset_y']
             
             pos_y = pos
@@ -176,13 +198,19 @@ def customimage(entity_id, service, hass):
                     break
 
             font = ImageFont.truetype(font_file, element['size'])
-            d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=element['color'], font=font)
+            d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=getIndexColor(element['color']), font=font)
 
-    img = img.rotate(rotate, expand=True)
+
+    if "rotate" in element: 
+        img = img.rotate(rotate, expand=True)
+
+    rgb_image = img.convert('RGB')
+    rgb_image.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'), format='JPEG', quality="maximum")
+
     buf = io.BytesIO()
-    img.save(buf, format='JPEG', quality=95)
-    img.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'))
+    rgb_image.save(buf, format='JPEG', quality="maximum")
     byte_im = buf.getvalue()
+
     return byte_im
 
 # 5 line text generator for 1.54 esls
@@ -278,22 +306,13 @@ def textgen2(d, text, col, just, yofs):
     return d
 
 
-# converts a char to a color
-def chartocol(c):
-    if c == "r":
-        return red
-    if c == "w":
-        return white
-    if c == "b":
-        return black
-
-
 # upload an image to the tag
 def uploadimg(img, mac, ip):
     url = "http://" + ip + "/imgupload"
     mp_encoder = MultipartEncoder(
         fields={
             'mac': mac,
+            'dither': "0",
             'image': ('image.jpg', img, 'image/jpeg'),
         }
     )
