@@ -34,7 +34,7 @@ def setup(hass, config):
         rotate = call.data.get("rotation", 0)
         ip = hass.states.get(DOMAIN + ".ip").state
         # we neet to know the esl type for resizing
-        hwtype = hass.states.get(DOMAIN + "." + mac.lower() + "hwtype").state
+        hwtype = hass.states.get(DOMAIN + "." + mac.lower()).state
         imgbuff = await hass.async_add_executor_job(downloadimg, url, hwtype, rotate)
         result = await hass.async_add_executor_job(uploadimg, imgbuff, mac, ip)
 
