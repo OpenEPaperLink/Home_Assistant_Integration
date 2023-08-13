@@ -34,6 +34,7 @@ splitth2 = 280
 size0 = [152, 152]
 size1 = [296, 128]
 size2 = [400, 300]
+size5 = [640, 384]
 
 # img downloader
 def downloadimg(url, hwtype, rotate):
@@ -75,6 +76,8 @@ def getres(hwtype):
         return size1
     if hwtype == "2":
         return size2
+    if hwtype == "5":
+        return size5
 
 # converts a color name to the corresponding color index for the palette
 def getIndexColor(color):
