@@ -31,72 +31,46 @@ red = 2
 
 splitth = 147
 splitth2 = 280
-size0 = [152, 152]
-size1 = [296, 128]
-size2 = [400, 300]
-size5 = [640, 384]
 
 # img downloader
-def downloadimg(url, hwtype, rotate):
-    # load the res of the esl
-    res = getres(hwtype)
+def downloadimg(entity_id, service, hass):
+    url = service.data.get("url", "")
+    rotate = service.data.get("rotation", 0)
+
+    # get image
     response = requests.get(url)
+
+    # load the res of the esl
+    res = [hass.states.get(entity_id).attributes['width'], hass.states.get(entity_id).attributes['height']]
+
     img = Image.open(io.BytesIO(response.content))
     if img.mode != 'RGB':
         img = img.convert('RGB')
+
     if rotate != 0:
-        img = img.rotate(rotate, expand=1)
+        img = img.rotate(-rotate, expand=1)
+    
     width, height = img.size
-    # swap for big display
-    if hwtype == "2":
-        b = res[0]
-        res[0] = res[1]
-        res[1] = b
-    # open esl expects the image rotated
-    if width == res[1] and height == res[0]:
-        print("all clear, pass")
-    elif width == res[0] and height == res[1]:
-        print("90 degree rotation needed")
-        img = img.rotate(90, expand=1)
-    else:
-        print("rotate + resize required")
-        img = img.rotate(90, expand=1)
-        img = img.resize((res[1], res[0]))
+
+    if width != res[0] or height != res[1]:
+        img = img.resize((res[0], res[1]))
+
     buf = io.BytesIO()
-    img.save(buf, format='JPEG')
+    img.save(buf, format='JPEG', quality="maximum")
+    img.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'), format='JPEG', quality="maximum")
     byte_im = buf.getvalue()
-    # img.save('img.png')
     return byte_im
 
-# hw type to size converter
-def getres(hwtype):
-    if hwtype == "0":
-        return size0
-    if hwtype == "1":
-        return size1
-    if hwtype == "2":
-        return size2
-    if hwtype == "5":
-        return size5
 
 # converts a color name to the corresponding color index for the palette
 def getIndexColor(color):
     color_str = str(color)
-    if color_str == "black":
+    if color_str == "black" or color_str == "b":
         return black
-    elif color_str == "red":
+    elif color_str == "red" or color_str == "r":
         return red
     else:
         return white
-
-# converts a char to a color
-def chartocol(c):
-    if c == "r":
-        return red
-    if c == "w":
-        return white
-    if c == "b":
-        return black
 
 # custom image generator
 def customimage(entity_id, service, hass):
@@ -149,7 +123,7 @@ def customimage(entity_id, service, hass):
 
             font_file = os.path.join(os.path.dirname(__file__), font)
             font = ImageFont.truetype(font_file, size)
-           
+
             if not "y" in element:
                 if not "y_padding" in element:
                     akt_pos_y = pos_y + 10
@@ -187,7 +161,6 @@ def customimage(entity_id, service, hass):
             
             pos_y = pos
 
-       
         if element["type"] == "icon":
             # ttf from https://github.com/Templarian/MaterialDesign-Webfont/blob/master/fonts/materialdesignicons-webfont.ttf
             font_file = os.path.join(os.path.dirname(__file__), 'materialdesignicons-webfont.ttf')
@@ -203,7 +176,6 @@ def customimage(entity_id, service, hass):
             font = ImageFont.truetype(font_file, element['size'])
             d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=getIndexColor(element['color']), font=font)
 
-
     if "rotate" in element: 
         img = img.rotate(rotate, expand=True)
 
@@ -217,57 +189,91 @@ def customimage(entity_id, service, hass):
     return byte_im
 
 # 5 line text generator for 1.54 esls
-def gen5line(line1, line2, line3, line4, line5, border, format1, format2, format3, format4, format5):
+def gen5line(entity_id, service, hass):
+    line1 = service.data.get("line1", "")
+    line2 = service.data.get("line2", "")
+    line3 = service.data.get("line3", "")
+    line4 = service.data.get("line4", "")
+    line5 = service.data.get("line5", "")
+    border = service.data.get("border", "w")
+    format1 = service.data.get("format1", "mwwb")
+    format2 = service.data.get("format2", "mwwb")
+    format3 = service.data.get("format3", "mwwb")
+    format4 = service.data.get("format4", "mwwb")
+    format5 = service.data.get("format5", "mwwb")
+
     w = 152
     h = 152
-    img = Image.new('RGB', (w, h), color=white)
+
+    img = Image.new('P', (w, h), color=white)
+    img.putpalette(color_palette)
+    
     d = ImageDraw.Draw(img)
     # we don't want interpolation
     d.fontmode = "1"
     # border
-    d.rectangle([(0, 0), (w - 1, h - 1)], fill=white, outline=chartocol(border))
+    d.rectangle([(0, 0), (w - 1, h - 1)], fill=white, outline=getIndexColor(border))
     # text backgrounds
-    d.rectangle([(1, 1), (150, 30)], fill=chartocol(format1[1]), outline=chartocol(format1[2]))
-    d.rectangle([(1, 31), (150, 60)], fill=chartocol(format2[1]), outline=chartocol(format2[2]))
-    d.rectangle([(1, 61), (150, 90)], fill=chartocol(format3[1]), outline=chartocol(format3[2]))
-    d.rectangle([(1, 91), (150, 120)], fill=chartocol(format4[1]), outline=chartocol(format4[2]))
-    d.rectangle([(1, 121), (150, 150)], fill=chartocol(format5[1]), outline=chartocol(format5[2]))
+    d.rectangle([(1, 1), (150, 30)], fill=getIndexColor(format1[1]), outline=getIndexColor(format1[2]))
+    d.rectangle([(1, 31), (150, 60)], fill=getIndexColor(format2[1]), outline=getIndexColor(format2[2]))
+    d.rectangle([(1, 61), (150, 90)], fill=getIndexColor(format3[1]), outline=getIndexColor(format3[2]))
+    d.rectangle([(1, 91), (150, 120)], fill=getIndexColor(format4[1]), outline=getIndexColor(format4[2]))
+    d.rectangle([(1, 121), (150, 150)], fill=getIndexColor(format5[1]), outline=getIndexColor(format5[2]))
     # text lines
-    d = textgen(d, str(line1), chartocol(format1[3]), format1[0], 0)
-    d = textgen(d, str(line2), chartocol(format2[3]), format2[0], 30)
-    d = textgen(d, str(line3), chartocol(format3[3]), format3[0], 60)
-    d = textgen(d, str(line4), chartocol(format4[3]), format4[0], 90)
-    d = textgen(d, str(line5), chartocol(format5[3]), format5[0], 120)
+    d = textgen(d, str(line1), getIndexColor(format1[3]), format1[0], 0)
+    d = textgen(d, str(line2), getIndexColor(format2[3]), format2[0], 30)
+    d = textgen(d, str(line3), getIndexColor(format3[3]), format3[0], 60)
+    d = textgen(d, str(line4), getIndexColor(format4[3]), format4[0], 90)
+    d = textgen(d, str(line5), getIndexColor(format5[3]), format5[0], 120)
+
+    rgb_image = img.convert('RGB')
+    rgb_image.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'), format='JPEG', quality="maximum")
+
     buf = io.BytesIO()
-    img.save(buf, format='JPEG', quality=95)
+    rgb_image.save(buf, format='JPEG', quality="maximum")
     byte_im = buf.getvalue()
-    # img.save('img.png')
+
     return byte_im
 
 
-def gen4line(line1, line2, line3, line4, border, format1, format2, format3, format4):
+def gen4line(entity_id, service, hass):
+    line1 = service.data.get("line1", "")
+    line2 = service.data.get("line2", "")
+    line3 = service.data.get("line3", "")
+    line4 = service.data.get("line4", "")
+    border = service.data.get("border", "w")
+    format1 = service.data.get("format1", "mwwb")
+    format2 = service.data.get("format2", "mwwb")
+    format3 = service.data.get("format3", "mwwb")
+    format4 = service.data.get("format4", "mwwb")
+
     w = 296
     h = 128
-    img = Image.new('RGB', (w, h), color=white)
+    img = Image.new('P', (w, h), color=white)
+    img.putpalette(color_palette)
     d = ImageDraw.Draw(img)
     # we don't want interpolation
     d.fontmode = "1"
     # border
-    d.rectangle([(0, 0), (w - 2, h - 2)], fill=chartocol(border))
+    d.rectangle([(0, 0), (w - 2, h - 2)], fill=getIndexColor(border))
     # text backgrounds
-    d.rectangle([(2, 2), (292, 32)], fill=chartocol(format1[1]), outline=chartocol(format1[2]))
-    d.rectangle([(2, 33), (292, 63)], fill=chartocol(format2[1]), outline=chartocol(format2[2]))
-    d.rectangle([(2, 64), (292, 94)], fill=chartocol(format3[1]), outline=chartocol(format3[2]))
-    d.rectangle([(2, 95), (292, 124)], fill=chartocol(format4[1]), outline=chartocol(format4[2]))
+    d.rectangle([(2, 2), (292, 32)], fill=getIndexColor(format1[1]), outline=getIndexColor(format1[2]))
+    d.rectangle([(2, 33), (292, 63)], fill=getIndexColor(format2[1]), outline=getIndexColor(format2[2]))
+    d.rectangle([(2, 64), (292, 94)], fill=getIndexColor(format3[1]), outline=getIndexColor(format3[2]))
+    d.rectangle([(2, 95), (292, 124)], fill=getIndexColor(format4[1]), outline=getIndexColor(format4[2]))
     # text lines
-    d = textgen2(d, str(line1), chartocol(format1[3]), format1[0], 2)
-    d = textgen2(d, str(line2), chartocol(format2[3]), format2[0], 33)
-    d = textgen2(d, str(line3), chartocol(format3[3]), format3[0], 64)
-    d = textgen2(d, str(line4), chartocol(format4[3]), format4[0], 95)
+    d = textgen2(d, str(line1), getIndexColor(format1[3]), format1[0], 2)
+    d = textgen2(d, str(line2), getIndexColor(format2[3]), format2[0], 33)
+    d = textgen2(d, str(line3), getIndexColor(format3[3]), format3[0], 64)
+    d = textgen2(d, str(line4), getIndexColor(format4[3]), format4[0], 95)
+    
+    rgb_image = img.convert('RGB')
+    rgb_image.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'), format='JPEG', quality="maximum")
+
     buf = io.BytesIO()
-    img.save(buf, format='JPEG', quality=95)
+    rgb_image.save(buf, format='JPEG', quality="maximum")
     byte_im = buf.getvalue()
-    # img.save('img.png')
+
     return byte_im
 
 
