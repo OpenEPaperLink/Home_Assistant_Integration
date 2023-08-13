@@ -15,6 +15,11 @@ dlimg:
       description: Rotation to be applied to the image in degrees
       required: false
       example: 0
+    dither:
+      name: Dither
+      description: Whether the AP should dither the image or not
+      required: false
+      example: true
 
 drawcustom:
   name: Draw Custom Image
@@ -154,3 +159,4 @@ lines4:
       description: Format string for the fourth row. Char 1 is for the text alignment, char 2 is for the background color, char 3 is for the border color and char 4 is for the text color
       required: false
       example: lrwb
+
