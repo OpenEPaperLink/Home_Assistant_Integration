@@ -6,8 +6,6 @@ target:
   entity_id:
     - open_epaper_link.0000028DF056743B
 data:
-  width: 640
-  height: 384
   background: white
   rotate: 90
   payload:
