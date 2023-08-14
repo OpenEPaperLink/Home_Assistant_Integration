@@ -79,19 +79,19 @@ def customimage(entity_id, service, hass):
     rotate = service.data.get("rotate", "0")
     background = getIndexColor(service.data.get("background","white"))
 
-    width = hass.states.get(entity_id).attributes['width']
-    height = hass.states.get(entity_id).attributes['height']
+    canvas_width = hass.states.get(entity_id).attributes['width']
+    canvas_height = hass.states.get(entity_id).attributes['height']
 
     if rotate == 0:
-        img = Image.new('P', (width, height), color=background)
+        img = Image.new('P', (canvas_width, canvas_height), color=background)
     elif rotate == 90:
-        img = Image.new('P', (height, width), color=background)
+        img = Image.new('P', (canvas_height, canvas_width), color=background)
     elif rotate == 180:
-        img = Image.new('P', (width, height), color=background)
+        img = Image.new('P', (canvas_width, canvas_height), color=background)
     elif rotate == 270:
-        img = Image.new('P', (height, width), color=background)
+        img = Image.new('P', (canvas_height, canvas_width), color=background)
     else:
-        img = Image.new('P', (width, height), color=background)
+        img = Image.new('P', (canvas_width, canvas_height), color=background)
 
     pos_y = 0
 
@@ -148,7 +148,8 @@ def customimage(entity_id, service, hass):
         if element["type"] == "multiline":
             font_file = os.path.join(os.path.dirname(__file__), element['font'])
             font = ImageFont.truetype(font_file, element['size'])
-            lst = element['value'].split(element["delimiter"])
+            _LOGGER.debug("Got Multiline string: %s with delimiter: %s" % (element['value'],element["delimiter"]))
+            lst = element['value'].replace("\n","").split(element["delimiter"])
 
             if not "start_y" in element:
                 pos = pos_y + + element['y_padding']
@@ -156,7 +157,8 @@ def customimage(entity_id, service, hass):
                 pos = element['start_y']
 
             for elem in lst:
-                d.text((element['x'], pos ), elem, fill=getIndexColor(element['color']), font=font)
+                _LOGGER.debug("String: %s" % (elem))
+                d.text((element['x'], pos ), str(elem), fill=getIndexColor(element['color']), font=font)
                 pos = pos + element['offset_y']
             
             pos_y = pos
@@ -175,9 +177,77 @@ def customimage(entity_id, service, hass):
 
             font = ImageFont.truetype(font_file, element['size'])
             d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=getIndexColor(element['color']), font=font)
+        
+        if element["type"] == "diagram":
+            img_draw = ImageDraw.Draw(img)
 
-    if "rotate" in element: 
-        img = img.rotate(rotate, expand=True)
+            if not "font" in element:
+                font = "ppb.ttf"
+            else:
+                font = element['font']
+
+            pos_x = element['x']
+            pos_y = element['y']
+
+            if not "width" in element:
+                width = canvas_width
+            else:
+                width = element['width']
+            
+            height = element['height']
+
+            if not "margin" in element:
+                offset_lines = 20
+            else:
+                offset_lines = element["margin"]
+
+            # x axis line
+            img_draw.line([(pos_x+offset_lines, pos_y+height-offset_lines),(pos_x+width,pos_y+height-offset_lines)],fill = getIndexColor('black'), width = 1)
+            # y axis line
+            img_draw.line([(pos_x+offset_lines, pos_y),(pos_x+offset_lines,pos_y+height-offset_lines)],fill = getIndexColor('black'), width = 1)
+
+            if "bars" in element:
+                if not "margin" in element["bars"]:
+                    bar_margin = 10
+                else:
+                    bar_margin = element["bars"]["margin"]
+
+                bars = element["bars"]["values"].split(";")
+                barcount = len(bars)
+                bar_width = math.floor((width - offset_lines - ((barcount + 1) * bar_margin)) / barcount)
+                _LOGGER.info("Found %i in bars width: %i" % (barcount,bar_width))
+
+                if not "legend_size" in element["bars"]:
+                    size = 10
+                else:
+                    size = element["bars"]["legend_size"]
+
+                font_file = os.path.join(os.path.dirname(__file__), font)
+                font = ImageFont.truetype(font_file, size)
+
+                if not "legend_color" in element["bars"]:
+                    legend_color = "black"
+                else:
+                    legend_color = element["bars"]["legend_color"]
+
+                max_val = 0
+                for bar in bars:
+                    name, value  = bar.split(",",1)
+                    if int(value) > max_val:
+                        max_val = int(value)
+
+                height_factor = (height - offset_lines) / max_val
+                bar_pos = 0
+                for bar in bars:
+                    name, value  = bar.split(",",1)
+
+                    # legend bottom
+                    x_pos = ((bar_margin + bar_width) * bar_pos) + offset_lines
+                    d.text((x_pos + (bar_width/2),  pos_y + height - offset_lines /2), str(name), fill=getIndexColor(legend_color), font=font, anchor="mm")
+                    img_draw.rectangle([(x_pos, pos_y+height-offset_lines-(height_factor*int(value))),(x_pos+bar_width, pos_y+height-offset_lines)],fill = getIndexColor(element["bars"]["color"]))
+                    bar_pos = bar_pos + 1
+
+    img = img.rotate(rotate, expand=True)
 
     rgb_image = img.convert('RGB')
     rgb_image.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'), format='JPEG', quality="maximum")
