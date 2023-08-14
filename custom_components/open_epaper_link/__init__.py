@@ -25,11 +25,12 @@ def setup(hass, config):
     async def dlimg(service: ServiceCall) -> None:
         ip = hass.states.get(DOMAIN + ".ip").state 
         entity_ids = service.data.get("entity_id")
+        dither = service.data.get("dither", False)
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
             id = entity_id.split(".")
             imgbuff = await hass.async_add_executor_job(downloadimg, entity_id, service, hass)
-            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip)
+            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip, dither)
 
     # callback for the 5 line service
     async def lines5service(service: ServiceCall) -> None:
@@ -72,3 +73,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
     return unload_ok
+
