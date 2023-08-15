@@ -61,6 +61,16 @@ def downloadimg(entity_id, service, hass):
     byte_im = buf.getvalue()
     return byte_im
 
+def get_wrapped_text(text: str, font: ImageFont.ImageFont,
+                     line_length: int):
+        lines = ['']
+        for word in text.split():
+            line = f'{lines[-1]} {word}'.strip()
+            if font.getlength(line) <= line_length:
+                lines[-1] = line
+            else:
+                lines.append(word)
+        return '\n'.join(lines)
 
 # converts a color name to the corresponding color index for the palette
 def getIndexColor(color):
@@ -103,7 +113,20 @@ def customimage(entity_id, service, hass):
     for element in payload:
         if element["type"] == "line":
             img_line = ImageDraw.Draw(img)  
-            img_line.line([(element['x_start'],element['y_start']),(element['x_end'],element['y_end'])],fill = red, width=4)
+
+            if not "y_start" in element:
+                if "y_padding" in element:
+                    y_start = pos_y + element["y_padding"]
+                else:
+                    y_start = pos_y
+                y_end = y_start
+            else:
+                y_start = element["y_start"]
+                y_end = element["y_end"]
+
+
+            img_line.line([(element['x_start'],y_start),(element['x_end'],y_end)],fill = getIndexColor(element['fill']), width=element['width'])
+            pos_y = y_start
         
         if element["type"] == "rectangle":
             img_rect = ImageDraw.Draw(img)  
@@ -141,9 +164,26 @@ def customimage(entity_id, service, hass):
                 anchor = "lt"
             else: 
                 anchor = element['anchor']
+            
+            if not "align" in element:
+                align = "left"
+            else: 
+                align = element['align']
+            
+            if not "spacing" in element:
+                spacing = 5
+            else: 
+                spacing = element['spacing']
 
-            d.text((element['x'],  akt_pos_y), str(element['value']), fill=getIndexColor(color), font=font, anchor=anchor)
-            pos_y = akt_pos_y
+            if "max_width" in element:
+                text = get_wrapped_text(str(element['value']), font, line_length=element['max_width'])
+                anchor = None
+            else:
+                text = str(element['value'])
+
+            d.text((element['x'],  akt_pos_y), text, fill=getIndexColor(color), font=font, anchor=anchor, align=align, spacing=spacing)
+            textbbox = d.textbbox((element['x'],  akt_pos_y), text, font=font, anchor=anchor, align=align, spacing=spacing)
+            pos_y = textbbox[3]
 
         if element["type"] == "multiline":
             font_file = os.path.join(os.path.dirname(__file__), element['font'])
