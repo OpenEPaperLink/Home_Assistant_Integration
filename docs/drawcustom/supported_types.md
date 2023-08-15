@@ -44,16 +44,20 @@ this payload takes a string and a delimiter, and will break the string on every 
 - font (required) name of ttf file from custom_component folder. e.g.: ppb.ttf
 - color (required) frontcolor of text. e.g.: black
 - start_y (optional) position on y axis
+- align (optional) left,center,right default: left (if text contains \n this set the alignment of the lines)
+- spacing (optional) if multiline text, spacing between single lines
+- max_width (optional) creats line breaks in the provided text, if text is longer than max_width defines (this will disable the anchor attribute)
 - y_padding (optional) offset to last text or multiline y position. works only if start_y is not provided. e.g.: 10
 
 ### line
 Due to a bug in upstream, this isnt working. Use rectangle instead!
 #### Parameters:
 - x_start (required)
-- y_start (required)
+- y_start (optional) if y_start is not provided, it will automaticly try to add the line at the bottom of the last text blck
+- y_padding (optional) if no y_start is provided, this will offset the start of the line to the last text block
 - x_end (required)
-- y_end (required)
-- color (required)
+- y_end (optional)
+- fill (required)
 - width (required)
 
 ### rectangle
