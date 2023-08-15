@@ -24,6 +24,15 @@ data:
       color: red
 ```
 ### text
+```
+    - type: text
+      value: "Hello World!"
+      font: "ppb.ttf"
+      x: 0
+      "y": 0
+      size: 40
+      color: red
+```
 #### Parameters:
 - value (required) The to show text
 - x (required) position on x axis
@@ -36,6 +45,15 @@ data:
 
 ### multiline
 this payload takes a string and a delimiter, and will break the string on every delimiter and move the cursor the amount if offset_y down the canvas.
+```
+    - type: multiline
+      value: "adb|asd"
+      delimiter: "|"
+      font: "ppb.ttf"
+      x: 0
+      size: 40
+      color: red
+```
 #### Parameters:
 - value (required) The to show text
 - delimiter (required) The delimiting character, to split value. e.g.: #
@@ -50,7 +68,16 @@ this payload takes a string and a delimiter, and will break the string on every 
 - y_padding (optional) offset to last text or multiline y position. works only if start_y is not provided. e.g.: 10
 
 ### line
-Due to a bug in upstream, this isnt working. Use rectangle instead!
+Draws a line
+```
+    - type: line
+      x_start: 20 
+      x_end: 380
+      y_start: 15
+      y_end: 15
+      width: 1
+      fill: red
+```
 #### Parameters:
 - x_start (required)
 - y_start (optional) if y_start is not provided, it will automaticly try to add the line at the bottom of the last text blck
@@ -61,6 +88,17 @@ Due to a bug in upstream, this isnt working. Use rectangle instead!
 - width (required)
 
 ### rectangle
+```
+    - type: rectangle
+      x_start: 20 
+      x_end: 80
+      y_start: 15
+      y_end: 30
+      width: 1
+      fill: red
+      outline: black
+      width: 2
+```
 #### Parameters:
 - x_start (required)
 - y_start (required)
@@ -71,6 +109,14 @@ Due to a bug in upstream, this isnt working. Use rectangle instead!
 - width (required) width of outline e.g. 2
 
 ### icon
+```
+- type: icon
+      value: account-cowboy-hat
+      x: 60
+      y: 120
+      size: 120
+      color: red
+```
 #### Parameters:
 - value (required) name of icon. from: https://pictogrammers.com/library/mdi/
 - size (required) e.g. 20
