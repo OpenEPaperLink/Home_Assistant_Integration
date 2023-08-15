@@ -53,7 +53,8 @@ Due to a bug in upstream, this isnt working. Use rectangle instead!
 - y_start (required)
 - x_end (required)
 - y_end (required)
-- color (optional) default: black
+- color (required)
+- width (required)
 
 ### rectangle
 #### Parameters:
