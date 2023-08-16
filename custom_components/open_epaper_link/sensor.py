@@ -412,7 +412,7 @@ class WakeupReasonSensor(SensorEntity):
         }
     def update(self) -> None:
         eslid = self._eslid
-        lut = {0: "TIMED",1: "BOOT",2: "GPIO",3: "NFC",252: "FIRSTBOOT",253: "NETWORK_SCAN",254: "WDT_RESET"}
+        lut = {0: "TIMED",1: "BOOT",2: "GPIO",3: "NFC",4: "BUTTON1",5: "BUTTON2",252: "FIRSTBOOT",253: "NETWORK_SCAN",254: "WDT_RESET"}
         wr = lut[self._hub.data[eslid]["wakeupReason"]]
         self._attr_native_value = wr
         
