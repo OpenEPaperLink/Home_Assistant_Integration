@@ -141,7 +141,7 @@ class Hub:
                 loop = self.eventloop
                 asyncio.run_coroutine_threadsafe(self.reloadcfgett(),loop)            
             #fire event with the wakeup reason
-            lut = {0: "TIMED",1: "BOOT",2: "GPIO",3: "NFC",252: "FIRSTBOOT",253: "NETWORK_SCAN",254: "WDT_RESET"}
+            lut = {0: "TIMED",1: "BOOT",2: "GPIO",3: "NFC",4: "BUTTON1",5: "BUTTON2",252: "FIRSTBOOT",253: "NETWORK_SCAN",254: "WDT_RESET"}
             event_data = {
                 "device_id": tagmac,
                 "type": lut[wakeupReason],
