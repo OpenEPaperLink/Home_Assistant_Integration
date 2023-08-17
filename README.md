@@ -20,7 +20,7 @@ Download an image from the provided url and if required, resized it for the esl 
 This requires that the esl has checked in once before fo Home Assistant knows the hardware type of it so if this service fail, wait 10 to 20 minutes.
 
 #### drawcustom
-This Service call draws a image local in home assistant, and will send it to the EPaper AP afterwards.
+This Service call draws a image local in home assistant, and will send it to the EPaper AP afterwards. Note that the rectangle is not transparent, so if it is drawn after other objects, it may overwrite them.
 
 Example Call:
 ```
@@ -32,6 +32,21 @@ data:
   background: white
   rotate: 270
   payload:
+    - type: rectangle
+      outline: red
+      fill: white
+      width: 5
+      x_start: 10
+      y_start: 10
+      x_end: 185
+      y_end: 240   
+    - type: line
+      fill: red
+      width: 3
+      x_start: 0
+      y_start: 237
+      x_end: 196
+      y_end: 240  
     - type: text
       value: "Hello World!"
       font: "ppb.ttf"
