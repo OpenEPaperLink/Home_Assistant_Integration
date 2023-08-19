@@ -53,13 +53,33 @@ def setup(hass, config):
             imgbuff = gen4line(entity_id, service, hass)
             id = entity_id.split(".")
             result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip)
+            
+    # callback for the setled service
+    async def setled(service: ServiceCall) -> None:
+        ip = hass.states.get(DOMAIN + ".ip").state
+
+        entity_ids = service.data.get("entity_id")
+        for entity_id in entity_ids:
+            _LOGGER.info("Called entity_id: %s" % (entity_id))
+            id = entity_id.split(".")
+            color = service.data.get("color", "")
+            cmd = ""
+            if(color == "off"): cmd = "{\"cmd\":\"100\"}"
+            if(color == "red"): cmd = "{\"cmd\":\"101\"}"
+            if(color == "green"): cmd = "{\"cmd\":\"102\"}"
+            if(color == "blue"): cmd = "{\"cmd\":\"103\"}"
+            if(color == "yellow"): cmd = "{\"cmd\":\"104\"}"
+            if(color == "cyan"): cmd = "{\"cmd\":\"105\"}"
+            if(color == "magenta"): cmd = "{\"cmd\":\"106\"}"
+            if(color == "white"): cmd = "{\"cmd\":\"107\"}"
+            result = await hass.async_add_executor_job(uploadcfg, cmd, id[1], "17",ip)
 
     # register the services
     hass.services.register(DOMAIN, "dlimg", dlimg)
     hass.services.register(DOMAIN, "lines5", lines5service)
     hass.services.register(DOMAIN, "lines4", lines4service)
     hass.services.register(DOMAIN, "drawcustom", drawcustomservice)
-
+    hass.services.register(DOMAIN, "setled", setled)
     # error haneling needs to be improved
     return True
 
