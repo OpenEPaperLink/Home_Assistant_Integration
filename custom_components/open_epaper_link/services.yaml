@@ -20,6 +20,30 @@ dlimg:
       description: Whether the AP should dither the image or not
       required: false
       example: true
+      
+setled:
+  name: Set led color
+  description: Sets the led color
+  target:
+    entity:
+      domain: open_epaper_link
+  fields:
+    color:
+      name: Color
+      description: color of the led
+      required: true
+      example: blue
+      selector:
+        select:
+          options:
+            - "off"
+            - "red"
+            - "green"
+            - "blue"
+            - "yellow"
+            - "cyan"
+            - "magenta"
+            - "white"
 
 drawcustom:
   name: Draw Custom Image
@@ -159,4 +183,3 @@ lines4:
       description: Format string for the fourth row. Char 1 is for the text alignment, char 2 is for the background color, char 3 is for the border color and char 4 is for the text color
       required: false
       example: lrwb
-
