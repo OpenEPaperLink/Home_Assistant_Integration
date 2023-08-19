@@ -439,3 +439,25 @@ def uploadimg(img, mac, ip, dither=False):
     if response.status_code != 200:
         _LOGGER.warning(response.status_code)
 
+# upload a cmd to the tag
+def uploadcfg(cfg, mac, contentmode, ip):
+    url = "http://" + ip + "/get_db?mac=" + mac
+    response = requests.get(url)
+    respjson = json.loads(response.text)
+    alias = respjson["tags"][0]["alias"];
+    rotate = respjson["tags"][0]["rotate"];
+    lut = respjson["tags"][0]["lut"];
+    url = "http://" + ip + "/save_cfg"
+    mp_encoder = MultipartEncoder(
+        fields={
+            'mac': mac,
+            'contentmode': str(contentmode),
+            'modecfgjson': cfg,
+            'alias': alias,
+            'rotate': str(rotate),
+            'lut':str(lut),
+        }
+    )
+    response = requests.post(url, headers={'Content-Type': mp_encoder.content_type}, data=mp_encoder)
+    if response.status_code != 200:
+        _LOGGER.warning(response.status_code)
