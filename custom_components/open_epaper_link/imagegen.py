@@ -61,6 +61,35 @@ def downloadimg(entity_id, service, hass):
     byte_im = buf.getvalue()
     return byte_im
 
+def displayimg(entity_id, service, hass):
+    file = service.data.get("file", "")
+    rotate = service.data.get("rotation", 0)
+
+    # get image
+#    response = requests.get(file)
+    response = open(file, "r")
+    
+    # load the res of the esl
+    res = [hass.states.get(entity_id).attributes['width'], hass.states.get(entity_id).attributes['height']]
+
+    img = Image.open(io.BytesIO(response.read()))
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+
+    if rotate != 0:
+        img = img.rotate(-rotate, expand=1)
+    
+    width, height = img.size
+
+    if width != res[0] or height != res[1]:
+        img = img.resize((res[0], res[1]))
+
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG', quality="maximum")
+    img.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'), format='JPEG', quality="maximum")
+    byte_im = buf.getvalue()
+    return byte_im
+
 def get_wrapped_text(text: str, font: ImageFont.ImageFont,
                      line_length: int):
         lines = ['']
