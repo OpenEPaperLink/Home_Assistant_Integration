@@ -121,7 +121,9 @@ class APTempSensor(SensorEntity):
             "identifiers": {(DOMAIN, "ap")}
         }
     def update(self) -> None:
-        self._attr_native_value = round(self._hub.data["ap"]["temp"],1)
+        temp = self._hub.data["ap"]["temp"]
+        if temp:
+            self._attr_native_value = round(temp,1)
         
 class APWifiStatusSensor(SensorEntity):
     def __init__(self, hub):
