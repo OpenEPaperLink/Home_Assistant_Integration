@@ -88,7 +88,7 @@ data:
   format1: mbbw 
   format2: mrbw 
   format3: lbrw 
-  format4: mwrb <br>
+  format4: mwrb
 ```
 
 If a template with a numeric sensor value still does not work, try appending a non-numeric string (can't be a blank string or just a space) e.g.
