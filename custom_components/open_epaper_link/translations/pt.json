@@ -1,0 +1,11 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "data": {
+                    "host": "nome da maquina ou IP"
+                }
+            }
+        }
+    }
+}
