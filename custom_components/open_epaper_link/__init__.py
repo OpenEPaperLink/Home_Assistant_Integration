@@ -11,16 +11,21 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def setup(hass, config):
-    # callback for the image downlaod service
+    # callback for the draw custom service
     async def drawcustomservice(service: ServiceCall) -> None:
         ip = hass.states.get(DOMAIN + ".ip").state 
         entity_ids = service.data.get("entity_id")
+        dry_run = service.data.get("dry-run", False)
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
             imgbuff = customimage(entity_id, service, hass)
             id = entity_id.split(".")
-            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip)
-
+            if (dry_run is False):
+                result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip)
+            else:
+                _LOGGER.info("Running dry-run - no upload to AP!")
+                result = True
+                
     # callback for the image downlaod service
     async def dlimg(service: ServiceCall) -> None:
         ip = hass.states.get(DOMAIN + ".ip").state 
