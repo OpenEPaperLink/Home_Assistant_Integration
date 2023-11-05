@@ -67,6 +67,11 @@ drawcustom:
       description: 0, 90, 180, 270
       required: false
       example: 90
+    dry-run:
+      name: Dry-run
+      description: Generate image, but don't send it to the AP.
+      required: false
+      example: true
 
 lines5:
   name: 5 Line Display
