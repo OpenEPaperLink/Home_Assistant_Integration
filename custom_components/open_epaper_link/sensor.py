@@ -136,7 +136,7 @@ class APWifiStatusSensor(SensorEntity):
             "identifiers": {(DOMAIN, "ap")}
         }
     def update(self) -> None:
-        lut = {3: "conected"}
+        lut = {3: "connected"}
         self._attr_native_value = lut[self._hub.data["ap"]["wifistatus"]]
         
 class APWifiSssidSensor(SensorEntity):
