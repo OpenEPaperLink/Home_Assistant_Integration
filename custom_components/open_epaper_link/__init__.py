@@ -4,11 +4,34 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from . import hub
 from .const import DOMAIN
+from datetime import datetime
 import logging
 import pprint
+import time
 
 _LOGGER = logging.getLogger(__name__)
 
+def checkconcurrent():
+    timebetweencalls = 3;
+    file_path = "lastapinteraction.txt"
+    filecontent = "0";
+    
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as file:
+            filecontent = file.read()
+    curtime = round(datetime.timestamp(datetime.now()))
+    
+    while round(float(filecontent)) + timebetweencalls > curtime:
+        _LOGGER.warn("concurrent call detected, waiting")
+        time.sleep((round(float(filecontent)) + timebetweencalls) - curtime)
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as file:
+                filecontent = file.read()
+        curtime = round(datetime.timestamp(datetime.now()))
+    
+    timestamp = datetime.timestamp(datetime.now())
+    with open(file_path, 'w') as file:
+        file.write(str(timestamp))
 
 def setup(hass, config):
     # callback for the draw custom service
@@ -18,6 +41,7 @@ def setup(hass, config):
         dry_run = service.data.get("dry-run", False)
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
+            checkconcurrent()
             imgbuff = customimage(entity_id, service, hass)
             id = entity_id.split(".")
             if (dry_run is False):
@@ -33,6 +57,7 @@ def setup(hass, config):
         dither = service.data.get("dither", False)
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
+            checkconcurrent()
             id = entity_id.split(".")
             imgbuff = await hass.async_add_executor_job(downloadimg, entity_id, service, hass)
             result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip, dither)
@@ -40,10 +65,10 @@ def setup(hass, config):
     # callback for the 5 line service
     async def lines5service(service: ServiceCall) -> None:
         ip = hass.states.get(DOMAIN + ".ip").state
-
         entity_ids = service.data.get("entity_id")
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
+            checkconcurrent()
             imgbuff = gen5line(entity_id, service, hass)
             id = entity_id.split(".")
             result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip)
@@ -51,10 +76,10 @@ def setup(hass, config):
     # callback for the 4 line service
     async def lines4service(service: ServiceCall) -> None:
         ip = hass.states.get(DOMAIN + ".ip").state
-
         entity_ids = service.data.get("entity_id")
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
+            checkconcurrent()
             imgbuff = gen4line(entity_id, service, hass)
             id = entity_id.split(".")
             result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip)
@@ -62,10 +87,10 @@ def setup(hass, config):
     # callback for the setled service
     async def setled(service: ServiceCall) -> None:
         ip = hass.states.get(DOMAIN + ".ip").state
-
         entity_ids = service.data.get("entity_id")
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
+            checkconcurrent()
             id = entity_id.split(".")
             color = service.data.get("color", "")
             cmd = ""
