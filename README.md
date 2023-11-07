@@ -65,13 +65,15 @@ data:
 Supported payload types, see [drawcustom payload types](docs/drawcustom/supported_types.md)
 
 
-#### 5 Line Display
+#### 5 Line Display (deprecated, use drawcustom for more options)
 
 Displays 5 (or up to 10) lines of text on a small 1.54" esl. If a text line contains a newline (\n), it will be split in 2 lines.
+Only works on 1.54" M2 displays.
 
-#### 4 Line Display
+#### 4 Line Display (deprecated, use drawcustom for more options)
 
 Displays 4 (or up to 8) lines of text on a 2.9" esl. If a text line contains a newline, it will be split in 2 lines.
+Only works on 2.9" M2 displays.
 
 #### Example Service Call
 Go to Developer Tools, Services, select the OpenEPaperLink: 4 Line Display service and paste the below in to the YAML editor. Replace the sensor names in curly brackets with values from your own system. Note that floats work better when rounded and that all numbers work better when converted to strings.
