@@ -9,6 +9,7 @@ import backoff
 import time
 import json
 import logging
+import os
 from threading import Thread
 from typing import Any
 from homeassistant.core import HomeAssistant
@@ -165,10 +166,11 @@ class Hub:
         _LOGGER.warning(error)
     #try to reconnect after 5 munutes
     def on_close(self,ws, error, a) -> None:
-        _LOGGER.warning("Websocket connection lost")
-        print("Connection lost")
-        print("Waiting 300 seconds")
-        time.sleep(300)
+        _LOGGER.warning("Websocket connection lost, trying to reconnect every 30 seconds")
+        ip = self._hass.states.get(DOMAIN + ".ip").state 
+        while os.system("ping -c 1 " + ip) != 0:
+            time.sleep(30)
+        _LOGGER.warning("reconnecting")
         self.establish_connection()
     #we could do something here
     def on_open(self,ws) -> None:
