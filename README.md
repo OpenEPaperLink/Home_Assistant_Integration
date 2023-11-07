@@ -77,9 +77,11 @@ Displays 4 (or up to 8) lines of text on a 2.9" esl. If a text line contains a n
 Go to Developer Tools, Services, select the OpenEPaperLink: 4 Line Display service and paste the below in to the YAML editor. Replace the sensor names in curly brackets with values from your own system. Note that floats work better when rounded and that all numbers work better when converted to strings.
 
 ```
-service: open_epaper_link.lines4 
-data: 
-  mac: 0000021EDE313B15 
+service: open_epaper_link.lines4
+target:
+  entity_id:
+    - open_epaper_link.0000021EDE313B15
+data:
   line1: " Time: {{ states('sensor.time') | string }} " 
   line2: " LR Temp: {{ state_attr('climate.living_room_2','current_temperature') | string }} C " 
   line3: " Yest. Elec {{ state_attr('sensor.electricity_yesterday_previous_accumulative_consumption','total') | round(2) | string }} kWh " 
