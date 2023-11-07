@@ -86,7 +86,7 @@ def getIndexColor(color):
 def customimage(entity_id, service, hass):
         
     payload = service.data.get("payload", "")
-    rotate = service.data.get("rotate", "0")
+    rotate = service.data.get("rotate", 0)
     background = getIndexColor(service.data.get("background","white"))
 
     canvas_width = hass.states.get(entity_id).attributes['width']
