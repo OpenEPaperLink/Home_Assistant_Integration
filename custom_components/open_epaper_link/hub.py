@@ -92,27 +92,30 @@ class Hub:
             ch = tag.get('ch')
             ver = tag.get('ver')
             #required for automations
-           
             hwmap = {
                 0: ["ST‐GR16000 1.54\"", 152, 152],
                 1: ["ST‐GR29000 2.9\"",  296, 128],
                 2: ["ST‐GR420B3N2 4.2\"",  400, 300],
                 5: ["ST‐GR750BN 7.4\"",  640, 384],
                 17: ["ST-GR2900L 2.9\" (UC8151)", 296, 128],
+                49: ["EL022GSWRN 2.2\"",  296, 160],
                 51: ["EL029GSWRN 2.9\"",  384, 168],
                 224: ["TFT 320x170",  320, 170],
                 240: ["SLT‐EM007 Segmented",  0, 0]
             }
-
-            self._hass.states.set(DOMAIN + "." + tagmac, hwType,{
-                "icon": "mdi:fullscreen",
-                "friendly_name": tagmac,
-                "should_poll": False,
-                "hwtype": hwType,
-                "hwstring": hwmap[hwType][0],
-                "width": hwmap[hwType][1],
-                "height": hwmap[hwType][2],
+            if hwType in hwmap:
+                self._hass.states.set(DOMAIN + "." + tagmac, hwType,{
+                    "icon": "mdi:fullscreen",
+                    "friendly_name": tagmac,
+                    "should_poll": False,
+                    "hwtype": hwType,
+                    "hwstring": hwmap[hwType][0],
+                    "width": hwmap[hwType][1],
+                    "height": hwmap[hwType][2],
                 })
+            else:
+                _LOGGER.warning("Id not in hwmap, pleas open an issue on github about this." +str(hwType))
+                
             self.data[tagmac] = dict()
             self.data[tagmac]["temperature"] = temperature
             self.data[tagmac]["rssi"] = RSSI
