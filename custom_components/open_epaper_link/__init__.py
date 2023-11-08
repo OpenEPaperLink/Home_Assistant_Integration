@@ -42,7 +42,7 @@ def setup(hass, config):
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
             checkconcurrent()
-            imgbuff = customimage(entity_id, service, hass)
+            imgbuff = await hass.async_add_executor_job(customimage,entity_id, service, hass)
             id = entity_id.split(".")
             if (dry_run is False):
                 result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip)
