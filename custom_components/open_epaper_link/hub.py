@@ -158,29 +158,29 @@ class Hub:
         elif 'apitem' in data:
             logmsg = data.get('apitem');
         else:
-            _LOGGER.warning("Unknown msg")
-            _LOGGER.warning(data)
+            _LOGGER.debug("Unknown msg")
+            _LOGGER.debug(data)
     #log websocket errors
     def on_error(self,ws, error) -> None:
-        _LOGGER.warning("Websocket error, most likely on_message crashed")
-        _LOGGER.warning(error)
+        _LOGGER.debug("Websocket error, most likely on_message crashed")
+        _LOGGER.debug(error)
     #try to reconnect after 5 munutes
     def on_close(self,ws, error, a) -> None:
         _LOGGER.warning("Websocket connection lost, trying to reconnect every 30 seconds")
         ip = self._hass.states.get(DOMAIN + ".ip").state 
         while os.system("ping -c 1 " + ip) != 0:
             time.sleep(30)
-        _LOGGER.warning("reconnecting")
+        _LOGGER.debug("reconnecting")
         self.establish_connection()
     #we could do something here
     def on_open(self,ws) -> None:
-        time.sleep(1)
+        _LOGGER.debug("WS started")
     #starts the websocket
     def establish_connection(self) -> None:
         ws_url = "ws://" + self._host + "/ws"
         ws = websocket.WebSocketApp(ws_url,on_message=self.on_message,on_error=self.on_error,on_close=self.on_close,on_open=self.on_open)
         ws.run_forever()
-        _LOGGER.warning("This should not happen")
+        _LOGGER.error("Integration crashed, this should never happen. It will not reconnect")
     #we should do more here
     async def test_connection(self) -> bool:
         return True
