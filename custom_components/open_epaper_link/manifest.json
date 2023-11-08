@@ -8,6 +8,6 @@
   "integration_type": "hub",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/jonasniesner/open_epaper_link_homeassistant/issues",
-  "requirements": [],
+  "requirements": ["qrcode[pil]"],
   "version": "0.1.4"
 }
