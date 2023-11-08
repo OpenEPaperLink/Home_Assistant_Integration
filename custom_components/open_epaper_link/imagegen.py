@@ -6,6 +6,7 @@ import os
 import pprint
 import json
 import requests
+import qrcode
 from PIL import Image, ImageDraw, ImageFont
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
@@ -217,7 +218,49 @@ def customimage(entity_id, service, hass):
 
             font = ImageFont.truetype(font_file, element['size'])
             d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=getIndexColor(element['color']), font=font)
-        
+
+        if element["type"] == "dlimg":
+            url = element['url']
+            x = element['x']
+            y = element['y']
+            xsize = element['xsize']
+            ysize = element['ysize']
+            rotate = element['rotate']
+            response = requests.get(url)
+            res = [xsize,ysize]
+            imgdl = Image.open(io.BytesIO(response.content))
+            if imgdl.mode != 'RGB':
+                imgdl = imgdl.convert('RGB')
+            if rotate != 0:
+                imgdl = imgdl.rotate(-rotate, expand=1)
+            width, height = imgdl.size
+            if width != res[0] or height != res[1]:
+                imgdl = imgdl.resize((res[0], res[1]))
+            imgdl = imgdl.convert("RGBA")
+            position = (x,y)
+            img.paste(imgdl, position, imgdl)
+ 
+        if element["type"] == "qrcode":
+            data = element['data']
+            x = element['x']
+            y = element['y']
+            color = element['color']
+            bgcolor = element['bgcolor']
+            border = element['border']
+            boxsize = element['boxsize']
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_H,
+                box_size=boxsize,
+                border=border,
+            )
+            qr.add_data(data)
+            qr.make(fit=True)
+            imgqr = qr.make_image(fill_color=color, back_color=bgcolor)
+            position = (x,y)
+            imgqr = imgqr.convert("RGBA")
+            img.paste(imgqr, position, imgqr)
+            
         if element["type"] == "diagram":
             img_draw = ImageDraw.Draw(img)
 
