@@ -121,3 +121,41 @@ Draws a line
 - value (required) name of icon. from: https://pictogrammers.com/library/mdi/
 - size (required) e.g. 20
 - color (required)  e.g. black, white, red
+
+### dlimg
+```
+    - type: dlimg
+      url: "https://upload.wikimedia.org/wikipedia/en/9/9a/Trollface_non-free.png"
+      x: 10
+      "y": 10
+      xsize: 120
+      ysize: 120
+      rotate: 0
+```
+#### Parameters:
+- url (required) url of the image to download
+- x (required) e.g. 20
+- y (required)  e.g. 10
+- xsize (required)  e.g. x size the image is resized 
+- ysize (required)  e.g. y size the image is resized 
+- rotate (required)  e.g. 0
+
+### qrcode
+```
+    - type: qrcode
+      data: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+      x: 140
+      "y": 50
+      boxsize: 2
+      border: 2
+      color: "black"
+      bgcolor: "white"
+```
+#### Parameters:
+- data (required) content of the qr code
+- x (required) e.g. 20
+- y (required)  e.g. 10
+- boxsize (required)  e.g. 2
+- border (required)  e.g. 2
+- color (required)  e.g. black
+- bgcolor (required)  e.g. white
