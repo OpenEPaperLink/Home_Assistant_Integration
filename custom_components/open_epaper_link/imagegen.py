@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import io
 import logging
 import os
@@ -9,53 +8,30 @@ import requests
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
 from requests_toolbelt.multipart.encoder import MultipartEncoder
+from homeassistant.exceptions import HomeAssistantError
 
 _LOGGER = logging.getLogger(__name__)
 
-# font imports
-rbmp = os.path.join(os.path.dirname(__file__), 'rbm.ttf')
-ppbp = os.path.join(os.path.dirname(__file__), 'ppb.ttf')
-rbm = ImageFont.truetype(rbmp, 11)
-ppb = ImageFont.truetype(ppbp, 23)
-
-# color definitions for picture generation
-color_palette = [
-    255, 255, 255,  # white
-    0, 0, 0,        # black
-    255, 0, 0       # red
-]
-
-white = 0
-black = 1
-red = 2
-
-
-splitth = 147
-splitth2 = 280
+white =  (255, 255, 255,255)
+black = (0, 0, 0,255)
+red = (255, 0, 0,255)
 
 # img downloader
 def downloadimg(entity_id, service, hass):
     url = service.data.get("url", "")
     rotate = service.data.get("rotation", 0)
-
     # get image
     response = requests.get(url)
-
     # load the res of the esl
     res = [hass.states.get(entity_id).attributes['width'], hass.states.get(entity_id).attributes['height']]
-
     img = Image.open(io.BytesIO(response.content))
     if img.mode != 'RGB':
         img = img.convert('RGB')
-
     if rotate != 0:
         img = img.rotate(-rotate, expand=1)
-    
     width, height = img.size
-
     if width != res[0] or height != res[1]:
         img = img.resize((res[0], res[1]))
-
     buf = io.BytesIO()
     img.save(buf, format='JPEG', quality="maximum")
     img.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'), format='JPEG', quality="maximum")
@@ -88,33 +64,38 @@ def customimage(entity_id, service, hass):
         
     payload = service.data.get("payload", "")
     rotate = service.data.get("rotate", 0)
+    dither = service.data.get("dither", False)
     background = getIndexColor(service.data.get("background","white"))
-
+    
+    entity = hass.states.get(entity_id)
+    if entity and 'width' in entity.attributes:
+        canvas_width = hass.states.get(entity_id).attributes['width']
+        
+    else:
+        raise HomeAssistantError("id was not found yet, please wait for the display to check in at least once")
+    
     canvas_width = hass.states.get(entity_id).attributes['width']
     canvas_height = hass.states.get(entity_id).attributes['height']
 
     if rotate == 0:
-        img = Image.new('P', (canvas_width, canvas_height), color=background)
+        img = Image.new('RGBA', (canvas_width, canvas_height), color=background)
     elif rotate == 90:
-        img = Image.new('P', (canvas_height, canvas_width), color=background)
+        img = Image.new('RGBA', (canvas_height, canvas_width), color=background)
     elif rotate == 180:
-        img = Image.new('P', (canvas_width, canvas_height), color=background)
+        img = Image.new('RGBA', (canvas_width, canvas_height), color=background)
     elif rotate == 270:
-        img = Image.new('P', (canvas_height, canvas_width), color=background)
+        img = Image.new('RGBA', (canvas_height, canvas_width), color=background)
     else:
-        img = Image.new('P', (canvas_width, canvas_height), color=background)
-
+        img = Image.new('RGBA', (canvas_width, canvas_height), color=background)
     pos_y = 0
-
-    img.putpalette(color_palette)
-
+    
     d = ImageDraw.Draw(img)
     d.fontmode = "1"
 
     for element in payload:
+        #line
         if element["type"] == "line":
             img_line = ImageDraw.Draw(img)  
-
             if not "y_start" in element:
                 if "y_padding" in element:
                     y_start = pos_y + element["y_padding"]
@@ -124,30 +105,24 @@ def customimage(entity_id, service, hass):
             else:
                 y_start = element["y_start"]
                 y_end = element["y_end"]
-
-
             img_line.line([(element['x_start'],y_start),(element['x_end'],y_end)],fill = getIndexColor(element['fill']), width=element['width'])
             pos_y = y_start
-        
+        #rectangle
         if element["type"] == "rectangle":
             img_rect = ImageDraw.Draw(img)  
             img_rect.rectangle([(element['x_start'],element['y_start']),(element['x_end'],element['y_end'])],fill = getIndexColor(element['fill']), outline=getIndexColor(element['outline']), width=element['width'])
-
+        #text
         if element["type"] == "text":
-
             if not "size" in element:
                 size = 20
             else: 
                 size = element['size']  
-
             if not "font" in element:
                 font = "ppb.ttf"
             else: 
                 font = element['font']
-
             font_file = os.path.join(os.path.dirname(__file__), font)
             font = ImageFont.truetype(font_file, size)
-
             if not "y" in element:
                 if not "y_padding" in element:
                     akt_pos_y = pos_y + 10
@@ -155,55 +130,45 @@ def customimage(entity_id, service, hass):
                     akt_pos_y = pos_y + element['y_padding']
             else:
                 akt_pos_y = element['y']
-
             if not "color" in element:
                 color = "black"
             else: 
                 color = element['color']
-            
             if not "anchor" in element:
                 anchor = "lt"
             else: 
                 anchor = element['anchor']
-            
             if not "align" in element:
                 align = "left"
             else: 
                 align = element['align']
-            
             if not "spacing" in element:
                 spacing = 5
             else: 
                 spacing = element['spacing']
-
             if "max_width" in element:
                 text = get_wrapped_text(str(element['value']), font, line_length=element['max_width'])
                 anchor = None
             else:
                 text = str(element['value'])
-
             d.text((element['x'],  akt_pos_y), text, fill=getIndexColor(color), font=font, anchor=anchor, align=align, spacing=spacing)
             textbbox = d.textbbox((element['x'],  akt_pos_y), text, font=font, anchor=anchor, align=align, spacing=spacing)
             pos_y = textbbox[3]
-
         if element["type"] == "multiline":
             font_file = os.path.join(os.path.dirname(__file__), element['font'])
             font = ImageFont.truetype(font_file, element['size'])
             _LOGGER.debug("Got Multiline string: %s with delimiter: %s" % (element['value'],element["delimiter"]))
             lst = element['value'].replace("\n","").split(element["delimiter"])
-
             if not "start_y" in element:
                 pos = pos_y + + element['y_padding']
             else:
                 pos = element['start_y']
-
             for elem in lst:
                 _LOGGER.debug("String: %s" % (elem))
                 d.text((element['x'], pos ), str(elem), fill=getIndexColor(element['color']), font=font)
                 pos = pos + element['offset_y']
-            
             pos_y = pos
-
+        #icon
         if element["type"] == "icon":
             # ttf from https://github.com/Templarian/MaterialDesign-Webfont/blob/master/fonts/materialdesignicons-webfont.ttf
             font_file = os.path.join(os.path.dirname(__file__), 'materialdesignicons-webfont.ttf')
@@ -215,31 +180,33 @@ def customimage(entity_id, service, hass):
                 if icon['name'] == element['value']:
                     chr_hex = icon['codepoint']
                     break
-
+            if chr_hex == "":
+                raise HomeAssistantError("Non valid icon used")
             font = ImageFont.truetype(font_file, element['size'])
             d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=getIndexColor(element['color']), font=font)
-
+       #dlimg
         if element["type"] == "dlimg":
             url = element['url']
             x = element['x']
             y = element['y']
             xsize = element['xsize']
             ysize = element['ysize']
-            rotate = element['rotate']
+            rotate2 = element['rotate']
             response = requests.get(url)
             res = [xsize,ysize]
             imgdl = Image.open(io.BytesIO(response.content))
-            if imgdl.mode != 'RGB':
-                imgdl = imgdl.convert('RGB')
-            if rotate != 0:
-                imgdl = imgdl.rotate(-rotate, expand=1)
+            if rotate2 != 0:
+                imgdl = imgdl.rotate(-rotate2, expand=1)
             width, height = imgdl.size
             if width != res[0] or height != res[1]:
                 imgdl = imgdl.resize((res[0], res[1]))
             imgdl = imgdl.convert("RGBA")
-            position = (x,y)
-            img.paste(imgdl, position, imgdl)
- 
+            
+            temp_image = Image.new("RGBA", img.size)
+            temp_image.paste(imgdl, (x,y), imgdl)
+            img = Image.alpha_composite(img, temp_image)
+
+        #qrcode
         if element["type"] == "qrcode":
             data = element['data']
             x = element['x']
@@ -260,88 +227,71 @@ def customimage(entity_id, service, hass):
             position = (x,y)
             imgqr = imgqr.convert("RGBA")
             img.paste(imgqr, position, imgqr)
-            
+        #diagram
         if element["type"] == "diagram":
             img_draw = ImageDraw.Draw(img)
-
             if not "font" in element:
                 font = "ppb.ttf"
             else:
                 font = element['font']
-
             pos_x = element['x']
             pos_y = element['y']
-
             if not "width" in element:
                 width = canvas_width
             else:
                 width = element['width']
-            
             height = element['height']
-
             if not "margin" in element:
                 offset_lines = 20
             else:
                 offset_lines = element["margin"]
-
             # x axis line
             img_draw.line([(pos_x+offset_lines, pos_y+height-offset_lines),(pos_x+width,pos_y+height-offset_lines)],fill = getIndexColor('black'), width = 1)
             # y axis line
             img_draw.line([(pos_x+offset_lines, pos_y),(pos_x+offset_lines,pos_y+height-offset_lines)],fill = getIndexColor('black'), width = 1)
-
             if "bars" in element:
                 if not "margin" in element["bars"]:
                     bar_margin = 10
                 else:
                     bar_margin = element["bars"]["margin"]
-
                 bars = element["bars"]["values"].split(";")
                 barcount = len(bars)
                 bar_width = math.floor((width - offset_lines - ((barcount + 1) * bar_margin)) / barcount)
                 _LOGGER.info("Found %i in bars width: %i" % (barcount,bar_width))
-
                 if not "legend_size" in element["bars"]:
                     size = 10
                 else:
                     size = element["bars"]["legend_size"]
-
                 font_file = os.path.join(os.path.dirname(__file__), font)
                 font = ImageFont.truetype(font_file, size)
-
                 if not "legend_color" in element["bars"]:
                     legend_color = "black"
                 else:
                     legend_color = element["bars"]["legend_color"]
-
                 max_val = 0
                 for bar in bars:
                     name, value  = bar.split(",",1)
                     if int(value) > max_val:
                         max_val = int(value)
-
                 height_factor = (height - offset_lines) / max_val
                 bar_pos = 0
                 for bar in bars:
                     name, value  = bar.split(",",1)
-
                     # legend bottom
                     x_pos = ((bar_margin + bar_width) * bar_pos) + offset_lines
                     d.text((x_pos + (bar_width/2),  pos_y + height - offset_lines /2), str(name), fill=getIndexColor(legend_color), font=font, anchor="mm")
                     img_draw.rectangle([(x_pos, pos_y+height-offset_lines-(height_factor*int(value))),(x_pos+bar_width, pos_y+height-offset_lines)],fill = getIndexColor(element["bars"]["color"]))
                     bar_pos = bar_pos + 1
-
+    #post processing
     img = img.rotate(rotate, expand=True)
-
     rgb_image = img.convert('RGB')
     rgb_image.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'), format='JPEG', quality="maximum")
-
     buf = io.BytesIO()
     rgb_image.save(buf, format='JPEG', quality="maximum")
     byte_im = buf.getvalue()
-
     return byte_im
 
-# 5 line text generator for 1.54 esls
+#5 line text generator for 1.54 esls (depricated)
 def gen5line(entity_id, service, hass):
     line1 = service.data.get("line1", "")
     line2 = service.data.get("line2", "")
@@ -354,13 +304,9 @@ def gen5line(entity_id, service, hass):
     format3 = service.data.get("format3", "mwwb")
     format4 = service.data.get("format4", "mwwb")
     format5 = service.data.get("format5", "mwwb")
-
     w = 152
     h = 152
-
-    img = Image.new('P', (w, h), color=white)
-    img.putpalette(color_palette)
-    
+    img = Image.new('RGB', (w, h), color=white)
     d = ImageDraw.Draw(img)
     # we don't want interpolation
     d.fontmode = "1"
@@ -378,17 +324,14 @@ def gen5line(entity_id, service, hass):
     d = textgen(d, str(line3), getIndexColor(format3[3]), format3[0], 60)
     d = textgen(d, str(line4), getIndexColor(format4[3]), format4[0], 90)
     d = textgen(d, str(line5), getIndexColor(format5[3]), format5[0], 120)
-
     rgb_image = img.convert('RGB')
     rgb_image.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'), format='JPEG', quality="maximum")
-
     buf = io.BytesIO()
     rgb_image.save(buf, format='JPEG', quality="maximum")
     byte_im = buf.getvalue()
-
     return byte_im
 
-
+#4 line text generator for 2.9 esls (depricated)
 def gen4line(entity_id, service, hass):
     line1 = service.data.get("line1", "")
     line2 = service.data.get("line2", "")
@@ -399,11 +342,9 @@ def gen4line(entity_id, service, hass):
     format2 = service.data.get("format2", "mwwb")
     format3 = service.data.get("format3", "mwwb")
     format4 = service.data.get("format4", "mwwb")
-
     w = 296
     h = 128
-    img = Image.new('P', (w, h), color=white)
-    img.putpalette(color_palette)
+    img = Image.new('RGB', (w, h), color=white)
     d = ImageDraw.Draw(img)
     # we don't want interpolation
     d.fontmode = "1"
@@ -419,19 +360,18 @@ def gen4line(entity_id, service, hass):
     d = textgen2(d, str(line2), getIndexColor(format2[3]), format2[0], 33)
     d = textgen2(d, str(line3), getIndexColor(format3[3]), format3[0], 64)
     d = textgen2(d, str(line4), getIndexColor(format4[3]), format4[0], 95)
-    
     rgb_image = img.convert('RGB')
     rgb_image.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'), format='JPEG', quality="maximum")
-
     buf = io.BytesIO()
     rgb_image.save(buf, format='JPEG', quality="maximum")
     byte_im = buf.getvalue()
 
     return byte_im
 
-
-# handles Text alignment
+# handles Text alignment(depricated)
 def textgen(d, text, col, just, yofs):
+    rbm = ImageFont.truetype(os.path.join(os.path.dirname(__file__), 'rbm.ttf'), 11)
+    ppb = ImageFont.truetype(os.path.join(os.path.dirname(__file__), 'ppb.ttf'), 23)
     x = 76
     if just == "l":
         x = 3
@@ -442,15 +382,16 @@ def textgen(d, text, col, just, yofs):
         split2 = text.split("\n")[1]
         d.text((x, 8 + yofs), split1, fill=col, anchor=just + "m", font=rbm)
         d.text((x, 22 + yofs), split2, fill=col, anchor=just + "m", font=rbm)
-    elif d.textlength(text, font=ppb) < splitth:
+    elif d.textlength(text, font=ppb) < 147:
         d.text((x, 15 + yofs), text, fill=col, anchor=just + "m", font=ppb)
     else:
         d.text((x, 15 + yofs), text, fill=col, anchor=just + "m", font=rbm)
     return d
 
-
-# handles Text alignment
+# handles Text alignment(depricated)
 def textgen2(d, text, col, just, yofs):
+    rbm = ImageFont.truetype(os.path.join(os.path.dirname(__file__), 'rbm.ttf'), 11)
+    ppb = ImageFont.truetype(os.path.join(os.path.dirname(__file__), 'ppb.ttf'), 23)
     x = 148
     if just == "l":
         x = 3
@@ -461,12 +402,11 @@ def textgen2(d, text, col, just, yofs):
         split2 = text.split("\n")[1]
         d.text((x, 8 + yofs), split1, fill=col, anchor=just + "m", font=rbm)
         d.text((x, 22 + yofs), split2, fill=col, anchor=just + "m", font=rbm)
-    elif d.textlength(text, font=ppb) < splitth2:
+    elif d.textlength(text, font=ppb) < 280:
         d.text((x, 15 + yofs), text, fill=col, anchor=just + "m", font=ppb)
     else:
         d.text((x, 15 + yofs), text, fill=col, anchor=just + "m", font=rbm)
     return d
-
 
 # upload an image to the tag
 def uploadimg(img, mac, ip, dither=False):
