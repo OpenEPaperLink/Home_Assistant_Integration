@@ -13,7 +13,7 @@ data:
       value: "Hello World!"
       font: "ppb.ttf"
       x: 0
-      "y": 0
+      y: 0
       size: 40
       color: red
     - type: icon
@@ -29,7 +29,7 @@ data:
       value: "Hello World!"
       font: "ppb.ttf"
       x: 0
-      "y": 0
+      y: 0
       size: 40
       color: red
 ```
