@@ -27,7 +27,7 @@ data:
 ```
     - type: text
       value: "Hello World!"
-      font: "ppb.ttf"
+      font: "/media/custom.ttf"
       x: 0
       y: 0
       size: 40
@@ -37,7 +37,7 @@ data:
 - value (required) The to show text
 - x (required) position on x axis
 - size (optional) size of text, default: 20
-- font (optional) name of ttf file from custom_component folder. Default: ppb.ttf
+- font (optional) ~~name of ttf file from custom_component folder. Default: ppb.ttf~~ if you want custom fonts, dont place them here, place them in for example /media to not have them deleted by the next update
 - color (optional) frontcolor of text. default: black
 - y (optional) position on y axis
 - y_padding (optional) offset to last text or multiline y position. works only if y is not provided. default: 10
