@@ -13,12 +13,6 @@ Every tag and the AP is exposed as a device.
 
 ### Services
 
-#### Download Image
-
-Download an image from the provided url and if required, resized it for the esl it should be displayed on.
-
-This requires that the esl has checked in once before fo Home Assistant knows the hardware type of it so if this service fail, wait 10 to 20 minutes.
-
 #### drawcustom
 This Service call draws a image local in home assistant, and will send it to the EPaper AP afterwards. Note that the rectangle is not transparent, so if it is drawn after other objects, it may overwrite them.
 
@@ -31,6 +25,7 @@ target:
 data:
   background: white
   rotate: 270
+  ttl: 300
   payload:
     - type: rectangle
       outline: red
@@ -64,6 +59,11 @@ data:
 
 Supported payload types, see [drawcustom payload types](docs/drawcustom/supported_types.md)
 
+#### Download Image (deprecated, use drawcustom for more options)
+
+Download an image from the provided url and if required, resized it for the esl it should be displayed on.
+
+This requires that the esl has checked in once before fo Home Assistant knows the hardware type of it so if this service fail, wait 10 to 20 minutes.
 
 #### 5 Line Display (deprecated, use drawcustom for more options)
 
