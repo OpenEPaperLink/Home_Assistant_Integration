@@ -88,11 +88,9 @@ def customimage(entity_id, service, hass):
     else:
         img = Image.new('RGBA', (canvas_width, canvas_height), color=background)
     pos_y = 0
-    
-    d = ImageDraw.Draw(img)
-    d.fontmode = "1"
 
     for element in payload:
+        _LOGGER.info("type: " + element["type"])
         #line
         if element["type"] == "line":
             img_line = ImageDraw.Draw(img)  
@@ -113,6 +111,8 @@ def customimage(entity_id, service, hass):
             img_rect.rectangle([(element['x_start'],element['y_start']),(element['x_end'],element['y_end'])],fill = getIndexColor(element['fill']), outline=getIndexColor(element['outline']), width=element['width'])
         #text
         if element["type"] == "text":
+            d = ImageDraw.Draw(img)
+            d.fontmode = "1"
             if not "size" in element:
                 size = 20
             else: 
@@ -155,6 +155,8 @@ def customimage(entity_id, service, hass):
             textbbox = d.textbbox((element['x'],  akt_pos_y), text, font=font, anchor=anchor, align=align, spacing=spacing)
             pos_y = textbbox[3]
         if element["type"] == "multiline":
+            d = ImageDraw.Draw(img)
+            d.fontmode = "1"
             font_file = os.path.join(os.path.dirname(__file__), element['font'])
             font = ImageFont.truetype(font_file, element['size'])
             _LOGGER.debug("Got Multiline string: %s with delimiter: %s" % (element['value'],element["delimiter"]))
@@ -170,6 +172,8 @@ def customimage(entity_id, service, hass):
             pos_y = pos
         #icon
         if element["type"] == "icon":
+            d = ImageDraw.Draw(img)
+            d.fontmode = "1"
             # ttf from https://github.com/Templarian/MaterialDesign-Webfont/blob/master/fonts/materialdesignicons-webfont.ttf
             font_file = os.path.join(os.path.dirname(__file__), 'materialdesignicons-webfont.ttf')
             meta_file = os.path.join(os.path.dirname(__file__), "materialdesignicons-webfont_meta.json") 
@@ -187,8 +191,8 @@ def customimage(entity_id, service, hass):
        #dlimg
         if element["type"] == "dlimg":
             url = element['url']
-            x = element['x']
-            y = element['y']
+            pos_x = element['x']
+            pos_y = element['y']
             xsize = element['xsize']
             ysize = element['ysize']
             rotate2 = element['rotate']
@@ -197,20 +201,19 @@ def customimage(entity_id, service, hass):
             imgdl = Image.open(io.BytesIO(response.content))
             if rotate2 != 0:
                 imgdl = imgdl.rotate(-rotate2, expand=1)
-            width, height = imgdl.size
-            if width != res[0] or height != res[1]:
+            width2, height2 = imgdl.size
+            if width2 != res[0] or height2 != res[1]:
                 imgdl = imgdl.resize((res[0], res[1]))
             imgdl = imgdl.convert("RGBA")
-            
             temp_image = Image.new("RGBA", img.size)
-            temp_image.paste(imgdl, (x,y), imgdl)
+            temp_image.paste(imgdl, (pos_x,pos_y), imgdl)
             img = Image.alpha_composite(img, temp_image)
-
+            img.convert('RGBA')
         #qrcode
         if element["type"] == "qrcode":
             data = element['data']
-            x = element['x']
-            y = element['y']
+            pos_x = element['x']
+            pos_y = element['y']
             color = element['color']
             bgcolor = element['bgcolor']
             border = element['border']
@@ -224,12 +227,15 @@ def customimage(entity_id, service, hass):
             qr.add_data(data)
             qr.make(fit=True)
             imgqr = qr.make_image(fill_color=color, back_color=bgcolor)
-            position = (x,y)
+            position = (pos_x,pos_y)
             imgqr = imgqr.convert("RGBA")
             img.paste(imgqr, position, imgqr)
+            img.convert('RGBA')
         #diagram
         if element["type"] == "diagram":
             img_draw = ImageDraw.Draw(img)
+            d = ImageDraw.Draw(img)
+            d.fontmode = "1"
             if not "font" in element:
                 font = "ppb.ttf"
             else:
@@ -291,6 +297,44 @@ def customimage(entity_id, service, hass):
     byte_im = buf.getvalue()
     return byte_im
 
+# upload an image to the tag
+def uploadimg(img, mac, ip, dither=False,ttl=60):
+    url = "http://" + ip + "/imgupload"
+    mp_encoder = MultipartEncoder(
+        fields={
+            'mac': mac,
+            'dither': "1" if dither else "0",
+            'ttl': str( ttl),
+            'image': ('image.jpg', img, 'image/jpeg'),
+        }
+    )
+    response = requests.post(url, headers={'Content-Type': mp_encoder.content_type}, data=mp_encoder)
+    if response.status_code != 200:
+        _LOGGER.warning(response.status_code)
+
+# upload a cmd to the tag
+def uploadcfg(cfg, mac, contentmode, ip):
+    url = "http://" + ip + "/get_db?mac=" + mac
+    response = requests.get(url)
+    respjson = json.loads(response.text)
+    alias = respjson["tags"][0]["alias"];
+    rotate = respjson["tags"][0]["rotate"];
+    lut = respjson["tags"][0]["lut"];
+    url = "http://" + ip + "/save_cfg"
+    mp_encoder = MultipartEncoder(
+        fields={
+            'mac': mac,
+            'contentmode': str(contentmode),
+            'modecfgjson': cfg,
+            'alias': alias,
+            'rotate': str(rotate),
+            'lut':str(lut),
+        }
+    )
+    response = requests.post(url, headers={'Content-Type': mp_encoder.content_type}, data=mp_encoder)
+    if response.status_code != 200:
+        _LOGGER.warning(response.status_code)
+
 #5 line text generator for 1.54 esls (depricated)
 def gen5line(entity_id, service, hass):
     line1 = service.data.get("line1", "")
@@ -306,7 +350,7 @@ def gen5line(entity_id, service, hass):
     format5 = service.data.get("format5", "mwwb")
     w = 152
     h = 152
-    img = Image.new('RGB', (w, h), color=white)
+    img = Image.new('RGBA', (w, h), color=white)
     d = ImageDraw.Draw(img)
     # we don't want interpolation
     d.fontmode = "1"
@@ -344,7 +388,7 @@ def gen4line(entity_id, service, hass):
     format4 = service.data.get("format4", "mwwb")
     w = 296
     h = 128
-    img = Image.new('RGB', (w, h), color=white)
+    img = Image.new('RGBA', (w, h), color=white)
     d = ImageDraw.Draw(img)
     # we don't want interpolation
     d.fontmode = "1"
@@ -407,40 +451,3 @@ def textgen2(d, text, col, just, yofs):
     else:
         d.text((x, 15 + yofs), text, fill=col, anchor=just + "m", font=rbm)
     return d
-
-# upload an image to the tag
-def uploadimg(img, mac, ip, dither=False):
-    url = "http://" + ip + "/imgupload"
-    mp_encoder = MultipartEncoder(
-        fields={
-            'mac': mac,
-            'dither': "1" if dither else "0",
-            'image': ('image.jpg', img, 'image/jpeg'),
-        }
-    )
-    response = requests.post(url, headers={'Content-Type': mp_encoder.content_type}, data=mp_encoder)
-    if response.status_code != 200:
-        _LOGGER.warning(response.status_code)
-
-# upload a cmd to the tag
-def uploadcfg(cfg, mac, contentmode, ip):
-    url = "http://" + ip + "/get_db?mac=" + mac
-    response = requests.get(url)
-    respjson = json.loads(response.text)
-    alias = respjson["tags"][0]["alias"];
-    rotate = respjson["tags"][0]["rotate"];
-    lut = respjson["tags"][0]["lut"];
-    url = "http://" + ip + "/save_cfg"
-    mp_encoder = MultipartEncoder(
-        fields={
-            'mac': mac,
-            'contentmode': str(contentmode),
-            'modecfgjson': cfg,
-            'alias': alias,
-            'rotate': str(rotate),
-            'lut':str(lut),
-        }
-    )
-    response = requests.post(url, headers={'Content-Type': mp_encoder.content_type}, data=mp_encoder)
-    if response.status_code != 200:
-        _LOGGER.warning(response.status_code)
