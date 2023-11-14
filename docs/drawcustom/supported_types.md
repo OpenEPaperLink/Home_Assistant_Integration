@@ -50,9 +50,11 @@ this payload takes a string and a delimiter, and will break the string on every 
       value: "adb|asd"
       delimiter: "|"
       font: "ppb.ttf"
+      offset_y: 50
       x: 0
       size: 40
-      color: red
+      color: black
+      y_padding: 10
 ```
 #### Parameters:
 - value (required) The to show text
@@ -61,11 +63,13 @@ this payload takes a string and a delimiter, and will break the string on every 
 - size (required) size of text. e.g. 20
 - font (required) name of ttf file from custom_component folder. e.g.: ppb.ttf
 - color (required) frontcolor of text. e.g.: black
+- y_padding (required) offset to last text or multiline y position. works only if start_y is not provided. e.g.: 10
+- offset_y (required) This is the line height: how much space to start the next line down the y axis.
 - start_y (optional) position on y axis
 - align (optional) left,center,right default: left (if text contains \n this set the alignment of the lines)
 - spacing (optional) if multiline text, spacing between single lines
 - max_width (optional) creats line breaks in the provided text, if text is longer than max_width defines (this will disable the anchor attribute)
-- y_padding (optional) offset to last text or multiline y position. works only if start_y is not provided. e.g.: 10
+- y_padding (required) offset to last text or multiline y position. works only if start_y is not provided. e.g.: 10
 
 ### line
 Draws a line
