@@ -186,6 +186,6 @@ class Hub:
         return True
     #reload is reqired to add new entities
     async def reloadcfgett(self) -> bool:
-        await self._hass.config_entries.async_unload_platforms(self._cfgenty, ["sensor"])
-        await self._hass.config_entries.async_forward_entry_setups(self._cfgenty, ["sensor"])
+        await self._hass.config_entries.async_unload_platforms(self._cfgenty, ["sensor","camera"])
+        await self._hass.config_entries.async_forward_entry_setups(self._cfgenty, ["sensor","camera"])
         return True
