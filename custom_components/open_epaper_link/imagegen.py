@@ -6,6 +6,7 @@ import pprint
 import json
 import requests
 import qrcode
+import shutil
 from PIL import Image, ImageDraw, ImageFont
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from homeassistant.exceptions import HomeAssistantError
@@ -291,7 +292,15 @@ def customimage(entity_id, service, hass):
     #post processing
     img = img.rotate(rotate, expand=True)
     rgb_image = img.convert('RGB')
-    rgb_image.save(os.path.join(os.path.dirname(__file__), entity_id + '.jpg'), format='JPEG', quality="maximum")
+    patha = os.path.join(os.path.dirname(__file__), entity_id + '.jpg')
+    pathb = os.path.join("/config/www/open_epaper_link", entity_id + '.jpg')
+    pathc = "/config/www/open_epaper_link"
+    isExist = os.path.exists(pathc)
+    if not isExist:
+        os.makedirs(pathc)
+    rgb_image.save(patha, format='JPEG', quality="maximum")
+    shutil.copy2(patha,pathb)
+    #rgb_image.save(os.path.join("/homeassistant/www/open_epaper_link", entity_id + '.jpg'), format='JPEG', quality="maximum")
     buf = io.BytesIO()
     rgb_image.save(buf, format='JPEG', quality="maximum")
     byte_im = buf.getvalue()
