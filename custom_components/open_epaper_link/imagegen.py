@@ -293,7 +293,7 @@ def customimage(entity_id, service, hass):
     img = img.rotate(rotate, expand=True)
     rgb_image = img.convert('RGB')
     patha = os.path.join(os.path.dirname(__file__), entity_id + '.jpg')
-    pathb = os.path.join("/config/www/open_epaper_link", entity_id + '.jpg')
+    pathb = os.path.join("/config/www/open_epaper_link", str(entity_id).lower() + '.jpg')
     pathc = "/config/www/open_epaper_link"
     isExist = os.path.exists(pathc)
     if not isExist:
