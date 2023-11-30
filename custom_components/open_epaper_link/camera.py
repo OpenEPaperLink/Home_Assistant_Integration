@@ -34,7 +34,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     new_devices = []
     for esls in hub.esls:
         if hub.data[esls]["lqi"] != 100 or hub.data[esls]["rssi"] != 100:
-            camera = LocalFile(esls, "/config/www/open_epaper_link/open_epaper_link."+ esls + ".jpg", hub)
+            camera = LocalFile(esls, "/config/www/open_epaper_link/open_epaper_link."+ str(esls).lower() + ".jpg", hub)
             new_devices.append(camera)
     async_add_entities(new_devices,True)
 
