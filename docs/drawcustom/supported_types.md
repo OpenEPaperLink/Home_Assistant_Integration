@@ -41,7 +41,7 @@ data:
 - color (optional) frontcolor of text. default: black
 - y (optional) position on y axis
 - y_padding (optional) offset to last text or multiline y position. works only if y is not provided. default: 10
-- anchor (optional) Position from the text, which shall be used as anchor. defualt: lf = left_top (mm = middle_middle) see https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html
+- anchor (optional) Position from the text, which shall be used as anchor. default: lt = left_top (mm = middle_middle) see https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html
 
 ### multiline
 this payload takes a string and a delimiter, and will break the string on every delimiter and move the cursor the amount if offset_y down the canvas.
@@ -68,7 +68,7 @@ this payload takes a string and a delimiter, and will break the string on every 
 - start_y (optional) position on y axis
 - align (optional) left,center,right default: left (if text contains \n this set the alignment of the lines)
 - spacing (optional) if multiline text, spacing between single lines
-- max_width (optional) creats line breaks in the provided text, if text is longer than max_width defines (this will disable the anchor attribute)
+- max_width (optional) creats line breaks in the provided text, if text is longer than max_width defines
 - y_padding (required) offset to last text or multiline y position. works only if start_y is not provided. e.g.: 10
 
 ### line
@@ -125,6 +125,7 @@ Draws a line
 - value (required) name of icon. from: https://pictogrammers.com/library/mdi/
 - size (required) e.g. 20
 - color (required)  e.g. black, white, red
+- anchor (optional) Position from the text, which shall be used as anchor. default: la = left/ascender see https://pillow.readthedocs.io/en/stable/handbook/text-anchors.
 
 ### dlimg
 ```
