@@ -188,7 +188,8 @@ def customimage(entity_id, service, hass):
             if chr_hex == "":
                 raise HomeAssistantError("Non valid icon used")
             font = ImageFont.truetype(font_file, element['size'])
-            d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=getIndexColor(element['color']), font=font)
+            anchor = element['anchor'] if 'anchor' in element else "la"
+            d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=getIndexColor(element['color']), font=font, anchor=anchor)
        #dlimg
         if element["type"] == "dlimg":
             url = element['url']
