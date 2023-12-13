@@ -120,10 +120,9 @@ Draws a rectangle.
   x_end: 80
   y_start: 15
   y_end: 30
-  width: 1
+  width: 2
   fill: red
   outline: black
-  width: 2
 ```
 
 #### Parameters:
