@@ -55,6 +55,8 @@ Draws text.
 - **y_padding** (optional) offset to last text or multiline y position. works only if y is not provided. default: 10
 - **anchor** (optional) Position from the text, which shall be used as anchor. default: `lt` (left_top). Other options include `mm` (middle_middle). See https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html
 - **max_width** (optional) creates line breaks in the provided text, if text is longer than `max_width` defines
+- **spacing** (optional) if line breaks created in the provided text using `max_width`, set spacing between single lines. Default: 5
+- **align** (optional) left, center, right default: left (this sets the alignment of any **new lines**)
 
 ### multiline
 
