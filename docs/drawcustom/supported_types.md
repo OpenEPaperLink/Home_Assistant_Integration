@@ -28,6 +28,34 @@ data:
       color: red
 ```
 
+## Data
+### payload
+Payload to draw, see below Types.
+
+Required: true
+
+
+### backgroundcolor
+Background color: black, white, red
+
+Required: true
+
+
+### rotate
+Rotate the whole image by 0, 90, 180, 270.
+
+Required: false (default: 0)
+
+
+### dry-run
+Generate image, but don't send it to the AP.
+
+Required: false (default: false)
+```yaml
+dry-run: true
+```
+
+
 ## Types
 
 ### text
