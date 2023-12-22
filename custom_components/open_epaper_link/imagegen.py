@@ -181,8 +181,13 @@ def customimage(entity_id, service, hass):
             f = open(meta_file) 
             data = json.load(f)
             chr_hex = ""
+
+            value = element['value']
+            if value.startswith("mdi:"):
+                value = value[4:]
+
             for icon in data:
-                if icon['name'] == element['value']:
+                if icon['name'] == value:
                     chr_hex = icon['codepoint']
                     break
             if chr_hex == "":
