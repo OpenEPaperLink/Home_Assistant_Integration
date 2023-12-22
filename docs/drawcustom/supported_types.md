@@ -179,7 +179,8 @@ Draws an icon.
 ```
 
 #### Parameters:
-- value (required) name of icon from https://pictogrammers.com/library/mdi/
+
+- value (required) name of icon from <https://pictogrammers.com/library/mdi/>, may be optionally prefixed with "mdi:"
 - size (required) e.g. 20
 - color (required) e.g. black, white, red
 - anchor (optional) position from the text, (see [text](#text) above for details)
