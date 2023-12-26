@@ -22,29 +22,195 @@ dlimg:
       example: true
       
 setled:
-  name: Set led color
-  description: Sets the led color
+  name: Set led pattern
+  description: Sets the led flash pattern
   target:
     entity:
       domain: open_epaper_link
   fields:
-    color:
-      name: Color
-      description: color of the led
+    mode:
+      name: Mode
+      description: The mode flashing, if set to off, the other options can be ignored
       required: true
-      example: blue
+      example: flash
+      default: flash
       selector:
         select:
           options:
             - "off"
-            - "red"
-            - "green"
-            - "blue"
-            - "yellow"
-            - "cyan"
-            - "magenta"
-            - "white"
-
+            - "flash"
+    brightness:
+      name: Brightness
+      description: Brightnes of the flashes
+      required: false
+      example: 1
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 16
+          step: 1
+          unit_of_measurement: ""
+          mode: slider
+        
+    repeats:
+      name: Repeats
+      description: Repeats of the flash pattern
+      required: false
+      example: 2
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 255
+          step: 1
+          unit_of_measurement: ""
+          mode: slider
+      
+    color1:
+      name: Color 1
+      description: Color of group 1, will internally be converted to rgb332
+      required: false
+      example: [255, 0, 0]
+      default: [255, 0, 0]
+      selector:
+        color_rgb:
+    flashSpeed1:
+      name: FlashSpeed 1
+      description: Delay between flashes in group 1
+      required: false
+      example: 0.2
+      default: 0.2
+      selector:
+        number:
+          min: 0
+          max: 1.5
+          step: 0.1
+          unit_of_measurement: "s"
+          mode: slider
+    flashCount1:
+      name: FlashCount1
+      description: Number of flashes in group 1
+      required: false
+      example: 2
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 15
+          step: 1
+          unit_of_measurement: ""
+          mode: slider
+    delay1:
+      name: Delay 1
+      description: Delay between group 1 and 2
+      required: false
+      example: 0.1
+      default: 0.1
+      selector:
+        number:
+          min: 0
+          max: 25.5
+          step: 0.1
+          unit_of_measurement: "s"
+          mode: slider      
+      
+    color2:
+      name: Color 2
+      description: Color of group 2
+      required: false
+      example: [0, 255, 0]
+      default: [0, 255, 0]
+      selector:
+        color_rgb:
+    flashSpeed2:
+      name: FlashSpeed 2
+      description: Delay between flashes in group 2
+      required: false
+      example: 0.2
+      default: 0.2
+      selector:
+        number:
+          min: 0
+          max: 1.5
+          step: 0.1
+          unit_of_measurement: "s"
+          mode: slider
+    flashCount2:
+      name: FlashCount2
+      description: Number of flashes in group 2
+      required: false
+      example: 2
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 15
+          step: 1
+          unit_of_measurement: ""
+          mode: slider
+    delay2:
+      name: Delay 2
+      description: Delay between group 2 and 3
+      required: false
+      example: 0.1
+      default: 0.1
+      selector:
+        number:
+          min: 0
+          max: 25.5
+          step: 0.1
+          unit_of_measurement: "s"
+          mode: slider   
+      
+    color3:
+      name: Color 3
+      description: Color of group 3
+      required: false
+      example: [0, 0, 255]
+      default: [0, 0, 255]
+      selector:
+        color_rgb:
+    flashSpeed3:
+      name: FlashSpeed 3
+      description: Delay between flashes in group 3
+      required: false
+      example: 0.2
+      default: 0.2
+      selector:
+        number:
+          min: 0
+          max: 1.5
+          step: 0.1
+          unit_of_measurement: "s"
+          mode: slider
+    flashCount3:
+      name: FlashCount3
+      description: Number of flashes in group 3
+      required: false
+      example: 2
+      default: 2
+      selector:
+        number:
+          min: 0
+          max: 15
+          step: 1
+          unit_of_measurement: ""
+          mode: slider
+    delay3:
+      name: Delay 3
+      description: Delay between group 3 and 1
+      required: false
+      example: 0
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 25.5
+          step: 0.1
+          unit_of_measurement: "s"
+          mode: slider   
+      
 drawcustom:
   name: Draw Custom Image
   description: Draws a custom image
