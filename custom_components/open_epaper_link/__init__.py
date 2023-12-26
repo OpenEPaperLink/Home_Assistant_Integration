@@ -11,6 +11,20 @@ import time
 
 _LOGGER = logging.getLogger(__name__)
 
+def rgb_to_rgb332(rgb):
+    # Ensure that RGB values are in the range [0, 255]
+    r, g, b = [max(0, min(255, x)) for x in rgb]
+    
+    # Convert RGB values to RGB332 format
+    r = (r // 32) & 0b111  # 3 bits for red
+    g = (g // 32) & 0b111  # 3 bits for green
+    b = (b // 64) & 0b11   # 2 bits for blue
+
+    # Combine the RGB332 components and convert to hex
+    rgb332 = (r << 5) | (g << 2) | b
+
+    return "0x" + str(hex(rgb332)[2:].zfill(2))
+    
 def checkconcurrent():
     timebetweencalls = 3;
     file_path = os.path.join(os.path.dirname(__file__), "lastapinteraction" + '.txt')
@@ -90,18 +104,29 @@ def setup(hass, config):
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
             checkconcurrent()
-            id = entity_id.split(".")
-            color = service.data.get("color", "")
-            cmd = ""
-            if(color == "off"): cmd = "{\"cmd\":\"100\"}"
-            if(color == "red"): cmd = "{\"cmd\":\"101\"}"
-            if(color == "green"): cmd = "{\"cmd\":\"102\"}"
-            if(color == "blue"): cmd = "{\"cmd\":\"103\"}"
-            if(color == "yellow"): cmd = "{\"cmd\":\"104\"}"
-            if(color == "cyan"): cmd = "{\"cmd\":\"105\"}"
-            if(color == "magenta"): cmd = "{\"cmd\":\"106\"}"
-            if(color == "white"): cmd = "{\"cmd\":\"107\"}"
-            result = await hass.async_add_executor_job(uploadcfg, cmd, id[1], "17",ip)
+            mac = entity_id.split(".")[1].upper()
+            mode = service.data.get("mode", "")
+            modebyte = "0"
+            if(mode == "off"): modebyte = "0"
+            if(mode == "flash"): modebyte = "1"
+            brightness = str(service.data.get("brightness", 2) - 1)
+            repeats = str(service.data.get("repeats", 2) - 1)
+            color1 = rgb_to_rgb332(service.data.get("color1", ""))
+            color2 = rgb_to_rgb332(service.data.get("color2", ""))
+            color3 = rgb_to_rgb332(service.data.get("color3", ""))
+            flashSpeed1 = str(int(service.data.get("flashSpeed1", 2) * 10))
+            flashSpeed2 = str(int(service.data.get("flashSpeed2", 2) * 10))
+            flashSpeed3 = str(int(service.data.get("flashSpeed3", 2) * 10))
+            flashCount1 = str(int(service.data.get("flashCount1", 2)))
+            flashCount2 = str(int(service.data.get("flashCount2", 2)))
+            flashCount3 = str(int(service.data.get("flashCount3", 2)))
+            delay1 = str(int(service.data.get("delay1", 2) * 10))
+            delay2 = str(int(service.data.get("delay2", 2) * 10))
+            delay3 = str(int(service.data.get("delay3", 2) * 10))
+            url = "http://" + ip + "/led_flash?mac=" + mac + "&pattern=" + modebyte + "," + brightness + "/" + color1 + "," + flashCount1 + "," + flashSpeed1 + "/" + color2 + "," + flashCount2 + "," + flashSpeed2 + "/" + color3 + "," + flashCount3 + "," + flashSpeed3 + "/" + repeats + "/" + delay1 + "," + delay2 + "," + delay3 + "/0";
+            result = await hass.async_add_executor_job(requests.get, url)
+            if result.status_code != 200:
+               _LOGGER.warning(result.status_code)
 
     # register the services
     hass.services.register(DOMAIN, "dlimg", dlimg)
