@@ -96,10 +96,7 @@ def customimage(entity_id, service, hass):
         if element["type"] == "line":
             img_line = ImageDraw.Draw(img)  
             if not "y_start" in element:
-                if "y_padding" in element:
-                    y_start = pos_y + element["y_padding"]
-                else:
-                    y_start = pos_y
+                y_start = pos_y + element.get("y_padding", 0)
                 y_end = y_start
             else:
                 y_start = element["y_start"]
@@ -114,39 +111,18 @@ def customimage(entity_id, service, hass):
         if element["type"] == "text":
             d = ImageDraw.Draw(img)
             d.fontmode = "1"
-            if not "size" in element:
-                size = 20
-            else: 
-                size = element['size']  
-            if not "font" in element:
-                font = "ppb.ttf"
-            else: 
-                font = element['font']
+            size = element.get('size', 20)
+            font = element.get('font', "ppb.ttf")
             font_file = os.path.join(os.path.dirname(__file__), font)
             font = ImageFont.truetype(font_file, size)
             if not "y" in element:
-                if not "y_padding" in element:
-                    akt_pos_y = pos_y + 10
-                else: 
-                    akt_pos_y = pos_y + element['y_padding']
+                akt_pos_y = pos_y + element.get('y_padding', 10)
             else:
                 akt_pos_y = element['y']
-            if not "color" in element:
-                color = "black"
-            else: 
-                color = element['color']
-            if not "anchor" in element:
-                anchor = "lt"
-            else: 
-                anchor = element['anchor']
-            if not "align" in element:
-                align = "left"
-            else: 
-                align = element['align']
-            if not "spacing" in element:
-                spacing = 5
-            else: 
-                spacing = element['spacing']
+            color = element.get('color', "black")
+            anchor = element.get('anchor', "lt")
+            align = element.get('align', "left")
+            spacing = element.get('spacing', 5)
             if "max_width" in element:
                 text = get_wrapped_text(str(element['value']), font, line_length=element['max_width'])
                 anchor = None
@@ -162,10 +138,7 @@ def customimage(entity_id, service, hass):
             font = ImageFont.truetype(font_file, element['size'])
             _LOGGER.debug("Got Multiline string: %s with delimiter: %s" % (element['value'],element["delimiter"]))
             lst = element['value'].replace("\n","").split(element["delimiter"])
-            if not "start_y" in element:
-                pos = pos_y + + element['y_padding']
-            else:
-                pos = element['start_y']
+            pos = element.get('start_y', pos_y + element['y_padding'])
             for elem in lst:
                 _LOGGER.debug("String: %s" % (elem))
                 d.text((element['x'], pos ), str(elem), fill=getIndexColor(element['color']), font=font)
@@ -243,44 +216,26 @@ def customimage(entity_id, service, hass):
             img_draw = ImageDraw.Draw(img)
             d = ImageDraw.Draw(img)
             d.fontmode = "1"
-            if not "font" in element:
-                font = "ppb.ttf"
-            else:
-                font = element['font']
+            font = element.get('font', "ppb.ttf")
             pos_x = element['x']
             pos_y = element['y']
-            if not "width" in element:
-                width = canvas_width
-            else:
-                width = element['width']
+            width = element.get('width', canvas_width)
             height = element['height']
-            if not "margin" in element:
-                offset_lines = 20
-            else:
-                offset_lines = element["margin"]
+            offset_lines = element.get('margin', 20)
             # x axis line
             img_draw.line([(pos_x+offset_lines, pos_y+height-offset_lines),(pos_x+width,pos_y+height-offset_lines)],fill = getIndexColor('black'), width = 1)
             # y axis line
             img_draw.line([(pos_x+offset_lines, pos_y),(pos_x+offset_lines,pos_y+height-offset_lines)],fill = getIndexColor('black'), width = 1)
             if "bars" in element:
-                if not "margin" in element["bars"]:
-                    bar_margin = 10
-                else:
-                    bar_margin = element["bars"]["margin"]
+                bar_margin = element["bars"].get('margin', 10)
                 bars = element["bars"]["values"].split(";")
                 barcount = len(bars)
                 bar_width = math.floor((width - offset_lines - ((barcount + 1) * bar_margin)) / barcount)
                 _LOGGER.info("Found %i in bars width: %i" % (barcount,bar_width))
-                if not "legend_size" in element["bars"]:
-                    size = 10
-                else:
-                    size = element["bars"]["legend_size"]
+                size = element["bars"].get('legend_size', 10)
                 font_file = os.path.join(os.path.dirname(__file__), font)
                 font = ImageFont.truetype(font_file, size)
-                if not "legend_color" in element["bars"]:
-                    legend_color = "black"
-                else:
-                    legend_color = element["bars"]["legend_color"]
+                legend_color = element["bars"].get('legend_color', "black")
                 max_val = 0
                 for bar in bars:
                     name, value  = bar.split(",",1)
