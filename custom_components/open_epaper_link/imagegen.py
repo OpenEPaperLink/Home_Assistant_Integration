@@ -60,6 +60,9 @@ def getIndexColor(color):
     else:
         return white
 
+def should_show_element(element):
+    return element['visible'] if 'visible' in element else True
+
 # custom image generator
 def customimage(entity_id, service, hass):
         
@@ -92,6 +95,10 @@ def customimage(entity_id, service, hass):
 
     for element in payload:
         _LOGGER.info("type: " + element["type"])
+        
+        if not should_show_element(element):
+            continue
+          
         #line
         if element["type"] == "line":
             img_line = ImageDraw.Draw(img)  

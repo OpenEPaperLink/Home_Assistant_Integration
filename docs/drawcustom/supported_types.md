@@ -85,6 +85,7 @@ Draws text.
 - **max_width** (optional) creates line breaks in the provided text, if text is longer than `max_width` defines
 - **spacing** (optional) if line breaks created in the provided text using `max_width`, set spacing between single lines. Default: 5
 - **align** (optional) left, center, right default: left (this sets the alignment of any **new lines**)
+- **visible** (optional) show element, default: True
 
 ### multiline
 
@@ -115,6 +116,7 @@ This payload takes a string and a delimiter, and will break the string on every 
 - **start_y** (optional) position on y axis
 - **align** (optional) left, center, right default: left (if text contains `\n` this sets the alignment of the lines)
 - **spacing** (optional) if multiline text, spacing between single lines
+- **visible** (optional) show element, default: True
 
 ### line
 
@@ -139,6 +141,7 @@ Draws a line.
 - **y_end** (optional)
 - **fill** (required)
 - **width** (required)
+- **visible** (optional) show element, default: True
 
 ### rectangle
 
@@ -164,6 +167,7 @@ Draws a rectangle.
 - **fill** (required) e.g. black
 - **outline** (required) e.g. red
 - **width** (required) width of outline, e.g. 2
+- **visible** (optional) show element, default: True
 
 ### icon
 
@@ -184,6 +188,7 @@ Draws an icon.
 - size (required) e.g. 20
 - color (required) e.g. black, white, red
 - anchor (optional) position from the text, (see [text](#text) above for details)
+- **visible** (optional) show element, default: True
 
 ### dlimg
 
@@ -207,6 +212,7 @@ Downloads an image from a URL and renders it.
 - **xsize** (required)  e.g. x size the image is resized
 - **ysize** (required)  e.g. y size the image is resized
 - **rotate** (required)  e.g. 0
+- **visible** (optional) show element, default: True
 
 ### qrcode
 
@@ -230,3 +236,4 @@ Downloads an image from a URL and renders it.
 - **border** (required) e.g. 2
 - **color** (required) e.g. black
 - **bgcolor** (required) e.g. white
+- **visible** (optional) show element, default: True
