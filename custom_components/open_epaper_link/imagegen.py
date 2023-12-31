@@ -7,6 +7,9 @@ import json
 import requests
 import qrcode
 import shutil
+from datetime import datetime
+import time
+from .const import DOMAIN
 from PIL import Image, ImageDraw, ImageFont
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from homeassistant.exceptions import HomeAssistantError
@@ -16,6 +19,20 @@ _LOGGER = logging.getLogger(__name__)
 white =  (255, 255, 255,255)
 black = (0, 0, 0,255)
 red = (255, 0, 0,255)
+
+queue = []
+notsetup = True;
+running = False;
+
+def setup(hass,notsetup):
+    if notsetup:
+        hass.bus.listen(DOMAIN + "_event", handle_event)
+        notsetup = False
+    return True
+
+def handle_event(self):
+    handlequeue()
+
 
 # img downloader
 def downloadimg(entity_id, service, hass):
@@ -271,14 +288,42 @@ def customimage(entity_id, service, hass):
         os.makedirs(pathc)
     rgb_image.save(patha, format='JPEG', quality="maximum")
     shutil.copy2(patha,pathb)
-    #rgb_image.save(os.path.join("/homeassistant/www/open_epaper_link", entity_id + '.jpg'), format='JPEG', quality="maximum")
     buf = io.BytesIO()
     rgb_image.save(buf, format='JPEG', quality="maximum")
     byte_im = buf.getvalue()
     return byte_im
 
+def queueimg(url, content):
+    queue.append([url,content])
+    
+def handlequeue():
+    global running
+    if running:
+        return True
+    if len(queue) == 0:
+        return True
+    running = True;
+    timebetweencalls = 10;
+    file_path = os.path.join(os.path.dirname(__file__), "lastapinteraction" + '.txt')
+    filecontent = "0";
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as file:
+            filecontent = file.read()
+    curtime = round(datetime.timestamp(datetime.now()))
+    if round(float(filecontent)) + timebetweencalls < curtime:
+        with open(file_path, 'w') as file:
+            file.write(str(datetime.timestamp(datetime.now())))
+        tp = queue.pop(0)
+        running = False;
+        response = requests.post(tp[0], headers={'Content-Type': tp[1].content_type}, data=tp[1])
+        if response.status_code != 200:
+            _LOGGER.warning(response.status_code)
+            queue.append(tp)
+    running = False;
+
 # upload an image to the tag
-def uploadimg(img, mac, ip, dither=False,ttl=60):
+def uploadimg(img, mac, ip, dither,ttl,hass):
+    setup(hass,notsetup)
     url = "http://" + ip + "/imgupload"
     mp_encoder = MultipartEncoder(
         fields={
@@ -288,9 +333,8 @@ def uploadimg(img, mac, ip, dither=False,ttl=60):
             'image': ('image.jpg', img, 'image/jpeg'),
         }
     )
-    response = requests.post(url, headers={'Content-Type': mp_encoder.content_type}, data=mp_encoder)
-    if response.status_code != 200:
-        _LOGGER.warning(response.status_code)
+    queueimg(url, mp_encoder)
+
 
 # upload a cmd to the tag
 def uploadcfg(cfg, mac, contentmode, ip):
