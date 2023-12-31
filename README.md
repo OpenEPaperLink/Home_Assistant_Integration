@@ -14,7 +14,7 @@ Every tag and the AP is exposed as a device.
 ### Services
 
 #### drawcustom
-This Service call draws a image local in home assistant, and will send it to the EPaper AP afterwards. Note that the rectangle is not transparent, so if it is drawn after other objects, it may overwrite them.
+This Service call draws a image local in home assistant, and will send it to the EPaper AP afterwards. To not draw the inside of the rectangle use `null` as the `fill` color value.
 
 Example Call:
 ```
