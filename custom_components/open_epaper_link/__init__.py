@@ -24,25 +24,6 @@ def rgb_to_rgb332(rgb):
     rgb332 = (r << 5) | (g << 2) | b
 
     return "0x" + str(hex(rgb332)[2:].zfill(2))
-    
-def checkconcurrent():
-    timebetweencalls = 3;
-    file_path = os.path.join(os.path.dirname(__file__), "lastapinteraction" + '.txt')
-    filecontent = "0";
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as file:
-            filecontent = file.read()
-    curtime = round(datetime.timestamp(datetime.now()))
-    while round(float(filecontent)) + timebetweencalls > curtime:
-        _LOGGER.warn("concurrent call detected, waiting")
-        time.sleep((round(float(filecontent)) + timebetweencalls) - curtime)
-        if os.path.exists(file_path):
-            with open(file_path, 'r') as file:
-                filecontent = file.read()
-        curtime = round(datetime.timestamp(datetime.now()))
-    timestamp = datetime.timestamp(datetime.now())
-    with open(file_path, 'w') as file:
-        file.write(str(timestamp))
 
 def setup(hass, config):
     # callback for the draw custom service
@@ -54,11 +35,10 @@ def setup(hass, config):
         dry_run = service.data.get("dry-run", False)
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
-            checkconcurrent()
             imgbuff = await hass.async_add_executor_job(customimage,entity_id, service, hass)
             id = entity_id.split(".")
             if (dry_run is False):
-                result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip, dither,ttl)
+                result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip, dither,ttl,hass)
             else:
                 _LOGGER.info("Running dry-run - no upload to AP!")
                 result = True
@@ -70,10 +50,9 @@ def setup(hass, config):
         dither = service.data.get("dither", False)
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
-            checkconcurrent()
             id = entity_id.split(".")
             imgbuff = await hass.async_add_executor_job(downloadimg, entity_id, service, hass)
-            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip, dither)
+            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip, dither,300,hass)
 
     # callback for the 5 line service(depricated)
     async def lines5service(service: ServiceCall) -> None:
@@ -81,10 +60,9 @@ def setup(hass, config):
         entity_ids = service.data.get("entity_id")
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
-            checkconcurrent()
             imgbuff = gen5line(entity_id, service, hass)
             id = entity_id.split(".")
-            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip)
+            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip,False,300,hass)
 
     # callback for the 4 line service(depricated)
     async def lines4service(service: ServiceCall) -> None:
@@ -92,10 +70,9 @@ def setup(hass, config):
         entity_ids = service.data.get("entity_id")
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
-            checkconcurrent()
             imgbuff = gen4line(entity_id, service, hass)
             id = entity_id.split(".")
-            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip)
+            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip,False,300,hass)
             
     # callback for the setled service
     async def setled(service: ServiceCall) -> None:
@@ -103,7 +80,6 @@ def setup(hass, config):
         entity_ids = service.data.get("entity_id")
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
-            checkconcurrent()
             mac = entity_id.split(".")[1].upper()
             mode = service.data.get("mode", "")
             modebyte = "0"
