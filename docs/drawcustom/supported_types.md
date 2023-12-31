@@ -164,7 +164,7 @@ Draws a rectangle.
 - **y_start** (required)
 - **x_end** (required)
 - **y_end** (required)
-- **fill** (required) e.g. black
+- **fill** (required) e.g. black, use `null` to not draw the inside
 - **outline** (required) e.g. red
 - **width** (required) width of outline, e.g. 2
 - **visible** (optional) show element, default: True

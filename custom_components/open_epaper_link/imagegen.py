@@ -52,6 +52,9 @@ def get_wrapped_text(text: str, font: ImageFont.ImageFont,
 
 # converts a color name to the corresponding color index for the palette
 def getIndexColor(color):
+    if color is None:
+        return None
+
     color_str = str(color)
     if color_str == "black" or color_str == "b":
         return black
