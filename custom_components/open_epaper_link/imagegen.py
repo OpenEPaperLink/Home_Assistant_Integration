@@ -296,8 +296,8 @@ def customimage(entity_id, service, hass):
             # Obtain drawing region, assume whole canvas if nothing is given
             x_start = element.get("x_start", 0)
             y_start = element.get("y_start", 0)
-            x_end = element.get("x_end", canvas_width-1)
-            y_end = element.get("y_end", canvas_height-1)
+            x_end = element.get("x_end", canvas_width-1-x_start)
+            y_end = element.get("y_end", canvas_height-1-x_start)
             width = x_end - x_start + 1
             height = y_end - y_start + 1
             # The duration of history to look at (default 1 day)
@@ -341,11 +341,6 @@ def customimage(entity_id, service, hass):
             # The minimum and maximum values that are always shown
             min_v = element.get("low", None)
             max_v = element.get("high", None)
-            # effective diagram dimensions
-            diag_x = x_start + (ylegend_width if ylegend_pos == "left" else 0)
-            diag_y = y_start
-            diag_width = width - ylegend_width
-            diag_height = height
             # Obtain all states of all given entities in the given duration
             all_states = get_significant_states(hass, start_time=start, entity_ids=[plot["entity"] for plot in element["data"]], significant_changes_only=False, minimal_response=True, no_attributes=False)
 
@@ -365,9 +360,23 @@ def customimage(entity_id, service, hass):
 
             max_v = math.ceil(max_v)
             min_v = math.floor(min_v)
+            # Prevent division by zero errors
             if max_v == min_v:
-                max_v += 1
+                min_v -= 1
             spread = max_v - min_v
+
+            # calculate ylenged_width if it should be automatically determined
+            if ylegend_width == -1:
+                ylegend_width = math.ceil(max(
+                    img_draw.textlength(str(max_v), font=ylegend_font),
+                    img_draw.textlength(str(min_v), font=ylegend_font),
+                ))
+
+            # effective diagram dimensions
+            diag_x = x_start + (ylegend_width if ylegend_pos == "left" else 0)
+            diag_y = y_start
+            diag_width = width - ylegend_width
+            diag_height = height
 
             if element.get("debug", False):
                 img_draw.rectangle([(x_start, y_start), (x_end, y_end)], fill=None, outline=getIndexColor("black"), width=1)
