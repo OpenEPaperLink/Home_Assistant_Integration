@@ -38,6 +38,8 @@ def handle_event(self):
     handlequeue()
 
 def is_decimal(string):
+    if string.startswith("-"):
+        string = string[1:]
     return len(string.split(".")) <= 2 and string.replace(".", "").isdecimal()
 
 def min_max(data):
