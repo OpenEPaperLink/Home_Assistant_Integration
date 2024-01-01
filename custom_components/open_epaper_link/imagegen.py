@@ -292,9 +292,6 @@ def customimage(entity_id, service, hass):
                     bar_pos = bar_pos + 1
         # plot
         if element["type"] == "plot":
-            if element.get("debug", False):
-                f = open("/config/www/open_epaper_link/" + str(entity_id).lower() + "." + element["data"][0]["entity"] + ".log", "w")
-
             img_draw = ImageDraw.Draw(img)
             # Obtain drawing region, assume whole canvas if nothing is given
             x_start = element.get("x_start", 0)
@@ -351,7 +348,6 @@ def customimage(entity_id, service, hass):
             diag_height = height
             # Obtain all states of all given entities in the given duration
             all_states = get_significant_states(hass, start_time=start, entity_ids=[plot["entity"] for plot in element["data"]], significant_changes_only=False, minimal_response=True, no_attributes=False)
-            # print(all_states, file=f)
 
             # prepare data and obtain min_v and max_v with it
             raw_data = []
@@ -388,9 +384,6 @@ def customimage(entity_id, service, hass):
                         curr += yaxis_tick_every
                     img_draw.point(grid_points, fill=getIndexColor(yaxis_grid_color))
 
-            if element.get("debug", False):
-                print("element['data']:", element["data"], file=f)
-                print("raw_data:", raw_data, file=f)
             # scale data and draw plot
             for plot, data in zip(element["data"], raw_data):
                 xy_raw = []
@@ -413,39 +406,22 @@ def customimage(entity_id, service, hass):
                     xy.append((last_x, round(sum(ys) / len(ys))))
 
                 img_draw.line(xy, fill=getIndexColor(plot.get("color", "black")), width=plot.get("width", 1), joint="curve")
-                if element.get("debug", False):
-                    print("line:", xy, file=f)
 
             # print y legend
             if ylegend_pos == "left":
                 img_draw.text((x_start, y_start), str(max_v), fill=getIndexColor(ylegend_color), font=ylegend_font, anchor="lt")
-                if element.get("debug", False):
-                    print("text:", (x_start, y_start), str(max_v), file=f)
                 img_draw.text((x_start, y_end), str(min_v), fill=getIndexColor(ylegend_color), font=ylegend_font, anchor="ls")
-                if element.get("debug", False):
-                    print("text:", (x_start, y_end), str(min_v), file=f)
             elif ylegend_pos == "right":
                 img_draw.text((x_end, y_start), str(max_v), fill=getIndexColor(ylegend_color), font=ylegend_font, anchor="rt")
-                if element.get("debug", False):
-                    print("text:", (x_end, y_start), str(max_v), file=f)
                 img_draw.text((x_end, y_end), str(min_v), fill=getIndexColor(ylegend_color), font=ylegend_font, anchor="rs")
-                if element.get("debug", False):
-                    print("text:", (x_end, y_end), str(min_v), file=f)
             # print y axis
             if yaxis is not None:
                 img_draw.rectangle([(diag_x, diag_y), (diag_x + yaxis_width - 1, diag_y + diag_height - 1)], width=0, fill=getIndexColor(yaxis_color))
-                if element.get("debug", False):
-                    print("rectangle:", [(diag_x, diag_y), (diag_x + yaxis_width - 1, diag_y + diag_height - 1)], file=f)
                 curr = min_v
                 while curr <= max_v:
                     curr_y = round(diag_y + (1 - ((curr - min_v) / spread)) * (diag_height - 1))
                     img_draw.rectangle([(diag_x + yaxis_width, curr_y), (diag_x + yaxis_width + yaxis_tick_width - 1, curr_y)], width=0, fill=getIndexColor(yaxis_color))
-                    if element.get("debug", False):
-                        print("rectangle:", [(diag_x + yaxis_width, curr_y), (diag_x + yaxis_width + yaxis_tick_width - 1, curr_y)], file=f)
                     curr += yaxis_tick_every
-
-            if element.get("debug", False):
-                f.close()
 
     #post processing
     img = img.rotate(rotate, expand=True)
