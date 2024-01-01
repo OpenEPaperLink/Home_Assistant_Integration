@@ -3,7 +3,7 @@
   "name": "OpenEPaperLink",
   "codeowners": ["@jonasniesner"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["recorder"],
   "documentation": "https://github.com/jonasniesner/open_epaper_link_homeassistant",
   "integration_type": "hub",
   "iot_class": "local_push",
