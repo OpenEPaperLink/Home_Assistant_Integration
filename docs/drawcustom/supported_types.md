@@ -237,3 +237,60 @@ Downloads an image from a URL and renders it.
 - **color** (required) e.g. black
 - **bgcolor** (required) e.g. white
 - **visible** (optional) show element, default: True
+
+### plot
+
+Renders the history of given home assistant entities as a line plot.
+The plot will scale according to the data, so you should only use multiple entities within the same data range.
+
+```yaml
+- type: plot
+  x_start: 10
+  y_start: 20
+  x_end: 199 # inclusive
+  y_end: 119 # inclusive
+  duration: 3600 # 1h in seconds
+  low: 10 # if all values are larger than 10, we include 10 anyway
+  high: 20 # if all values are smaller than 20, we include 20 anyway
+  ylegend:
+    position: right # show legend on the right
+    color: red
+  yaxis:
+    tick_width: 4 # show very wide ticks
+    grid: 3 # place a grid point every 3rd pixel
+  data:
+    - entity: sensor.my_room_temperature
+      width: 3 # show very thick line
+    - entity: sensor.my_outside_temperature
+      color: red
+```
+
+#### Parameters:
+- **x_start** (optional, default `0`) the left start of the whole plot (inlusive)
+- **y_start** (optional, default `0`) the top start of the whole plot (inlusive)
+- **x_end** (optional, default `0`) the right end of the whole plot (inlusive)
+- **y_end** (optional, default `0`) the bottom end of the whole plot (inlusive)
+- **duration** (optional, default `86400`) the number of seconds to look back, defaults to one day
+- **font** (optional, default `ppb.ttf`) the font used for text output (may be overwritten by more specific font statements)
+- **size** (optional, default `10`) the respective font size
+- **low** (optional) if provided, it is ensured that the given value is included on the lower end of the plot (e.g., if values are in the range 12 to 17, providing 10 will make 10 the lower end, providing 14 changes nothing)
+- **high** (optional) if provided, it is ensured that the given value is included on the upper end of the plot
+- **debug** (optional, default `false`) if `true`, draw a black rectangle around the whole plot region and a red rectangle around the region with the data
+- **ylegend** (optional) displays the highest and lowest value as a legend on the side, set to `null` to disable
+  - **width** (optional, default `-1`) the number of pixels reserved for the legend, if `-1` it is automatically computed
+  - **color** (optional, default `black`) the color for the legend
+  - **position** (optional, default `left`) either `left` or `right`, the position of the legend
+  - **font** / **size** (optional) the font file and size, defaults to the font selected at main level
+- **yaxis** (optional) displays a vertical axis with ticks and a grid, set to `null` to disable
+  - **width** (optional, default `1`) the width of the vertical axis
+  - **color** (optional, default `black`) the color of the vertical axis
+  - **tick_width** (optional, default `2`) the width for each axis tick, set to `0` to disable
+  - **tick_every** (optional, default `1.0`) place a tick at every
+  - **grid** (optional, default `5`) place a point horizontally every `grid`th pixel at the coordinates of the ticks, set to `null` to disable
+  - **grid_color** (optional, default `black`) color for the grid points
+- **data** (required) a list of objects for which the history should be rendered, each object has the following properties:
+  - **entity** (required) the home assistant entity with has numeric data
+  - **color** (optional, default `black`) the color of the plot
+  - **width** (optional, default `1`) the width of the plot line
+  - **joint** (optional, default `null`) sets the `joint` option for the [line draw funtion](https://pillow.readthedocs.io/en/stable/reference/ImageDraw.html#PIL.ImageDraw.ImageDraw.line), can be `curve` or `null`
+- **visible** (optional) show element, default: True
