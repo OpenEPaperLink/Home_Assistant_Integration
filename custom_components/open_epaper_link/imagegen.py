@@ -14,6 +14,9 @@ from .const import DOMAIN
 from PIL import Image, ImageDraw, ImageFont
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.components.recorder.history import get_significant_states
+from homeassistant.util import dt
+from datetime import timedelta, datetime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +37,15 @@ def setup(hass,notsetup):
 def handle_event(self):
     handlequeue()
 
+def is_decimal(string):
+    return len(string.split(".")) <= 2 and string.replace(".", "").isdecimal()
+
+def min_max(data):
+    mi, ma = data[0], data[0]
+    for d in data[1:]:
+        mi = min(mi, d)
+        ma = max(ma, d)
+    return mi, ma
 
 # img downloader
 def downloadimg(entity_id, service, hass):
@@ -278,6 +290,163 @@ def customimage(entity_id, service, hass):
                     d.text((x_pos + (bar_width/2),  pos_y + height - offset_lines /2), str(name), fill=getIndexColor(legend_color), font=font, anchor="mm")
                     img_draw.rectangle([(x_pos, pos_y+height-offset_lines-(height_factor*int(value))),(x_pos+bar_width, pos_y+height-offset_lines)],fill = getIndexColor(element["bars"]["color"]))
                     bar_pos = bar_pos + 1
+        # plot
+        if element["type"] == "plot":
+            if element.get("debug", False):
+                f = open("/config/www/open_epaper_link/" + str(entity_id).lower() + "." + element["data"][0]["entity"] + ".log", "w")
+
+            img_draw = ImageDraw.Draw(img)
+            # Obtain drawing region, assume whole canvas if nothing is given
+            x_start = element.get("x_start", 0)
+            y_start = element.get("y_start", 0)
+            x_end = element.get("x_end", canvas_width-1)
+            y_end = element.get("y_end", canvas_height-1)
+            width = x_end - x_start + 1
+            height = y_end - y_start + 1
+            # The duration of history to look at (default 1 day)
+            duration = timedelta(seconds=element.get("duration", 60*60*24))
+            end = dt.now()
+            start = end - duration
+            # The label font and size
+            size = element.get("size", 10)
+            font_file = element.get("font", "ppb.ttf")
+            abs_font_file = os.path.join(os.path.dirname(__file__), font_file)
+            font = ImageFont.truetype(abs_font_file, size)
+            # The value legend
+            ylegend = element.get("ylegend", dict())
+            if ylegend is None:
+                ylegend_width = 0
+            else:
+                ylegend_width = ylegend.get("width", 20)
+                ylegend_color = ylegend.get("color", "black")
+                ylegend_pos = ylegend.get("position", "left")
+                if ylegend_pos not in ("left", "right", None):
+                    ylegend_pos = "left"
+                ylegend_font_file = ylegend.get("font", font_file)
+                ylegend_size = ylegend.get("size", size)
+                if ylegend_font_file != font_file or ylegend_size != size:
+                    ylegend_abs_font_file = os.path.join(os.path.dirname(__file__), ylegend_font_file)
+                    ylegend_font = ImageFont.truetype(ylegend_abs_font_file, ylegend_size)
+                else:
+                    ylegend_font = font
+            # The value axis
+            yaxis = element.get("yaxis", dict())
+            if yaxis is None:
+                yaxis_width = 0
+                yaxis_tick_width = 0
+            else:
+                yaxis_width = yaxis.get("width", 1)
+                yaxis_color = yaxis.get("color", "black")
+                yaxis_tick_width = yaxis.get("tick_width", 2)
+                yaxis_tick_every = float(yaxis.get("tick_every", 1))
+                yaxis_grid = yaxis.get("grid", 5)
+                yaxis_grid_color = yaxis.get("grid_color", "black")
+            # The minimum and maximum values that are always shown
+            min_v = element.get("low", None)
+            max_v = element.get("high", None)
+            # effective diagram dimensions
+            diag_x = x_start + (ylegend_width if ylegend_pos == "left" else 0)
+            diag_y = y_start
+            diag_width = width - ylegend_width
+            diag_height = height
+            # Obtain all states of all given entities in the given duration
+            all_states = get_significant_states(hass, start_time=start, entity_ids=[plot["entity"] for plot in element["data"]], significant_changes_only=False, minimal_response=True, no_attributes=False)
+            # print(all_states, file=f)
+
+            # prepare data and obtain min_v and max_v with it
+            raw_data = []
+            for plot in element["data"]:
+                states = all_states[plot["entity"]]
+                state_obj = states[0]
+                states[0] = {"state": state_obj.state, "last_changed": str(state_obj.last_changed)}
+                states = [(datetime.fromisoformat(s["last_changed"]), float(s["state"])) for s in states if is_decimal(s["state"])]
+
+                min_v_local, max_v_local = min_max([s[1] for s in states])
+                min_v = min(min_v or min_v_local, min_v_local)
+                max_v = max(max_v or max_v_local, max_v_local)
+
+                raw_data.append(states)
+
+            max_v = math.ceil(max_v)
+            min_v = math.floor(min_v)
+            if max_v == min_v:
+                max_v += 1
+            spread = max_v - min_v
+
+            if element.get("debug", False):
+                img_draw.rectangle([(x_start, y_start), (x_end, y_end)], fill=None, outline=getIndexColor("black"), width=1)
+                img_draw.rectangle([(diag_x, diag_y), (diag_x + diag_width - 1, diag_y + diag_height - 1)], fill=None, outline=getIndexColor("red"), width=1)
+
+            # print y grid
+            if yaxis is not None:
+                if yaxis_grid is not None:
+                    grid_points = []
+                    curr = min_v
+                    while curr <= max_v:
+                        curr_y = round(diag_y + (1 - ((curr - min_v) / spread)) * (diag_height - 1))
+                        grid_points.extend((x, curr_y) for x in range(diag_x, diag_x + diag_width, yaxis_grid))
+                        curr += yaxis_tick_every
+                    img_draw.point(grid_points, fill=getIndexColor(yaxis_grid_color))
+
+            if element.get("debug", False):
+                print("element['data']:", element["data"], file=f)
+                print("raw_data:", raw_data, file=f)
+            # scale data and draw plot
+            for plot, data in zip(element["data"], raw_data):
+                xy_raw = []
+                for time, value in data:
+                    rel_time = (time - start) / duration
+                    rel_value = (value - min_v) / spread
+                    xy_raw.append((round(diag_x + rel_time * (diag_width - 1)), round(diag_y + (1 - rel_value) * (diag_height - 1))))
+                # smooth out the data, i.e. if x values appear multiple times, only add them once with the average of all y values
+                xy = []
+                last_x = None
+                ys = []
+                for x, y in xy_raw:
+                    if x != last_x:
+                        if ys:
+                            xy.append((last_x, round(sum(ys) / len(ys))))
+                            ys = []
+                        last_x = x
+                    ys.append(y)
+                if ys:
+                    xy.append((last_x, round(sum(ys) / len(ys))))
+
+                img_draw.line(xy, fill=getIndexColor(plot.get("color", "black")), width=plot.get("width", 1), joint="curve")
+                if element.get("debug", False):
+                    print("line:", xy, file=f)
+
+            # print y legend
+            if ylegend_pos == "left":
+                img_draw.text((x_start, y_start), str(max_v), fill=getIndexColor(ylegend_color), font=ylegend_font, anchor="lt")
+                if element.get("debug", False):
+                    print("text:", (x_start, y_start), str(max_v), file=f)
+                img_draw.text((x_start, y_end), str(min_v), fill=getIndexColor(ylegend_color), font=ylegend_font, anchor="ls")
+                if element.get("debug", False):
+                    print("text:", (x_start, y_end), str(min_v), file=f)
+            elif ylegend_pos == "right":
+                img_draw.text((x_end, y_start), str(max_v), fill=getIndexColor(ylegend_color), font=ylegend_font, anchor="rt")
+                if element.get("debug", False):
+                    print("text:", (x_end, y_start), str(max_v), file=f)
+                img_draw.text((x_end, y_end), str(min_v), fill=getIndexColor(ylegend_color), font=ylegend_font, anchor="rs")
+                if element.get("debug", False):
+                    print("text:", (x_end, y_end), str(min_v), file=f)
+            # print y axis
+            if yaxis is not None:
+                img_draw.rectangle([(diag_x, diag_y), (diag_x + yaxis_width - 1, diag_y + diag_height - 1)], width=0, fill=getIndexColor(yaxis_color))
+                if element.get("debug", False):
+                    print("rectangle:", [(diag_x, diag_y), (diag_x + yaxis_width - 1, diag_y + diag_height - 1)], file=f)
+                curr = min_v
+                while curr <= max_v:
+                    curr_y = round(diag_y + (1 - ((curr - min_v) / spread)) * (diag_height - 1))
+                    img_draw.rectangle([(diag_x + yaxis_width, curr_y), (diag_x + yaxis_width + yaxis_tick_width - 1, curr_y)], width=0, fill=getIndexColor(yaxis_color))
+                    if element.get("debug", False):
+                        print("rectangle:", [(diag_x + yaxis_width, curr_y), (diag_x + yaxis_width + yaxis_tick_width - 1, curr_y)], file=f)
+                    curr += yaxis_tick_every
+
+            if element.get("debug", False):
+                f.close()
+
     #post processing
     img = img.rotate(rotate, expand=True)
     rgb_image = img.convert('RGB')
