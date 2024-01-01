@@ -314,7 +314,7 @@ def customimage(entity_id, service, hass):
             if ylegend is None:
                 ylegend_width = 0
             else:
-                ylegend_width = ylegend.get("width", 20)
+                ylegend_width = ylegend.get("width", -1)
                 ylegend_color = ylegend.get("color", "black")
                 ylegend_pos = ylegend.get("position", "left")
                 if ylegend_pos not in ("left", "right", None):
