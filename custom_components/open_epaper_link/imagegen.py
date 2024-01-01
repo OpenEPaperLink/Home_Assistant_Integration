@@ -414,7 +414,7 @@ def customimage(entity_id, service, hass):
                 if ys:
                     xy.append((last_x, round(sum(ys) / len(ys))))
 
-                img_draw.line(xy, fill=getIndexColor(plot.get("color", "black")), width=plot.get("width", 1), joint="curve")
+                img_draw.line(xy, fill=getIndexColor(plot.get("color", "black")), width=plot.get("width", 1), joint=plot.get("joint", None))
 
             # print y legend
             if ylegend_pos == "left":
@@ -426,11 +426,12 @@ def customimage(entity_id, service, hass):
             # print y axis
             if yaxis is not None:
                 img_draw.rectangle([(diag_x, diag_y), (diag_x + yaxis_width - 1, diag_y + diag_height - 1)], width=0, fill=getIndexColor(yaxis_color))
-                curr = min_v
-                while curr <= max_v:
-                    curr_y = round(diag_y + (1 - ((curr - min_v) / spread)) * (diag_height - 1))
-                    img_draw.rectangle([(diag_x + yaxis_width, curr_y), (diag_x + yaxis_width + yaxis_tick_width - 1, curr_y)], width=0, fill=getIndexColor(yaxis_color))
-                    curr += yaxis_tick_every
+                if yaxis_tick_width > 0:
+                    curr = min_v
+                    while curr <= max_v:
+                        curr_y = round(diag_y + (1 - ((curr - min_v) / spread)) * (diag_height - 1))
+                        img_draw.rectangle([(diag_x + yaxis_width, curr_y), (diag_x + yaxis_width + yaxis_tick_width - 1, curr_y)], width=0, fill=getIndexColor(yaxis_color))
+                        curr += yaxis_tick_every
 
     #post processing
     img = img.rotate(rotate, expand=True)
