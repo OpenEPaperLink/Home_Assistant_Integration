@@ -108,12 +108,12 @@ This payload takes a string and a delimiter, and will break the string on every 
 - **value** (required) the text to display
 - **delimiter** (required) the delimiting character, to split value, e.g. `#`
 - **x** (required) position on x axis
-- **size** (required) size of text, e.g. 20
-- **font** (required) name of ttf font file (see [text](#text) above for details)
-- **color** (optional) font color of text. default: black
-- **y_padding** (required) offset to last text or multiline y position. works only if `start_y` is not provided. e.g.: `10`
 - **offset_y** (required) This is the line height: how much space to start the next line down the y axis.
 - **start_y** (optional) position on y axis
+- **y_padding** (optional) offset to last text or multiline y position. works only if `start_y` is not provided. default: 10
+- **size** (optional) size of text, default: 20
+- **font** (optional) name of ttf font file (see [text](#text) above for details). default: `ppb.ttf`
+- **color** (optional) font color of text. default: black
 - **align** (optional) left, center, right default: left (if text contains `\n` this sets the alignment of the lines)
 - **spacing** (optional) if multiline text, spacing between single lines
 - **visible** (optional) show element, default: True
@@ -124,7 +124,7 @@ Draws a line.
 
 ```yaml
 - type: line
-  x_start: 20 
+  x_start: 20
   x_end: 380
   y_start: 15
   y_end: 15
@@ -149,7 +149,7 @@ Draws a rectangle.
 
 ```yaml
 - type: rectangle
-  x_start: 20 
+  x_start: 20
   x_end: 80
   y_start: 15
   y_end: 30
@@ -208,10 +208,10 @@ Downloads an image from a URL and renders it.
 
 - **url** (required) url of the image to download
 - **x** (required) e.g. 20
-- **y** (required)  e.g. 10
-- **xsize** (required)  e.g. x size the image is resized
-- **ysize** (required)  e.g. y size the image is resized
-- **rotate** (required)  e.g. 0
+- **y** (required) e.g. 10
+- **xsize** (required) e.g. x size the image is resized
+- **ysize** (required) e.g. y size the image is resized
+- **rotate** (required) e.g. 0
 - **visible** (optional) show element, default: True
 
 ### qrcode
@@ -231,7 +231,7 @@ Downloads an image from a URL and renders it.
 
 - **data** (required) content of the qr code
 - **x** (required) e.g. 20
-- **y** (required)  e.g. 10
+- **y** (required) e.g. 10
 - **boxsize** (required) e.g. 2
 - **border** (required) e.g. 2
 - **color** (required) e.g. black
@@ -266,6 +266,7 @@ The plot will scale according to the data, so you should only use multiple entit
 ```
 
 #### Parameters:
+
 - **x_start** (optional, default `0`) the left start of the whole plot (inlusive)
 - **y_start** (optional, default `0`) the top start of the whole plot (inlusive)
 - **x_end** (optional, default `0`) the right end of the whole plot (inlusive)

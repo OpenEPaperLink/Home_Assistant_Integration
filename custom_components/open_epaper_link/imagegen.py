@@ -176,14 +176,17 @@ def customimage(entity_id, service, hass):
         if element["type"] == "multiline":
             d = ImageDraw.Draw(img)
             d.fontmode = "1"
-            font_file = os.path.join(os.path.dirname(__file__), element['font'])
-            font = ImageFont.truetype(font_file, element['size'])
+            size = element.get('size', 20)
+            font = element.get('font', "ppb.ttf")
+            font_file = os.path.join(os.path.dirname(__file__), font)
+            font = ImageFont.truetype(font_file, size)
+            color = element.get('color', "black")
             _LOGGER.debug("Got Multiline string: %s with delimiter: %s" % (element['value'],element["delimiter"]))
             lst = element['value'].replace("\n","").split(element["delimiter"])
-            pos = element.get('start_y', pos_y + element['y_padding'])
+            pos = element.get('start_y', pos_y + element.get('y_padding', 10))
             for elem in lst:
                 _LOGGER.debug("String: %s" % (elem))
-                d.text((element['x'], pos ), str(elem), fill=getIndexColor(element['color']), font=font)
+                d.text((element['x'], pos ), str(elem), fill=getIndexColor(color), font=font)
                 pos = pos + element['offset_y']
             pos_y = pos
         #icon
