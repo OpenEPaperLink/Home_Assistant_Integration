@@ -223,9 +223,15 @@ def customimage(entity_id, service, hass):
             xsize = element['xsize']
             ysize = element['ysize']
             rotate2 = element['rotate']
-            response = requests.get(url)
+
             res = [xsize,ysize]
-            imgdl = Image.open(io.BytesIO(response.content))
+            imgdl = ""
+            if "http://" in url or "https://" in url:
+                response = requests.get(url)
+                imgdl = Image.open(io.BytesIO(response.content))
+            else:
+                imgdl = Image.open(url)
+                
             if rotate2 != 0:
                 imgdl = imgdl.rotate(-rotate2, expand=1)
             width2, height2 = imgdl.size
