@@ -202,9 +202,14 @@ def customimage(entity_id, service, hass):
                 value = value[4:]
 
             for icon in data:
-                if icon['name'] == value or value in icon['aliases']:
+                if icon['name'] == value:
                     chr_hex = icon['codepoint']
                     break
+            if chr_hex == "":
+                for icon in data:
+                    if value in icon['aliases']:
+                        chr_hex = icon['codepoint']
+                        break
             if chr_hex == "":
                 raise HomeAssistantError("Non valid icon used")
             font = ImageFont.truetype(font_file, element['size'])
