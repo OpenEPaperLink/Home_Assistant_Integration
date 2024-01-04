@@ -249,7 +249,7 @@ The plot will scale according to the data, so you should only use multiple entit
   y_start: 20
   x_end: 199 # inclusive
   y_end: 119 # inclusive
-  duration: 3600 # 1h in seconds
+  duration: 36000 # 10h in seconds
   low: 10 # if all values are larger than 10, we include 10 anyway
   high: 20 # if all values are smaller than 20, we include 20 anyway
   ylegend:
@@ -271,7 +271,7 @@ The plot will scale according to the data, so you should only use multiple entit
 - **y_start** (optional, default `0`) the top start of the whole plot (inlusive)
 - **x_end** (optional, default `0`) the right end of the whole plot (inlusive)
 - **y_end** (optional, default `0`) the bottom end of the whole plot (inlusive)
-- **duration** (optional, default `86400`) the number of seconds to look back, defaults to one day
+- **duration** (optional, default `86400`) the number of seconds to look back, defaults to one day, please keep in mind tat the recorder might not have the most up to date data
 - **font** (optional, default `ppb.ttf`) the font used for text output (may be overwritten by more specific font statements)
 - **size** (optional, default `10`) the respective font size
 - **low** (optional) if provided, it is ensured that the given value is included on the lower end of the plot (e.g., if values are in the range 12 to 17, providing 10 will make 10 the lower end, providing 14 changes nothing)
