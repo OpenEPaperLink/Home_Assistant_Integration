@@ -1,4 +1,3 @@
-"""Platform for sensor integration."""
 from __future__ import annotations
 from .const import DOMAIN
 import logging
@@ -10,7 +9,7 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.const import TEMP_CELSIUS
+from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
@@ -27,7 +26,6 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     new_devices.append(APWifiRssiSensor(hub))
     new_devices.append(APStateSensor(hub))
     new_devices.append(APRunStateSensor(hub))
-    new_devices.append(APTempSensor(hub))
     new_devices.append(APWifiStatusSensor(hub))
     new_devices.append(APWifiSssidSensor(hub))
     for esls in hub.esls:
@@ -37,7 +35,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         new_devices.append(PendingSensor(esls,hub))
         new_devices.append(WakeupReasonSensor(esls,hub))
         new_devices.append(CapabilitiesSensor(esls,hub))
-        if hub.data[esls]["lqi"] != 100 or hub.data[esls]["rssi"] != 100:
+        if (hub.data[esls]["lqi"] != 100 or hub.data[esls]["rssi"] != 100) and hub.data[esls]["hwtype"] != 224 and hub.data[esls]["hwtype"] != 240:
             new_devices.append(TempSensor(esls,hub))
             new_devices.append(RssiSensor(esls,hub))
             new_devices.append(BatteryVoltageSensor(esls,hub))
@@ -112,7 +110,7 @@ class APTempSensor(SensorEntity):
         self._attr_unique_id = "ap_aptemp"
         self._attr_name = "AP Temp"
         self._hub = hub
-        self._attr_native_unit_of_measurement = TEMP_CELSIUS
+        self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_state_class = SensorStateClass.MEASUREMENT
     @property
@@ -231,9 +229,9 @@ class TempSensor(SensorEntity):
     def __init__(self, esls,hub):
         self._attr_unique_id = f"{esls}_temp"
         self._eslid = esls
-        self._attr_name = f"{esls} Temperature"
+        self._attr_name = hub.data[esls]["tagname"] + " Temperature"
         self._hub = hub
-        self._attr_native_unit_of_measurement = TEMP_CELSIUS
+        self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_state_class = SensorStateClass.MEASUREMENT
     @property
@@ -249,7 +247,7 @@ class RssiSensor(SensorEntity):
     def __init__(self, esls,hub):
         self._attr_unique_id = f"{esls}_rssi"
         self._eslid = esls
-        self._attr_name = f"{esls} Rssi"
+        self._attr_name = hub.data[esls]["tagname"] + " Rssi"
         self._hub = hub
         self._attr_native_unit_of_measurement = "dB"
         self._attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
@@ -267,7 +265,7 @@ class BatteryVoltageSensor(SensorEntity):
     def __init__(self, esls,hub):
         self._attr_unique_id = f"{esls}_batteryvoltage"
         self._eslid = esls
-        self._attr_name = f"{esls} Battery Voltage"
+        self._attr_name = hub.data[esls]["tagname"] + " Battery Voltage"
         self._hub = hub
         self._attr_native_unit_of_measurement = "V"
         self._attr_device_class = SensorDeviceClass.VOLTAGE
@@ -285,7 +283,7 @@ class LqiSensor(SensorEntity):
     def __init__(self, esls,hub):
         self._attr_unique_id = f"{esls}_lqi"
         self._eslid = esls
-        self._attr_name = f"{esls} Link Quality Index"
+        self._attr_name = hub.data[esls]["tagname"] + " Link Quality Index"
         self._hub = hub
         self._attr_native_unit_of_measurement = ""
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -302,7 +300,7 @@ class ContentModeSensor(SensorEntity):
     def __init__(self, esls,hub):
         self._attr_unique_id = f"{esls}_contentmode"
         self._eslid = esls
-        self._attr_name = f"{esls} Content Mode"
+        self._attr_name = hub.data[esls]["tagname"] + " Content Mode"
         self._hub = hub
         self._attr_native_unit_of_measurement = ""
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -319,15 +317,16 @@ class LastSeenSensor(SensorEntity):
     def __init__(self, esls,hub):
         self._attr_unique_id = f"{esls}_lastseen"
         self._eslid = esls
-        self._attr_name = f"{esls} Last Seen"
+        self._attr_name = hub.data[esls]["tagname"] + " Last Seen"
         self._hub = hub
         self._attr_device_class = SensorDeviceClass.TIMESTAMP
     @property
     def device_info(self) -> DeviceInfo:
         return {
             "identifiers": {(DOMAIN, self._eslid)},
-            "name": self._eslid,
-            "sw_version": self._hub.data[self._eslid]["ver"],
+            "name": self._hub.data[self._eslid]["tagname"],
+            "sw_version": hex(self._hub.data[self._eslid]["ver"]),
+            "serial_number": self._eslid,
             "model": self._hub.data[self._eslid]["hwstring"],
             "manufacturer": "OpenEpaperLink",
             "via_device": (DOMAIN, "ap")
@@ -340,7 +339,7 @@ class NextUpdateSensor(SensorEntity):
     def __init__(self, esls,hub):
         self._attr_unique_id = f"{esls}_nextupdate"
         self._eslid = esls
-        self._attr_name = f"{esls} Next Update"
+        self._attr_name = hub.data[esls]["tagname"] + " Next Update"
         self._hub = hub
         self._attr_device_class = SensorDeviceClass.TIMESTAMP
     @property
@@ -356,7 +355,7 @@ class NextCheckinSensor(SensorEntity):
     def __init__(self, esls,hub):
         self._attr_unique_id = f"{esls}_nextcheckin"
         self._eslid = esls
-        self._attr_name = f"{esls} Next Checkin"
+        self._attr_name = hub.data[esls]["tagname"] + " Next Checkin"
         self._hub = hub
         self._attr_device_class = SensorDeviceClass.TIMESTAMP
     @property
@@ -372,7 +371,7 @@ class PendingSensor(SensorEntity):
     def __init__(self, esls,hub):
         self._attr_unique_id = f"{esls}_pending"
         self._eslid = esls
-        self._attr_name = f"{esls} Pending Transfer"
+        self._attr_name = hub.data[esls]["tagname"] + " Pending Transfer"
         self._hub = hub
         self._attr_native_unit_of_measurement = ""
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -385,27 +384,11 @@ class PendingSensor(SensorEntity):
         eslid = self._eslid
         self._attr_native_value = self._hub.data[eslid]["pending"]
         
-class AliasSensor(SensorEntity):
-    def __init__(self, esls,hub):
-        self._attr_unique_id = f"{esls}_alias"
-        self._eslid = esls
-        self._attr_name = f"{esls} Alias"
-        self._hub = hub
-        self._attr_native_unit_of_measurement = ""
-    @property
-    def device_info(self) -> DeviceInfo:
-        return {
-            "identifiers": {(DOMAIN, self._eslid)},
-        }
-    def update(self) -> None:
-        eslid = self._eslid
-        self._attr_native_value = self._hub.data[eslid]["alias"]
-        
 class WakeupReasonSensor(SensorEntity):
     def __init__(self, esls,hub):
         self._attr_unique_id = f"{esls}_wakeupReason"
         self._eslid = esls
-        self._attr_name = f"{esls} Wakeup Reason"
+        self._attr_name = hub.data[esls]["tagname"] + " Wakeup Reason"
         self._hub = hub
     @property
     def device_info(self) -> DeviceInfo:
@@ -422,7 +405,7 @@ class CapabilitiesSensor(SensorEntity):
     def __init__(self, esls,hub):
         self._attr_unique_id = f"{esls}_capabilities"
         self._eslid = esls
-        self._attr_name = f"{esls} Capabilities"
+        self._attr_name = hub.data[esls]["tagname"] + " Capabilities"
         self._hub = hub
     @property
     def device_info(self) -> DeviceInfo:
@@ -432,46 +415,12 @@ class CapabilitiesSensor(SensorEntity):
     def update(self) -> None:
         eslid = self._eslid
         self._attr_native_value = self._hub.data[eslid]["capabilities"]
-    
-class HashSensor(SensorEntity):
-    def __init__(self, esls,hub):
-        self._attr_unique_id = f"{esls}_hashv"
-        self._eslid = esls
-        self._attr_name = f"{esls} Hash"
-        self._hub = hub
-        self._attr_native_unit_of_measurement = ""
-    @property
-    def device_info(self) -> DeviceInfo:
-        return {
-            "identifiers": {(DOMAIN, self._eslid)},
-        }
-    def update(self) -> None:
-        eslid = self._eslid
-        self._attr_native_value = self._hub.data[eslid]["hashv"]
-        
-class HWTypeSensor(SensorEntity):
-    def __init__(self, esls,hub):
-        self._attr_unique_id = f"{esls}_hwtype"
-        self._eslid = esls
-        self._attr_name = f"{esls} Hardware Type"
-        self._hub = hub
-        self._attr_native_unit_of_measurement = ""
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-    @property
-    def device_info(self) -> DeviceInfo:
-        return {
-            "identifiers": {(DOMAIN, self._eslid)},
-            "name": self.name,
-        }
-    def update(self) -> None:
-        eslid = self._eslid
-        self._attr_native_value = self._hub.data[eslid]["hwtype"]
         
 class BatteryPercentageSensor(SensorEntity):
     def __init__(self, esls,hub):
         self._attr_unique_id = f"{esls}_battery"
         self._eslid = esls
-        self._attr_name = f"{esls} Battery"
+        self._attr_name = hub.data[esls]["tagname"] + " Battery"
         self._hub = hub
         self._attr_native_unit_of_measurement = "%"
         self._attr_device_class = SensorDeviceClass.BATTERY
