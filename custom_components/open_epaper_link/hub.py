@@ -92,6 +92,11 @@ class Hub:
             lut = tag.get('lut')
             ch = tag.get('ch')
             ver = tag.get('ver')
+            tagname = ""
+            if alias:
+                tagname = alias
+            else:
+                tagname = tagmac
             #required for automations
             hwmap = {
                 0: ["ST‐GR16000 1.54\"", 152, 152],
@@ -111,7 +116,13 @@ class Hub:
             if hwType in hwmap:
                 self._hass.states.set(DOMAIN + "." + tagmac, hwType,{
                     "icon": "mdi:fullscreen",
-                    "friendly_name": tagmac,
+                    "friendly_name": tagname,
+                    "attr_unique_id": tagmac,
+                    "unique_id": tagmac,
+                    "device_class": "sensor",
+                    "device_info": {
+                    "identifiers": {(DOMAIN, tagmac)}
+                    },
                     "should_poll": False,
                     "hwtype": hwType,
                     "hwstring": hwmap[hwType][0],
@@ -143,6 +154,7 @@ class Hub:
             self.data[tagmac]["lut"] = lut
             self.data[tagmac]["ch"] = ch
             self.data[tagmac]["ver"] = ver
+            self.data[tagmac]["tagname"] = tagname
             #maintains a list of all tags, new entities should be generated here
             if tagmac not in self.esls:
                 self.esls.append(tagmac)
