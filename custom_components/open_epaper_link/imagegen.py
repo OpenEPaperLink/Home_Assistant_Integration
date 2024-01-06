@@ -308,7 +308,7 @@ def customimage(entity_id, service, hass):
             height = y_end - y_start + 1
             # The duration of history to look at (default 1 day)
             duration = timedelta(seconds=element.get("duration", 60*60*24))
-            end = dt.now()
+            end = dt.utcnow()
             start = end - duration
             # The label font and size
             size = element.get("size", 10)
