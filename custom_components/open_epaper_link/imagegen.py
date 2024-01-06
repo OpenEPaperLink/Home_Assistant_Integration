@@ -9,7 +9,6 @@ import requests
 import qrcode
 import shutil
 import asyncio
-from datetime import datetime
 import time
 from .const import DOMAIN
 from PIL import Image, ImageDraw, ImageFont
@@ -19,6 +18,7 @@ from homeassistant.components.recorder.history import get_significant_states
 from homeassistant.util import dt
 from homeassistant.components.recorder import get_instance
 from datetime import timedelta, datetime
+
 _LOGGER = logging.getLogger(__name__)
 
 white =  (255, 255, 255,255)
@@ -57,7 +57,7 @@ def min_max(data):
 def downloadimg(entity_id, service, hass):
     entity = hass.states.get(entity_id)
     if not (entity and 'width' in entity.attributes):
-        raise HomeAssistantError("id was not found yet, please wait for the display to check in at least once")
+        raise HomeAssistantError("id was not found yet, please wait for the display to check in at least once " + entity_id)
     url = service.data.get("url", "")
     rotate = service.data.get("rotation", 0)
     # get image
@@ -109,7 +109,7 @@ def customimage(entity_id, service, hass):
     background = getIndexColor(service.data.get("background","white"))
     entity = hass.states.get(entity_id)
     if not (entity and 'width' in entity.attributes):
-        raise HomeAssistantError("id was not found yet, please wait for the display to check in at least once")
+        raise HomeAssistantError("id was not found yet, please wait for the display to check in at least once " + entity_id)
     canvas_width = hass.states.get(entity_id).attributes['width']
     canvas_height = hass.states.get(entity_id).attributes['height']
     if rotate == 0:
@@ -308,6 +308,7 @@ def customimage(entity_id, service, hass):
             height = y_end - y_start + 1
             # The duration of history to look at (default 1 day)
             duration = timedelta(seconds=element.get("duration", 60*60*24))
+            
             end = dt.utcnow()
             start = end - duration
             # The label font and size
@@ -523,7 +524,7 @@ def uploadcfg(cfg, mac, contentmode, ip):
 def gen5line(entity_id, service, hass):
     entity = hass.states.get(entity_id)
     if not (entity and 'width' in entity.attributes):
-        raise HomeAssistantError("id was not found yet, please wait for the display to check in at least once")
+        raise HomeAssistantError("id was not found yet, please wait for the display to check in at least once " + entity_id)
     line1 = service.data.get("line1", "")
     line2 = service.data.get("line2", "")
     line3 = service.data.get("line3", "")
@@ -565,7 +566,7 @@ def gen5line(entity_id, service, hass):
 def gen4line(entity_id, service, hass):
     entity = hass.states.get(entity_id)
     if not (entity and 'width' in entity.attributes):
-        raise HomeAssistantError("id was not found yet, please wait for the display to check in at least once")
+        raise HomeAssistantError("id was not found yet, please wait for the display to check in at least once " + entity_id)
     line1 = service.data.get("line1", "")
     line2 = service.data.get("line2", "")
     line3 = service.data.get("line3", "")
