@@ -299,6 +299,7 @@ def customimage(entity_id, service, hass):
         # plot
         if element["type"] == "plot":
             img_draw = ImageDraw.Draw(img)
+            img_draw.fontmode = "1"
             # Obtain drawing region, assume whole canvas if nothing is given
             x_start = element.get("x_start", 0)
             y_start = element.get("y_start", 0)
