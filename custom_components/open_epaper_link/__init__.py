@@ -30,6 +30,10 @@ def setup(hass, config):
     async def drawcustomservice(service: ServiceCall) -> None:
         ip = hass.states.get(DOMAIN + ".ip").state 
         entity_ids = service.data.get("entity_id")
+        #sometimes you get a string, that's not nice to iterate over for ids....
+        if isInstance(entity_ids, str):
+            entity_ids=[entity_ids]
+
         dither = service.data.get("dither", False)
         ttl = service.data.get("ttl", 60)
         dry_run = service.data.get("dry-run", False)
