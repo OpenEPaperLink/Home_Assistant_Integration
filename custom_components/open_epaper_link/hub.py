@@ -184,14 +184,8 @@ class Hub:
     def on_error(self,ws, error) -> None:
         _LOGGER.debug("Websocket error, most likely on_message crashed")
         _LOGGER.debug(error)
-    #try to reconnect after 5 munutes
     def on_close(self,ws, error, a) -> None:
         _LOGGER.warning("Websocket connection lost, trying to reconnect every 30 seconds")
-        ip = self._hass.states.get(DOMAIN + ".ip").state 
-        while os.system("ping -c 1 " + ip) != 0:
-            time.sleep(30)
-        _LOGGER.debug("reconnecting")
-        self.establish_connection()
     #we could do something here
     def on_open(self,ws) -> None:
         _LOGGER.debug("WS started")
@@ -199,7 +193,8 @@ class Hub:
     def establish_connection(self) -> None:
         ws_url = "ws://" + self._host + "/ws"
         ws = websocket.WebSocketApp(ws_url,on_message=self.on_message,on_error=self.on_error,on_close=self.on_close,on_open=self.on_open)
-        ws.run_forever()
+        # try to reconnect every 30 seconds
+        ws.run_forever(reconnect=30)
         _LOGGER.error("Integration crashed, this should never happen. It will not reconnect")
     #we should do more here
     async def test_connection(self) -> bool:
