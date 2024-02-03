@@ -184,8 +184,11 @@ class Hub:
     def on_error(self,ws, error) -> None:
         _LOGGER.debug("Websocket error, most likely on_message crashed")
         _LOGGER.debug(error)
-    def on_close(self,ws, error, a) -> None:
-        _LOGGER.warning("Websocket connection lost, trying to reconnect every 30 seconds")
+    def on_close(self, ws, close_status_code, close_msg) -> None:
+        _LOGGER.warning(
+            f"Websocket connection lost to url={ws.url} "
+            "(close_status_code={close_status_code}, close_msg={close_msg}), "
+            "trying to reconnect every 30 seconds")
     #we could do something here
     def on_open(self,ws) -> None:
         _LOGGER.debug("WS started")
