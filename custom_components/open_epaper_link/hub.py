@@ -16,7 +16,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import device_registry as dr
 from .const import DOMAIN
+
 _LOGGER: Final = logging.getLogger(__name__)
+
+# Time to wait before trying to reconnect on disconnections.
+_RECONNECT_SECONDS : int = 30
+
 #Hub class for handeling communication
 class Hub:
     #the init function starts the thread for all other communication
@@ -36,7 +41,7 @@ class Hub:
         self.data["ap"]["dbsize"] = None;
         self.data["ap"]["littlefsfree"] = None;
         self.eventloop = asyncio.get_event_loop()
-        thread = Thread(target=self.establish_connection)
+        thread = Thread(target=self.connection_thread)
         thread.start()
         self.online = True
     #parses websocket messages
@@ -184,23 +189,30 @@ class Hub:
     def on_error(self,ws, error) -> None:
         _LOGGER.debug("Websocket error, most likely on_message crashed")
         _LOGGER.debug(error)
-    #try to reconnect after 5 munutes
-    def on_close(self,ws, error, a) -> None:
-        _LOGGER.warning("Websocket connection lost, trying to reconnect every 30 seconds")
-        ip = self._hass.states.get(DOMAIN + ".ip").state 
-        while os.system("ping -c 1 " + ip) != 0:
-            time.sleep(30)
-        _LOGGER.debug("reconnecting")
-        self.establish_connection()
+    def on_close(self, ws, close_status_code, close_msg) -> None:
+        _LOGGER.warning(
+            f"Websocket connection lost to url={ws.url} "
+            f"(close_status_code={close_status_code}, close_msg={close_msg}), "
+            f"trying to reconnect every {_RECONNECT_SECONDS} seconds")
     #we could do something here
     def on_open(self,ws) -> None:
         _LOGGER.debug("WS started")
+
     #starts the websocket
-    def establish_connection(self) -> None:
-        ws_url = "ws://" + self._host + "/ws"
-        ws = websocket.WebSocketApp(ws_url,on_message=self.on_message,on_error=self.on_error,on_close=self.on_close,on_open=self.on_open)
-        ws.run_forever()
-        _LOGGER.error("Integration crashed, this should never happen. It will not reconnect")
+    def connection_thread(self) -> None:
+        while True:
+            try:
+                ws_url = "ws://" + self._host + "/ws"
+                ws = websocket.WebSocketApp(
+                    ws_url, on_message=self.on_message, on_error=self.on_error,
+                    on_close=self.on_close, on_open=self.on_open)
+                ws.run_forever(reconnect=_RECONNECT_SECONDS)
+            except Exception as e:
+                _LOGGER.exception(e)
+
+            _LOGGER.error(f"open_epaper_link WebSocketApp crashed, reconnecting in {_RECONNECT_SECONDS} seconds")
+            time.sleep(_RECONNECT_SECONDS)
+
     #we should do more here
     async def test_connection(self) -> bool:
         return True
