@@ -11,6 +11,7 @@ import shutil
 import asyncio
 import time
 from .const import DOMAIN
+from .util import get_image_folder, get_image_path
 from PIL import Image, ImageDraw, ImageFont
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 from homeassistant.exceptions import HomeAssistantError
@@ -447,8 +448,8 @@ def customimage(entity_id, service, hass):
     img = img.rotate(rotate, expand=True)
     rgb_image = img.convert('RGB')
     patha = os.path.join(os.path.dirname(__file__), entity_id + '.jpg')
-    pathb = os.path.join("/config/www/open_epaper_link", str(entity_id).lower() + '.jpg')
-    pathc = "/config/www/open_epaper_link"
+    pathb = get_image_path(hass, entity_id)
+    pathc = get_image_folder(hass)
     isExist = os.path.exists(pathc)
     if not isExist:
         os.makedirs(pathc)

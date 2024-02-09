@@ -1,5 +1,6 @@
 from __future__ import annotations
 from .const import DOMAIN
+from .util import get_image_path
 import logging
 import datetime
 import mimetypes
@@ -22,7 +23,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     new_devices = []
     for esls in hub.esls:
         if hub.data[esls]["lqi"] != 100 or hub.data[esls]["rssi"] != 100:
-            camera = LocalFile(esls, "/config/www/open_epaper_link/open_epaper_link."+ str(esls).lower() + ".jpg", hub)
+            camera = LocalFile(esls, get_image_path(hass, "open_epaper_link." + str(esls).lower()), hub)
             new_devices.append(camera)
     async_add_entities(new_devices,True)
 
@@ -49,7 +50,7 @@ class LocalFile(Camera):
     @property
     def name(self):
         return self._name
-        
+
     def camera_image(
         self, width: int | None = None, height: int | None = None
     ) -> bytes | None:
@@ -65,7 +66,7 @@ class LocalFile(Camera):
 
     def check_file_path_access(self, file_path):
         """Check that filepath given is readable."""
-        
+
     def update_file_path(self, file_path):
         self._file_path = file_path
         self.schedule_update_ha_state()
