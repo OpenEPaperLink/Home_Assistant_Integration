@@ -119,7 +119,15 @@ class Hub:
                 52: ["M3 4.2\"",  400, 300],
                 53: ["M3 6.0\"",  600, 448],
                 54: ["M3 7.5\"",  800, 480],
+                96: ["HS BWY 3.5\"",  384, 184],
+                97: ["HS BWR 3.5\"",  384, 184],
+                98: ["HS BW 3.5\"",  384, 184],
+                178: ["Gicisky BLE EPD BW 2.9\"",  296, 128],
+                179: ["Gicisky BLE EPD BWR 2.9\"",  296, 128],
+                181: ["Gicisky BLE EPD BWR 4.2\"",  400, 300],
+                190: ["ATC MiThermometer BLE",  6, 8],
                 224: ["AP display",  320, 170],
+                225: ["AP display",  160, 80],
                 240: ["Segmented",  0, 0]
             }
             if hwType in hwmap:
@@ -139,7 +147,7 @@ class Hub:
                     "height": hwmap[hwType][2],
                 })
             else:
-                _LOGGER.warning("Id not in hwmap, pleas open an issue on github about this." +str(hwType))
+                _LOGGER.warning("Id not in hwmap, please open an issue on github about this." +str(hwType))
                 
             self.data[tagmac] = dict()
             self.data[tagmac]["temperature"] = temperature
