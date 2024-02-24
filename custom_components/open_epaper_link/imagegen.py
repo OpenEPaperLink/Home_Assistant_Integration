@@ -488,7 +488,7 @@ def handlequeue():
             queue.append(tp)
     running = False;
 # upload an image to the tag
-def uploadimg(img, mac, ip, dither,ttl,hass):
+def uploadimg(img, mac, ip, dither,ttl,preloadtype,preloadlut,hass):
     setup(hass,notsetup)
     url = "http://" + ip + "/imgupload"
     mp_encoder = MultipartEncoder(
@@ -497,6 +497,8 @@ def uploadimg(img, mac, ip, dither,ttl,hass):
             'contentmode': "25",
             'dither': "1" if dither else "0",
             'ttl': str( ttl),
+            'preloadtype': str( preloadtype),
+            'preloadlut': str( preloadlut),
             'image': ('image.jpg', img, 'image/jpeg'),
         }
     )
