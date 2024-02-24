@@ -36,13 +36,15 @@ def setup(hass, config):
 
         dither = service.data.get("dither", False)
         ttl = service.data.get("ttl", 60)
+        preloadtype = service.data.get("preloadtype", 0)
+        preloadlut = service.data.get("preloadlut", 0)
         dry_run = service.data.get("dry-run", False)
         for entity_id in entity_ids:
             _LOGGER.info("Called entity_id: %s" % (entity_id))
             imgbuff = await hass.async_add_executor_job(customimage,entity_id, service, hass)
             id = entity_id.split(".")
             if (dry_run is False):
-                result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip, dither,ttl,hass)
+                result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip, dither,ttl,preloadtype,preloadlut,hass)
             else:
                 _LOGGER.info("Running dry-run - no upload to AP!")
                 result = True
@@ -56,7 +58,7 @@ def setup(hass, config):
             _LOGGER.info("Called entity_id: %s" % (entity_id))
             id = entity_id.split(".")
             imgbuff = await hass.async_add_executor_job(downloadimg, entity_id, service, hass)
-            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip, dither,300,hass)
+            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip, dither,300,0,0,hass)
 
     # callback for the 5 line service(depricated)
     async def lines5service(service: ServiceCall) -> None:
@@ -66,7 +68,7 @@ def setup(hass, config):
             _LOGGER.info("Called entity_id: %s" % (entity_id))
             imgbuff = gen5line(entity_id, service, hass)
             id = entity_id.split(".")
-            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip,False,300,hass)
+            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip,False,300,0,0,hass)
 
     # callback for the 4 line service(depricated)
     async def lines4service(service: ServiceCall) -> None:
@@ -76,7 +78,7 @@ def setup(hass, config):
             _LOGGER.info("Called entity_id: %s" % (entity_id))
             imgbuff = gen4line(entity_id, service, hass)
             id = entity_id.split(".")
-            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip,False,300,hass)
+            result = await hass.async_add_executor_job(uploadimg, imgbuff, id[1], ip,False,300,0,0,hass)
             
     # callback for the setled service
     async def setled(service: ServiceCall) -> None:
