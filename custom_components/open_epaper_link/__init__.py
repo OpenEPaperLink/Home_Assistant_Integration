@@ -23,7 +23,7 @@ def rgb_to_rgb332(rgb):
     # Combine the RGB332 components and convert to hex
     rgb332 = (r << 5) | (g << 2) | b
 
-    return "0x" + str(hex(rgb332)[2:].zfill(2))
+    return str(hex(rgb332)[2:].zfill(2))
 
 def setup(hass, config):
     # callback for the draw custom service
@@ -89,21 +89,21 @@ def setup(hass, config):
             modebyte = "0"
             if(mode == "off"): modebyte = "0"
             if(mode == "flash"): modebyte = "1"
-            brightness = str(service.data.get("brightness", 2) - 1)
-            repeats = str(service.data.get("repeats", 2) - 1)
+            modebyte = hex(int((int(service.data.get("brightness", 2) - 1) << 4)) + int(modebyte))[2:]
+            repeats = int_to_hex_string(service.data.get("repeats", 2) - 1)
             color1 = rgb_to_rgb332(service.data.get("color1", ""))
             color2 = rgb_to_rgb332(service.data.get("color2", ""))
             color3 = rgb_to_rgb332(service.data.get("color3", ""))
-            flashSpeed1 = str(int(service.data.get("flashSpeed1", 2) * 10))
-            flashSpeed2 = str(int(service.data.get("flashSpeed2", 2) * 10))
-            flashSpeed3 = str(int(service.data.get("flashSpeed3", 2) * 10))
-            flashCount1 = str(int(service.data.get("flashCount1", 2)))
-            flashCount2 = str(int(service.data.get("flashCount2", 2)))
-            flashCount3 = str(int(service.data.get("flashCount3", 2)))
-            delay1 = str(int(service.data.get("delay1", 2) * 10))
-            delay2 = str(int(service.data.get("delay2", 2) * 10))
-            delay3 = str(int(service.data.get("delay3", 2) * 10))
-            url = "http://" + ip + "/led_flash?mac=" + mac + "&pattern=" + modebyte + "," + brightness + "/" + color1 + "," + flashCount1 + "," + flashSpeed1 + "/" + color2 + "," + flashCount2 + "," + flashSpeed2 + "/" + color3 + "," + flashCount3 + "," + flashSpeed3 + "/" + repeats + "/" + delay1 + "," + delay2 + "," + delay3 + "/0";
+            flashSpeed1 = hex(int(service.data.get("flashSpeed1", 2) * 10))[2:]
+            flashSpeed2 = hex(int(service.data.get("flashSpeed2", 2) * 10))[2:]
+            flashSpeed3 = hex(int(service.data.get("flashSpeed3", 2) * 10))[2:]
+            flashCount1 = hex(int(service.data.get("flashCount1", 2)))[2:]
+            flashCount2 = hex(int(service.data.get("flashCount2", 2)))[2:]
+            flashCount3 = hex(int(service.data.get("flashCount3", 2)))[2:]
+            delay1 = int_to_hex_string(int(service.data.get("delay1", 2) * 10))
+            delay2 = int_to_hex_string(int(service.data.get("delay2", 2) * 10))
+            delay3 = int_to_hex_string(int(service.data.get("delay3", 2) * 10))
+            url = "http://" + ip + "/led_flash?mac=" + mac + "&pattern=" + modebyte + color1 + flashSpeed1 + flashCount1 + delay1 + color2 + flashSpeed2 + flashCount2 + delay2 + color3 + flashSpeed3 + flashCount3 + delay3 + repeats + "00";
             result = await hass.async_add_executor_job(requests.get, url)
             if result.status_code != 200:
                _LOGGER.warning(result.status_code)
@@ -117,6 +117,12 @@ def setup(hass, config):
     # error haneling needs to be improved
     return True
 
+def int_to_hex_string(number):
+    hex_string = hex(number)[2:]
+    if len(hex_string) == 1:
+         hex_string = '0' + hex_string
+    return hex_string
+    
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub.Hub(hass, entry.data["host"], entry)
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
