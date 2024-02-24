@@ -494,6 +494,7 @@ def uploadimg(img, mac, ip, dither,ttl,hass):
     mp_encoder = MultipartEncoder(
         fields={
             'mac': mac,
+            'contentmode': "25",
             'dither': "1" if dither else "0",
             'ttl': str( ttl),
             'image': ('image.jpg', img, 'image/jpeg'),
