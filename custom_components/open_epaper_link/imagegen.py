@@ -175,12 +175,13 @@ def customimage(entity_id, service, hass):
             font_file = os.path.join(os.path.dirname(__file__), font)
             font = ImageFont.truetype(font_file, size)
             color = element.get('color', "black")
+            anchor = element.get('anchor', "lm")
             _LOGGER.debug("Got Multiline string: %s with delimiter: %s" % (element['value'],element["delimiter"]))
             lst = element['value'].replace("\n","").split(element["delimiter"])
             pos = element.get('start_y', pos_y + element.get('y_padding', 10))
             for elem in lst:
                 _LOGGER.debug("String: %s" % (elem))
-                d.text((element['x'], pos ), str(elem), fill=getIndexColor(color), font=font)
+                d.text((element['x'], pos ), str(elem), fill=getIndexColor(color), font=font, anchor=anchor)
                 pos = pos + element['offset_y']
             pos_y = pos
         #icon
