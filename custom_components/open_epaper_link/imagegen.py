@@ -181,7 +181,7 @@ def customimage(entity_id, service, hass):
             pos = element.get('start_y', pos_y + element.get('y_padding', 10))
             for elem in lst:
                 _LOGGER.debug("String: %s" % (elem))
-                d.text((element['x'], pos ), str(elem), fill=getIndexColor(color), font=font, anchor=anchor))
+                d.text((element['x'], pos ), str(elem), fill=getIndexColor(color), font=font, anchor=anchor)
                 pos = pos + element['offset_y']
             pos_y = pos
         #icon
