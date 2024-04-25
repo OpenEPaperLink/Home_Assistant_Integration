@@ -10,6 +10,7 @@ import qrcode
 import shutil
 import asyncio
 import time
+import base64
 from .const import DOMAIN
 from .util import get_image_folder, get_image_path
 from PIL import Image, ImageDraw, ImageFont
@@ -224,6 +225,26 @@ def customimage(entity_id, service, hass):
             if "http://" in url or "https://" in url:
                 response = requests.get(url)
                 imgdl = Image.open(io.BytesIO(response.content))
+            elif "data:" in url:
+                s = url[5:]
+                if not s or ',' not in s:
+                    raise HomeAssistantError('invalid data url')
+                media_type, _, raw_data = s.partition(',')
+                is_base64_encoded = media_type.endswith(';base64')
+                if is_base64_encoded:
+                    media_type = media_type[:-7]
+                    missing_padding = '=' * (-len(raw_data) % 4)
+                    if missing_padding:
+                        raw_data += missing_padding
+                    try:
+                        data = base64.b64decode(raw_data)
+                    except ValueError as exc:
+                        raise HomeAssistantError('invalid base64 in data url') from exc
+                else:
+                    # Note: unquote_to_bytes() does not raise exceptions for invalid
+                    # or partial escapes, so there is no error handling here.
+                    data = urllib.parse.unquote_to_bytes(raw_data)
+                imgdl = Image.open(io.BytesIO(data))
             else:
                 imgdl = Image.open(url)
                 

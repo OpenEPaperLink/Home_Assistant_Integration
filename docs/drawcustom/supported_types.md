@@ -206,7 +206,7 @@ Downloads an image from a URL and renders it.
 
 #### Parameters:
 
-- **url** (required) url of the image to download. Either the full http/https URL address for an externally accessible image, or locally stored image needs to be e.g. `url: /config/media/chuck-icon.jpg` if stored within a folder called `media` in your main config or homeassistant folder.
+- **url** (required) url of the image to download. Either the full http/https URL address for an externally accessible image or Data URI like 'data:image/gif;base64,R0lGODdhAQABAPAAAP8AAAAAACwAAAAAAQABAAACAkQBADs' or locally stored image needs to be e.g. `url: /config/media/chuck-icon.jpg` if stored within a folder called `media` in your main config or homeassistant folder.
 - **x** (required) e.g. 20
 - **y** (required) e.g. 10
 - **xsize** (required) e.g. x size the image is resized
