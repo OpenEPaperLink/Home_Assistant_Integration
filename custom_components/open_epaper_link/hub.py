@@ -188,7 +188,7 @@ class Hub:
                 "device_id": tagmac,
                 "type": lut[wakeupReason],
             }
-            self._hass.bus.async_fire(DOMAIN + "_event", event_data)
+            self._hass.bus.fire(DOMAIN + "_event", event_data)
         elif 'errMsg' in data:
             ermsg = data.get('errMsg');
         elif 'logMsg' in data:
