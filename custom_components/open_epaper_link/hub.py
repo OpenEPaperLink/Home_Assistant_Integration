@@ -130,6 +130,7 @@ class Hub:
                 178: ["Gicisky BLE EPD BW 2.9\"",  296, 128],
                 179: ["Gicisky BLE EPD BWR 2.9\"",  296, 128],
                 181: ["Gicisky BLE EPD BWR 4.2\"",  400, 300],
+                186: ["Gicisky BLE TFT 2.13\"",  250, 132],
                 191: ["Gicisky BLE Unknown",  0, 0],
                 190: ["ATC MiThermometer BLE",  6, 8],
                 224: ["AP display",  320, 170],
