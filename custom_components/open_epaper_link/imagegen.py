@@ -147,6 +147,13 @@ def customimage(entity_id, service, hass):
         if element["type"] == "rectangle":
             img_rect = ImageDraw.Draw(img)  
             img_rect.rectangle([(element['x_start'],element['y_start']),(element['x_end'],element['y_end'])],fill = getIndexColor(element['fill']), outline=getIndexColor(element['outline']), width=element['width'])
+        #rectangle pattern
+        if element["type"] == "rectangle_pattern":
+            img_rect_pattern = ImageDraw.Draw(img)
+            for x in range(element["x_repeat"]):
+                for y in range(element["y_repeat"]):
+                    img_rect_pattern.rectangle([(element['x_start'] + x * (element['x_offset'] + element['x_size']),element['y_start'] + y * (element['y_offset'] + element['y_size'])),(element['x_start'] + x * (element['x_offset'] + element['x_size'])+element['x_size'],element['y_start'] + y * (element['y_offset'] + element['y_size'])+element['y_size'])], fill=getIndexColor(element['fill']),outline=getIndexColor(element['outline']),width=element['width'])
+
         #text
         if element["type"] == "text":
             d = ImageDraw.Draw(img)
