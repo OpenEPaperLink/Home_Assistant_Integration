@@ -169,6 +169,40 @@ Draws a rectangle.
 - **width** (required) width of outline, e.g. 2
 - **visible** (optional) show element, default: True
 
+### rectangle pattern
+
+Draws rectangles that are repeated in x and y dierction.
+
+```yaml
+  - type: rectangle_pattern
+    x_start: 5
+    x_size: 35
+    x_offset: 10
+    y_start: 28
+    y_size: 18
+    y_offset: 2
+    fill: white
+    outline: red
+    width: 1
+    x_repeat: 1
+    y_repeat: 4
+```
+
+#### Parameters:
+
+- **x_start** (required)
+- **x_size** (required) length of rectangle in the x direction
+- **x_offset** (required) distance between rectangles in x direction
+- **y_start** (required)
+- **y_size** (required) length of rectangle in the y direction
+- **y_offset** (required) distance between rectangles in y direction
+- **fill** (required) e.g. black, use `null` to not draw the inside
+- **outline** (required) e.g. red
+- **width** (required) width of outline
+- **x_repeat** (required) number of rectangles in x direction
+- **y_repeat** (required) number of rectangles in y direction
+- **visible** (optional) show element, default: True
+
 ### icon
 
 Draws an icon.
