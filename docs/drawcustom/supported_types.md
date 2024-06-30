@@ -84,6 +84,8 @@ Draws text.
 - **anchor** (optional) Position from the text, which shall be used as anchor. default: `lt` (left_top). Other options include `mm` (middle_middle). See https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html
 - **max_width** (optional) creates line breaks in the provided text, if text is longer than `max_width` defines
 - **spacing** (optional) if line breaks created in the provided text using `max_width`, set spacing between single lines. Default: 5
+- **stroke_width** (optional) adds stroke around text with color `stroke_fill`. Default: 0
+- **stroke_fill** (optional) the color of the added stroke. Default: white
 - **align** (optional) left, center, right default: left (this sets the alignment of any **new lines**)
 - **visible** (optional) show element, default: True
 
@@ -114,8 +116,10 @@ This payload takes a string and a delimiter, and will break the string on every 
 - **size** (optional) size of text, default: 20
 - **font** (optional) name of ttf font file (see [text](#text) above for details). default: `ppb.ttf`
 - **color** (optional) font color of text. default: black
-- **align** (optional) left, center, right default: left (if text contains `\n` this sets the alignment of the lines)
 - **spacing** (optional) if multiline text, spacing between single lines
+- **stroke_width** (optional) adds stroke around text with color `stroke_fill`. Default: 0
+- **stroke_fill** (optional) the color of the added stroke. Default: white
+- **align** (optional) left, center, right default: left (if text contains `\n` this sets the alignment of the lines)
 - **visible** (optional) show element, default: True
 
 ### line
