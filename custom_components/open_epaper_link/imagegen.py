@@ -129,7 +129,7 @@ def customimage(entity_id, service, hass):
         img = Image.new('RGBA', (canvas_width, canvas_height), color=background)
     pos_y = 0
     for element in payload:
-        _LOGGER.info("type: " + element["type"])
+        _LOGGER.debug("type: " + element["type"])
         if not should_show_element(element):
             continue
         #line
@@ -170,13 +170,15 @@ def customimage(entity_id, service, hass):
             anchor = element.get('anchor', "lt")
             align = element.get('align', "left")
             spacing = element.get('spacing', 5)
+            stroke_width = element.get('stroke_width', 0)
+            stroke_fill = element.get('stroke_fill', 'white')
             if "max_width" in element:
                 text = get_wrapped_text(str(element['value']), font, line_length=element['max_width'])
                 anchor = None
             else:
                 text = str(element['value'])
-            d.text((element['x'],  akt_pos_y), text, fill=getIndexColor(color), font=font, anchor=anchor, align=align, spacing=spacing)
-            textbbox = d.textbbox((element['x'],  akt_pos_y), text, font=font, anchor=anchor, align=align, spacing=spacing)
+            d.text((element['x'],  akt_pos_y), text, fill=getIndexColor(color), font=font, anchor=anchor, align=align, spacing=spacing, stroke_width=stroke_width, stroke_fill=stroke_fill)
+            textbbox = d.textbbox((element['x'],  akt_pos_y), text, font=font, anchor=anchor, align=align, spacing=spacing, stroke_width=stroke_width)
             pos_y = textbbox[3]
         if element["type"] == "multiline":
             d = ImageDraw.Draw(img)
@@ -187,12 +189,14 @@ def customimage(entity_id, service, hass):
             font = ImageFont.truetype(font_file, size)
             color = element.get('color', "black")
             anchor = element.get('anchor', "lm")
+            stroke_width = element.get('stroke_width', 0)
+            stroke_fill = element.get('stroke_fill', 'white')
             _LOGGER.debug("Got Multiline string: %s with delimiter: %s" % (element['value'],element["delimiter"]))
             lst = element['value'].replace("\n","").split(element["delimiter"])
             pos = element.get('start_y', pos_y + element.get('y_padding', 10))
             for elem in lst:
                 _LOGGER.debug("String: %s" % (elem))
-                d.text((element['x'], pos ), str(elem), fill=getIndexColor(color), font=font, anchor=anchor)
+                d.text((element['x'], pos ), str(elem), fill=getIndexColor(color), font=font, anchor=anchor, stroke_width=stroke_width, stroke_fill=stroke_fill)
                 pos = pos + element['offset_y']
             pos_y = pos
         #icon
@@ -202,7 +206,7 @@ def customimage(entity_id, service, hass):
             # ttf from https://github.com/Templarian/MaterialDesign-Webfont/blob/master/fonts/materialdesignicons-webfont.ttf
             font_file = os.path.join(os.path.dirname(__file__), 'materialdesignicons-webfont.ttf')
             meta_file = os.path.join(os.path.dirname(__file__), "materialdesignicons-webfont_meta.json") 
-            f = open(meta_file) 
+            f = open(meta_file)
             data = json.load(f)
             chr_hex = ""
             value = element['value']
@@ -219,9 +223,11 @@ def customimage(entity_id, service, hass):
                         break
             if chr_hex == "":
                 raise HomeAssistantError("Non valid icon used: "+ value)
+            stroke_width = element.get('stroke_width', 0)
+            stroke_fill = element.get('stroke_fill', 'white')
             font = ImageFont.truetype(font_file, element['size'])
             anchor = element['anchor'] if 'anchor' in element else "la"
-            d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=getIndexColor(element['color']), font=font, anchor=anchor)
+            d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=getIndexColor(element['color']), font=font, anchor=anchor, stroke_width=stroke_width, stroke_fill=stroke_fill)
        #dlimg
         if element["type"] == "dlimg":
             url = element['url']
@@ -491,6 +497,7 @@ def customimage(entity_id, service, hass):
     rgb_image.save(buf, format='JPEG', quality="maximum")
     byte_im = buf.getvalue()
     return byte_im
+
 # adds an image to the queue
 def queueimg(url, content):
     queue.append([url,content])
