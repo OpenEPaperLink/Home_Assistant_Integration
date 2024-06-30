@@ -129,7 +129,7 @@ def customimage(entity_id, service, hass):
         img = Image.new('RGBA', (canvas_width, canvas_height), color=background)
     pos_y = 0
     for element in payload:
-        _LOGGER.info("type: " + element["type"])
+        _LOGGER.debug("type: " + element["type"])
         if not should_show_element(element):
             continue
         #line
