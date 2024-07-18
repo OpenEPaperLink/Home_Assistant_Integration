@@ -482,6 +482,71 @@ def customimage(entity_id, service, hass):
                         img_draw.rectangle([(diag_x + yaxis_width, curr_y), (diag_x + yaxis_width + yaxis_tick_width - 1, curr_y)], width=0, fill=getIndexColor(yaxis_color))
                         curr += yaxis_tick_every
 
+        # progress_bar
+        if element["type"] == "progress_bar":
+            img_draw = ImageDraw.Draw(img)
+
+            x_start = element['x_start']
+            y_start = element['y_start']
+            x_end = element['x_end']
+            y_end = element['y_end']
+            progress = element['progress']
+            direction = element.get('direction', 'right')
+            background = getIndexColor(element.get('background', 'white'))
+            fill = getIndexColor(element.get('fill', 'red'))
+            outline = getIndexColor(element.get('outline', 'black'))
+            width = element.get('width', 1)
+            show_percentage = element.get('show_percentage', False)
+
+            # background
+            img_draw.rectangle([(x_start, y_start), (x_end, y_end)], fill=background, outline=outline, width=width)
+
+            # Calculate progress dimensions
+            if direction in ['right', 'left']:
+                progress_width = int((x_end - x_start) * (progress / 100))
+                progress_height = y_end - y_start
+            else:  # up or down
+                progress_width = x_end - x_start
+                progress_height = int((y_end - y_start) * (progress / 100))
+
+            # Draw progress
+            if direction == 'right':
+                img_draw.rectangle([(x_start, y_start), (x_start + progress_width, y_end)], fill=fill)
+            elif direction == 'left':
+                img_draw.rectangle([(x_end - progress_width, y_start), (x_end, y_end)], fill=fill)
+            elif direction == 'up':
+                img_draw.rectangle([(x_start, y_end - progress_height), (x_end, y_end)], fill=fill)
+            elif direction == 'down':
+                img_draw.rectangle([(x_start, y_start), (x_end, y_start + progress_height)], fill=fill)
+
+            img_draw.rectangle([(x_start, y_start), (x_end, y_end)], fill=None, outline=outline, width=width)
+
+            # display percentage text if enabled
+            if show_percentage:
+                font_size = min(y_end - y_start - 4, x_end - x_start - 4, 20)  # Adjust max font size as needed
+                font = ImageFont.truetype(os.path.join(os.path.dirname(__file__), 'ppb.ttf'), font_size)
+                percentage_text = f"{progress}%"
+
+                # Calculate text position
+                text_bbox = img_draw.textbbox((0, 0), percentage_text, font=font)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_height = text_bbox[3] - text_bbox[1]
+                text_x = (x_start + x_end - text_width) // 2
+                text_y = (y_start + y_end - text_height) // 2
+
+                # text color based on progress
+                if progress > 50:
+                    text_color = background
+                else:
+                    text_color = fill
+
+                # Draw text
+                img_draw.text((text_x, text_y), percentage_text, font=font, fill=text_color)
+
+
+
+
+
     #post processing
     img = img.rotate(rotate, expand=True)
     rgb_image = img.convert('RGB')

@@ -347,6 +347,7 @@ Draws a progress bar
   width: 1
   progress: 42
   direction: right
+  show_percentage: true
 ```
 
 #### Parameters:
@@ -362,3 +363,4 @@ Draws a progress bar
 - **outline** (optional, default `black`) color of outline
 - **width** (optional, default `1`) width of outline
 - **visible** (optional, default `True`) show element
+- **show_percentage** (optional, default `False`) show percentage in the middle of the progress bar
