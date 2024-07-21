@@ -531,8 +531,8 @@ def customimage(entity_id, service, hass):
                 text_bbox = img_draw.textbbox((0, 0), percentage_text, font=font)
                 text_width = text_bbox[2] - text_bbox[0]
                 text_height = text_bbox[3] - text_bbox[1]
-                text_x = (x_start + x_end - text_width) // 2
-                text_y = (y_start + y_end - text_height) // 2
+                text_x = (x_start + x_end - text_width) / 2
+                text_y = (y_start + y_end - text_height) / 2
 
                 # text color based on progress
                 if progress > 50:
@@ -541,7 +541,7 @@ def customimage(entity_id, service, hass):
                     text_color = fill
 
                 # Draw text
-                img_draw.text((text_x, text_y), percentage_text, font=font, fill=text_color)
+                img_draw.text((text_x, text_y), percentage_text, font=font, fill=text_color, anchor='lt') # TODO anchor is still off
 
 
 
