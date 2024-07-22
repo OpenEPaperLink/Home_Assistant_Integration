@@ -175,7 +175,7 @@ Draws a rectangle.
 
 ### rectangle pattern
 
-Draws rectangles that are repeated in x and y dierction.
+Draws rectangles that are repeated in x and y direction.
 
 ```yaml
   - type: rectangle_pattern
@@ -333,3 +333,34 @@ The plot will scale according to the data, so you should only use multiple entit
   - **width** (optional, default `1`) the width of the plot line
   - **joint** (optional, default `null`) sets the `joint` option for the [line draw funtion](https://pillow.readthedocs.io/en/stable/reference/ImageDraw.html#PIL.ImageDraw.ImageDraw.line), can be `curve` or `null`
 - **visible** (optional) show element, default: True
+
+### Progress Bar
+Draws a progress bar
+```yaml
+- type: progress_bar
+  x_start: 10
+  y_start: 10
+  x_end: 280
+  y_end: 30
+  fill: red
+  outline: black
+  width: 1
+  progress: 42
+  direction: right
+  show_percentage: true
+```
+
+#### Parameters:
+
+- **x_start** (required)
+- **y_start** (required)
+- **x_end** (required)
+- **y_end** (required)
+- **progress** (required) progress in percent, eg. `42`
+- **direction** (optional, default `right`) direction in which the progress bar should be filled, possible values are `right`, `left` `up`, `down`
+- **background** (optional, default `white`)
+- **fill** (optional, default `red`) color of the progress bar 
+- **outline** (optional, default `black`) color of outline
+- **width** (optional, default `1`) width of outline
+- **visible** (optional, default `True`) show element
+- **show_percentage** (optional, default `False`) show percentage in the middle of the progress bar
