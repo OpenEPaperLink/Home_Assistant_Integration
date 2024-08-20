@@ -143,8 +143,8 @@ Draws a line.
 - **y_padding** (optional) if no `y_start` is provided, this will offset the start of the line to the last text block
 - **x_end** (required)
 - **y_end** (optional)
-- **fill** (required)
-- **width** (required)
+- **fill** (optional) default black
+- **width** (optional) default 1
 - **visible** (optional) show element, default: True
 
 ### rectangle
@@ -168,9 +168,9 @@ Draws a rectangle.
 - **y_start** (required)
 - **x_end** (required)
 - **y_end** (required)
-- **fill** (required) e.g. black, use `null` to not draw the inside
-- **outline** (required) e.g. red
-- **width** (required) width of outline, e.g. 2
+- **fill** (optional) default `null`, use `null` to not draw the inside
+- **outline** (optional) default black
+- **width** (optional) width of outline, default 1
 - **visible** (optional) show element, default: True
 
 ### rectangle pattern
@@ -200,9 +200,9 @@ Draws rectangles that are repeated in x and y direction.
 - **y_start** (required)
 - **y_size** (required) length of rectangle in the y direction
 - **y_offset** (required) distance between rectangles in y direction
-- **fill** (required) e.g. black, use `null` to not draw the inside
-- **outline** (required) e.g. red
-- **width** (required) width of outline
+- **fill** (optional) default `null` use `null` to not draw the inside
+- **outline** (optional) default black
+- **width** (optional) default 1
 - **x_repeat** (required) number of rectangles in x direction
 - **y_repeat** (required) number of rectangles in y direction
 - **visible** (optional) show element, default: True
@@ -224,7 +224,7 @@ Draws an icon.
 
 - value (required) name of icon from <https://pictogrammers.com/library/mdi/>, may be optionally prefixed with "mdi:"
 - size (required) e.g. 20
-- color (required) e.g. black, white, red
+- fill (optional) default black (was color before)
 - anchor (optional) position from the text, (see [text](#text) above for details)
 - **visible** (optional) show element, default: True
 
@@ -249,7 +249,7 @@ Downloads an image from a URL and renders it.
 - **y** (required) e.g. 10
 - **xsize** (required) e.g. x size the image is resized
 - **ysize** (required) e.g. y size the image is resized
-- **rotate** (required) e.g. 0
+- **rotate** (optional) default 0
 - **visible** (optional) show element, default: True
 
 ### qrcode
@@ -270,10 +270,10 @@ Downloads an image from a URL and renders it.
 - **data** (required) content of the qr code
 - **x** (required) e.g. 20
 - **y** (required) e.g. 10
-- **boxsize** (required) e.g. 2
-- **border** (required) e.g. 2
-- **color** (required) e.g. black
-- **bgcolor** (required) e.g. white
+- **boxsize** (optional) default 2
+- **border** (optional) default 1
+- **color** (optional) default black
+- **bgcolor** (optional) default white
 - **visible** (optional) show element, default: True
 
 ### plot

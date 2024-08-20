@@ -132,29 +132,45 @@ def customimage(entity_id, service, hass):
         _LOGGER.debug("type: " + element["type"])
         if not should_show_element(element):
             continue
-        #line
+        # line
         if element["type"] == "line":
             img_line = ImageDraw.Draw(img)  
-            if not "y_start" in element:
+            if "y_start" not in element:
                 y_start = pos_y + element.get("y_padding", 0)
                 y_end = y_start
             else:
                 y_start = element["y_start"]
                 y_end = element["y_end"]
-            img_line.line([(element['x_start'],y_start),(element['x_end'],y_end)],fill = getIndexColor(element['fill']), width=element['width'])
+
+            fill = getIndexColor(element['fill']) if 'fill' in element else black
+            width = element['width'] if 'width' in element else 1
+
+            img_line.line([(element['x_start'], y_start), (element['x_end'], y_end)], fill=fill, width=width)
             pos_y = y_start
-        #rectangle
+        # rectangle
         if element["type"] == "rectangle":
-            img_rect = ImageDraw.Draw(img)  
-            img_rect.rectangle([(element['x_start'],element['y_start']),(element['x_end'],element['y_end'])],fill = getIndexColor(element['fill']), outline=getIndexColor(element['outline']), width=element['width'])
-        #rectangle pattern
+            img_rect = ImageDraw.Draw(img)
+            fill = getIndexColor(element['fill']) if 'fill' in element else None
+            outline = getIndexColor(element['outline']) if 'outline' in element else "black"
+            width = element['width'] if 'width' in element else 1
+            img_rect.rectangle([(element['x_start'], element['y_start']), (element['x_end'], element['y_end'])],
+                               fill=fill, outline=outline, width=width)
+        # rectangle pattern
         if element["type"] == "rectangle_pattern":
             img_rect_pattern = ImageDraw.Draw(img)
+            fill = getIndexColor(element['fill']) if 'fill' in element else None
+            outline = getIndexColor(element['outline']) if 'outline' in element else "black"
+            width = element['width'] if 'width' in element else 1
             for x in range(element["x_repeat"]):
                 for y in range(element["y_repeat"]):
-                    img_rect_pattern.rectangle([(element['x_start'] + x * (element['x_offset'] + element['x_size']),element['y_start'] + y * (element['y_offset'] + element['y_size'])),(element['x_start'] + x * (element['x_offset'] + element['x_size'])+element['x_size'],element['y_start'] + y * (element['y_offset'] + element['y_size'])+element['y_size'])], fill=getIndexColor(element['fill']),outline=getIndexColor(element['outline']),width=element['width'])
+                    img_rect_pattern.rectangle([(element['x_start'] + x * (element['x_offset'] + element['x_size']),
+                                                 element['y_start'] + y * (element['y_offset'] + element['y_size'])),
+                                                (element['x_start'] + x * (element['x_offset'] + element['x_size'])
+                                                 + element['x_size'], element['y_start'] + y * (element['y_offset']
+                                                 + element['y_size'])+element['y_size'])],
+                                               fill=fill, outline=outline, width=width)
 
-        #text
+        # text
         if element["type"] == "text":
             d = ImageDraw.Draw(img)
             d.fontmode = "1"
@@ -199,7 +215,7 @@ def customimage(entity_id, service, hass):
                 d.text((element['x'], pos ), str(elem), fill=getIndexColor(color), font=font, anchor=anchor, stroke_width=stroke_width, stroke_fill=stroke_fill)
                 pos = pos + element['offset_y']
             pos_y = pos
-        #icon
+        # icon
         if element["type"] == "icon":
             d = ImageDraw.Draw(img)
             d.fontmode = "1"
@@ -227,15 +243,18 @@ def customimage(entity_id, service, hass):
             stroke_fill = element.get('stroke_fill', 'white')
             font = ImageFont.truetype(font_file, element['size'])
             anchor = element['anchor'] if 'anchor' in element else "la"
-            d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=getIndexColor(element['color']), font=font, anchor=anchor, stroke_width=stroke_width, stroke_fill=stroke_fill)
-       #dlimg
+            fill = getIndexColor(element['color']) if 'color' in element \
+                else getIndexColor(element['fill']) if 'fill' in element else "black"
+            d.text((element['x'],  element['y']), chr(int(chr_hex, 16)), fill=fill, font=font,
+                   anchor=anchor, stroke_width=stroke_width, stroke_fill=stroke_fill)
+        # dlimg
         if element["type"] == "dlimg":
             url = element['url']
             pos_x = element['x']
             pos_y = element['y']
             xsize = element['xsize']
             ysize = element['ysize']
-            rotate2 = element['rotate']
+            rotate2 = element['rotate'] if 'rotate' in element else 0
             res = [xsize,ysize]
             imgdl = ""
             if "http://" in url or "https://" in url:
@@ -274,15 +293,15 @@ def customimage(entity_id, service, hass):
             temp_image.paste(imgdl, (pos_x,pos_y), imgdl)
             img = Image.alpha_composite(img, temp_image)
             img.convert('RGBA')
-        #qrcode
+        # qrcode
         if element["type"] == "qrcode":
             data = element['data']
             pos_x = element['x']
             pos_y = element['y']
-            color = element['color']
-            bgcolor = element['bgcolor']
-            border = element['border']
-            boxsize = element['boxsize']
+            color = element['color'] if 'color' in element else "black"
+            bgcolor = element['bgcolor'] if 'bgcolor' in element else "white"
+            border = element['border'] if 'border' in element else 1
+            boxsize = element['boxsize'] if 'boxsize' in element else 2
             qr = qrcode.QRCode(
                 version=1,
                 error_correction=qrcode.constants.ERROR_CORRECT_H,
@@ -296,7 +315,7 @@ def customimage(entity_id, service, hass):
             imgqr = imgqr.convert("RGBA")
             img.paste(imgqr, position, imgqr)
             img.convert('RGBA')
-        #diagram
+        # diagram
         if element["type"] == "diagram":
             img_draw = ImageDraw.Draw(img)
             d = ImageDraw.Draw(img)
