@@ -185,6 +185,16 @@ def customimage(entity_id, service, hass):
             width = element['width'] if 'width' in element else 1
             img_circle.circle((element['x'], element['y']), element['radius'], fill=fill, outline=outline, width=width)
 
+        # ellipse
+        if element["type"] == "ellipse":
+            check_for_missing_required_arguments(element, ["x_start", "x_end", "y_start", "y_end"], "ellipse")
+            img_ellipse = ImageDraw.Draw(img)
+            fill = getIndexColor(element['fill']) if 'fill' in element else None
+            outline = getIndexColor(element['outline']) if 'outline' in element else "black"
+            width = element['width'] if 'width' in element else 1
+            img_ellipse.ellipse([(element['x_start'], element['y_start']), (element['x_end'], element['y_end'])],
+                                fill=fill, outline=outline, width=width)
+
         # text
         if element["type"] == "text":
             check_for_missing_required_arguments(element, ["x", "value"], "text")

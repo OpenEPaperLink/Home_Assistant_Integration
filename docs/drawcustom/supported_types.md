@@ -227,6 +227,28 @@ Draws a circle around a center point.
 - **outline** (optional) default black
 - **width** (optional) width of outline, default 1
 
+### ellipse
+
+Draws an ellipse inside the bounding box.
+
+```yaml
+- type: ellipse
+  x_start: 50
+  x_end: 100
+  y_start: 50
+  y_end: 100
+```
+
+#### Parameters:
+
+- **x_start** (required) x position of the upper left corner
+- **y_start** (required) y position of the upper left corner
+- **x_end** (required) x position of the lower right corner
+- **y_end** (required) y position of the lower right corner
+- **fill** (optional) default `null`, use `null` to not draw the inside
+- **outline** (optional) default black
+- **width** (optional) width of outline, default 1
+
 ### icon
 
 Draws an icon.
