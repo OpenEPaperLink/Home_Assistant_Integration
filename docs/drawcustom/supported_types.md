@@ -223,6 +223,8 @@ Draws an icon.
 #### Parameters:
 
 - value (required) name of icon from <https://pictogrammers.com/library/mdi/>, may be optionally prefixed with "mdi:"
+- x (required) x position
+- y (required) y position
 - size (required) e.g. 20
 - fill (optional) default black (was color before)
 - anchor (optional) position from the text, (see [text](#text) above for details)
