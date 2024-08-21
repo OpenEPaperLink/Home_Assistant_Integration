@@ -207,6 +207,26 @@ Draws rectangles that are repeated in x and y direction.
 - **y_repeat** (required) number of rectangles in y direction
 - **visible** (optional) show element, default: True
 
+### circle
+
+Draws a circle around a center point.
+
+```yaml
+- type: circle
+  x: 50
+  y: 50
+  radius: 20
+```
+
+#### Parameters:
+
+- **x** (required) x position of the center
+- **y** (required) y position of the center
+- **radius** (required) radius of the circle
+- **fill** (optional) default `null`, use `null` to not draw the inside
+- **outline** (optional) default black
+- **width** (optional) width of outline, default 1
+
 ### icon
 
 Draws an icon.

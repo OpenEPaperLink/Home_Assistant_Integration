@@ -176,6 +176,15 @@ def customimage(entity_id, service, hass):
                                                  + element['y_size'])+element['y_size'])],
                                                fill=fill, outline=outline, width=width)
 
+        # circle
+        if element["type"] == "circle":
+            check_for_missing_required_arguments(element, ["x", "y", "radius"], "circle")
+            img_circle = ImageDraw.Draw(img)
+            fill = getIndexColor(element['fill']) if 'fill' in element else None
+            outline = getIndexColor(element['outline']) if 'outline' in element else "black"
+            width = element['width'] if 'width' in element else 1
+            img_circle.circle((element['x'], element['y']), element['radius'], fill=fill, outline=outline, width=width)
+
         # text
         if element["type"] == "text":
             check_for_missing_required_arguments(element, ["x", "value"], "text")
