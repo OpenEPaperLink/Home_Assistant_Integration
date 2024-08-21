@@ -134,6 +134,7 @@ def customimage(entity_id, service, hass):
             continue
         # line
         if element["type"] == "line":
+            check_for_missing_required_arguments(element, ["x_start", "x_end"], "line")
             img_line = ImageDraw.Draw(img)  
             if "y_start" not in element:
                 y_start = pos_y + element.get("y_padding", 0)
@@ -149,6 +150,7 @@ def customimage(entity_id, service, hass):
             pos_y = y_start
         # rectangle
         if element["type"] == "rectangle":
+            check_for_missing_required_arguments(element, ["x_start", "x_end", "y_start", "y_end"], "rectangle")
             img_rect = ImageDraw.Draw(img)
             fill = getIndexColor(element['fill']) if 'fill' in element else None
             outline = getIndexColor(element['outline']) if 'outline' in element else "black"
@@ -157,6 +159,10 @@ def customimage(entity_id, service, hass):
                                fill=fill, outline=outline, width=width)
         # rectangle pattern
         if element["type"] == "rectangle_pattern":
+            check_for_missing_required_arguments(element, ["x_start", "x_size",
+                                                           "y_start", "y_size",
+                                                           "x_repeat", "y_repeat",
+                                                           "x_offset", "y_offset"], "rectangle_pattern")
             img_rect_pattern = ImageDraw.Draw(img)
             fill = getIndexColor(element['fill']) if 'fill' in element else None
             outline = getIndexColor(element['outline']) if 'outline' in element else "black"
@@ -172,6 +178,7 @@ def customimage(entity_id, service, hass):
 
         # text
         if element["type"] == "text":
+            check_for_missing_required_arguments(element, ["x", "value"], "text")
             d = ImageDraw.Draw(img)
             d.fontmode = "1"
             size = element.get('size', 20)
@@ -197,6 +204,7 @@ def customimage(entity_id, service, hass):
             textbbox = d.textbbox((element['x'],  akt_pos_y), text, font=font, anchor=anchor, align=align, spacing=spacing, stroke_width=stroke_width)
             pos_y = textbbox[3]
         if element["type"] == "multiline":
+            check_for_missing_required_arguments(element, ["x", "value", "delimiter"], "multiline")
             d = ImageDraw.Draw(img)
             d.fontmode = "1"
             size = element.get('size', 20)
@@ -217,6 +225,7 @@ def customimage(entity_id, service, hass):
             pos_y = pos
         # icon
         if element["type"] == "icon":
+            check_for_missing_required_arguments(element, ["x", "y", "value", "size"], "icon")
             d = ImageDraw.Draw(img)
             d.fontmode = "1"
             # ttf from https://github.com/Templarian/MaterialDesign-Webfont/blob/master/fonts/materialdesignicons-webfont.ttf
@@ -249,6 +258,7 @@ def customimage(entity_id, service, hass):
                    anchor=anchor, stroke_width=stroke_width, stroke_fill=stroke_fill)
         # dlimg
         if element["type"] == "dlimg":
+            check_for_missing_required_arguments(element, ["x", "y", "url", "xsize", "ysize"], "dlimg")
             url = element['url']
             pos_x = element['x']
             pos_y = element['y']
@@ -295,6 +305,7 @@ def customimage(entity_id, service, hass):
             img.convert('RGBA')
         # qrcode
         if element["type"] == "qrcode":
+            check_for_missing_required_arguments(element, ["x", "y", "data"], "qrcode")
             data = element['data']
             pos_x = element['x']
             pos_y = element['y']
@@ -356,6 +367,7 @@ def customimage(entity_id, service, hass):
                     bar_pos = bar_pos + 1
         # plot
         if element["type"] == "plot":
+            check_for_missing_required_arguments(element, ["data"], "plot")
             img_draw = ImageDraw.Draw(img)
             img_draw.fontmode = "1"
             # Obtain drawing region, assume whole canvas if nothing is given
@@ -503,6 +515,7 @@ def customimage(entity_id, service, hass):
 
         # progress_bar
         if element["type"] == "progress_bar":
+            check_for_missing_required_arguments(element, ["x_start", "x_end", "y_start", "y_end", "progress"], "progress_bar")
             img_draw = ImageDraw.Draw(img)
 
             x_start = element['x_start']
@@ -779,3 +792,12 @@ def textgen2(d, text, col, just, yofs):
     else:
         d.text((x, 15 + yofs), text, fill=col, anchor=just + "m", font=rbm)
     return d
+
+
+def check_for_missing_required_arguments(element, required_keys, func_name):
+    missing_keys = []
+    for key in required_keys:
+        if key not in element:
+            missing_keys.append(key)
+    if missing_keys:
+        raise HomeAssistantError(f"Missing required argument(s) '{', '.join(missing_keys)}' in '{func_name}'")
