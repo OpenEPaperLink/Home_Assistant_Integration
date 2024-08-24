@@ -172,6 +172,8 @@ Draws a rectangle.
 - **outline** (optional) default black
 - **width** (optional) width of outline, default 1
 - **visible** (optional) show element, default: True
+- **radius** (optional) default 0, if set, the rectangle will be drawn with rounded corners
+- **corners** (optional) if set, the rectangle will be drawn with rounded corners, possible values are `all`, or `top_left`, `top_right`, `bottom_left`, `bottom_right` separated by a comma, if set without radius the default radius will be 10
 
 ### rectangle pattern
 
@@ -206,6 +208,8 @@ Draws rectangles that are repeated in x and y direction.
 - **x_repeat** (required) number of rectangles in x direction
 - **y_repeat** (required) number of rectangles in y direction
 - **visible** (optional) show element, default: True
+- **radius** (optional) default 0, if set, the rectangle will be drawn with rounded corners, if set without corners all corners will be rounded
+- **corners** (optional) if set, the rectangle will be drawn with rounded corners, possible values are `all`, or `top_left`, `top_right`, `bottom_left`, `bottom_right` separated by a comma, if set without radius the default radius will be 10
 
 ### circle
 

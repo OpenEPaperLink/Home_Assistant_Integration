@@ -5,6 +5,8 @@ import os
 import pprint
 import math
 import json
+from math import radians
+
 import requests
 import qrcode
 import shutil
@@ -152,11 +154,14 @@ def customimage(entity_id, service, hass):
         if element["type"] == "rectangle":
             check_for_missing_required_arguments(element, ["x_start", "x_end", "y_start", "y_end"], "rectangle")
             img_rect = ImageDraw.Draw(img)
-            fill = getIndexColor(element['fill']) if 'fill' in element else None
-            outline = getIndexColor(element['outline']) if 'outline' in element else "black"
-            width = element['width'] if 'width' in element else 1
-            img_rect.rectangle([(element['x_start'], element['y_start']), (element['x_end'], element['y_end'])],
-                               fill=fill, outline=outline, width=width)
+            rect_fill = getIndexColor(element['fill']) if 'fill' in element else None
+            rect_outline = getIndexColor(element['outline']) if 'outline' in element else "black"
+            rect_width = element['width'] if 'width' in element else 1
+            radius = element['radius'] if 'radius' in element else 10 if 'corners' in element else 0
+            corners = rounded_corners(element['corners']) if 'corners' in element else rounded_corners("all") if 'radius' in element else (False, False, False, False)
+
+            img_rect.rounded_rectangle([(element['x_start'], element['y_start']), (element['x_end'], element['y_end'])],
+                               fill=rect_fill, outline=rect_outline, width=rect_width, radius=radius, corners=corners)
         # rectangle pattern
         if element["type"] == "rectangle_pattern":
             check_for_missing_required_arguments(element, ["x_start", "x_size",
@@ -167,14 +172,17 @@ def customimage(entity_id, service, hass):
             fill = getIndexColor(element['fill']) if 'fill' in element else None
             outline = getIndexColor(element['outline']) if 'outline' in element else "black"
             width = element['width'] if 'width' in element else 1
+            radius = element['radius'] if 'radius' in element else 10 if 'corners' in element else 0
+            corners = rounded_corners(element['corners']) if 'corners' in element else rounded_corners("all") if 'radius' in element else (False, False, False, False)
+
             for x in range(element["x_repeat"]):
                 for y in range(element["y_repeat"]):
-                    img_rect_pattern.rectangle([(element['x_start'] + x * (element['x_offset'] + element['x_size']),
+                    img_rect_pattern.rounded_rectangle([(element['x_start'] + x * (element['x_offset'] + element['x_size']),
                                                  element['y_start'] + y * (element['y_offset'] + element['y_size'])),
                                                 (element['x_start'] + x * (element['x_offset'] + element['x_size'])
                                                  + element['x_size'], element['y_start'] + y * (element['y_offset']
                                                  + element['y_size'])+element['y_size'])],
-                                               fill=fill, outline=outline, width=width)
+                                               fill=fill, outline=outline, width=width, radius=radius, corners=corners)
 
         # circle
         if element["type"] == "circle":
@@ -820,3 +828,22 @@ def check_for_missing_required_arguments(element, required_keys, func_name):
             missing_keys.append(key)
     if missing_keys:
         raise HomeAssistantError(f"Missing required argument(s) '{', '.join(missing_keys)}' in '{func_name}'")
+
+def rounded_corners(corner_string):
+    if corner_string == "all":
+        return True, True, True, True
+
+    corners = corner_string.split(",")
+    corner_map = {
+        "top_left": 0,
+        "top_right": 1,
+        "bottom_right": 2,
+        "bottom_left": 3
+    }
+    result = [False] * 4
+    for corner in corners:
+        corner = corner.strip()
+        if corner in corner_map:
+            result[corner_map[corner]] = True
+
+    return tuple(result)
