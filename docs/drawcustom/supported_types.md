@@ -172,6 +172,8 @@ Draws a rectangle.
 - **outline** (optional) default black
 - **width** (optional) width of outline, default 1
 - **visible** (optional) show element, default: True
+- **radius** (optional) default 0, if set, the rectangle will be drawn with rounded corners
+- **corners** (optional) if set, the rectangle will be drawn with rounded corners, possible values are `all`, or `top_left`, `top_right`, `bottom_left`, `bottom_right` separated by a comma, if set without radius the default radius will be 10
 
 ### rectangle pattern
 
@@ -206,6 +208,50 @@ Draws rectangles that are repeated in x and y direction.
 - **x_repeat** (required) number of rectangles in x direction
 - **y_repeat** (required) number of rectangles in y direction
 - **visible** (optional) show element, default: True
+- **radius** (optional) default 0, if set, the rectangle will be drawn with rounded corners, if set without corners all corners will be rounded
+- **corners** (optional) if set, the rectangle will be drawn with rounded corners, possible values are `all`, or `top_left`, `top_right`, `bottom_left`, `bottom_right` separated by a comma, if set without radius the default radius will be 10
+
+### circle
+
+Draws a circle around a center point.
+
+```yaml
+- type: circle
+  x: 50
+  y: 50
+  radius: 20
+```
+
+#### Parameters:
+
+- **x** (required) x position of the center
+- **y** (required) y position of the center
+- **radius** (required) radius of the circle
+- **fill** (optional) default `null`, use `null` to not draw the inside
+- **outline** (optional) default black
+- **width** (optional) width of outline, default 1
+
+### ellipse
+
+Draws an ellipse inside the bounding box.
+
+```yaml
+- type: ellipse
+  x_start: 50
+  x_end: 100
+  y_start: 50
+  y_end: 100
+```
+
+#### Parameters:
+
+- **x_start** (required) x position of the upper left corner
+- **y_start** (required) y position of the upper left corner
+- **x_end** (required) x position of the lower right corner
+- **y_end** (required) y position of the lower right corner
+- **fill** (optional) default `null`, use `null` to not draw the inside
+- **outline** (optional) default black
+- **width** (optional) width of outline, default 1
 
 ### icon
 
