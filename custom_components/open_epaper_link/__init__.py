@@ -1,13 +1,15 @@
 from __future__ import annotations
 from .imagegen import *
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from . import hub
 from .const import DOMAIN
 from datetime import datetime
 import logging
 import pprint
 import time
+
+from .util import send_tag_cmd, reboot_ap
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -109,14 +111,45 @@ def setup(hass, config):
             result = await hass.async_add_executor_job(requests.get, url)
             if result.status_code != 200:
                 _LOGGER.warning(result.status_code)
+    async def clear_pending_service(service: ServiceCall)-> None:
+        entity_ids = service.data.get("entity_id")
 
-    # register the services
+        for entity_id in entity_ids:
+            await send_tag_cmd(hass, entity_id,"clear")
+
+    async def force_refresh_service(service: ServiceCall)-> None:
+        entity_ids = service.data.get("entity_id")
+
+        for entity_id in entity_ids:
+            await send_tag_cmd(hass, entity_id,"refresh")
+
+    async def reboot_tag_service(service: ServiceCall)-> None:
+        entity_ids = service.data.get("entity_id")
+
+        for entity_id in entity_ids:
+            await send_tag_cmd(hass, entity_id,"reboot")
+
+    async def scan_channels_service(service: ServiceCall)-> None:
+        entity_ids = service.data.get("entity_id")
+
+        for entity_id in entity_ids:
+            await send_tag_cmd(hass, entity_id,"scan")
+
+    async def reboot_ap_service(service: ServiceCall)-> None:
+        await reboot_ap(hass)
+
+# register the services
     hass.services.register(DOMAIN, "dlimg", dlimg)
     hass.services.register(DOMAIN, "lines5", lines5service)
     hass.services.register(DOMAIN, "lines4", lines4service)
     hass.services.register(DOMAIN, "drawcustom", drawcustomservice)
     hass.services.register(DOMAIN, "setled", setled)
-    # error haneling needs to be improved
+    hass.services.register(DOMAIN, "clear_pending", clear_pending_service)
+    hass.services.register(DOMAIN, "force_refresh", force_refresh_service)
+    hass.services.register(DOMAIN, "reboot_tag", reboot_tag_service)
+    hass.services.register(DOMAIN, "scan_channels", scan_channels_service)
+    hass.services.register(DOMAIN, "reboot_ap", reboot_ap_service)
+    # error handling needs to be improved
     return True
 
 def int_to_hex_string(number):
