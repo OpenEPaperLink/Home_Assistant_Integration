@@ -1,0 +1,25 @@
+{
+  "services": {
+    "dlimg": {
+      "service": "mdi:download"
+    },
+    "lines4": {
+      "service": "mdi:text-long"
+    },
+    "lines5": {
+      "service": "mdi:text-long"
+    },
+    "drawcustom": {
+      "service": "mdi:code-braces-box"
+    },
+    "setled": {
+      "service": "mdi:wall-sconce-flat-variant"
+    },
+    "clear_pending": {
+      "service": "mdi:delete"
+    },
+    "force_refresh": {
+      "service": "mdi:refresh"
+    }
+  }
+}
