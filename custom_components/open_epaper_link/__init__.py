@@ -9,7 +9,7 @@ import logging
 import pprint
 import time
 
-from .util import clear_pending
+from .util import send_tag_cmd
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -112,11 +112,16 @@ def setup(hass, config):
             if result.status_code != 200:
                 _LOGGER.warning(result.status_code)
     async def clear_pending_service(service: ServiceCall)-> None:
-        component: EntityComponent = hass.data[DOMAIN]
         entity_ids = service.data.get("entity_id")
 
         for entity_id in entity_ids:
-            await clear_pending(hass, entity_id)
+            await send_tag_cmd(hass, entity_id,"clear")
+
+    async def force_refresh_service(service: ServiceCall)-> None:
+        entity_ids = service.data.get("entity_id")
+
+        for entity_id in entity_ids:
+            await send_tag_cmd(hass, entity_id,"refresh")
 
 
 # register the services
@@ -126,6 +131,7 @@ def setup(hass, config):
     hass.services.register(DOMAIN, "drawcustom", drawcustomservice)
     hass.services.register(DOMAIN, "setled", setled)
     hass.services.register(DOMAIN, "clear_pending", clear_pending_service)
+    hass.services.register(DOMAIN, "force_refresh", force_refresh_service)
     # error handling needs to be improved
     return True
 

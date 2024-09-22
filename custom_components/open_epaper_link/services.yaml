@@ -360,3 +360,9 @@ clear_pending:
   target:
     entity:
       domain: open_epaper_link
+force_refresh:
+  name: Force Refresh
+  description: Forces the ESL to refresh the display
+  target:
+    entity:
+      domain: open_epaper_link
