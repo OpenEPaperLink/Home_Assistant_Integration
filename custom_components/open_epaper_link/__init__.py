@@ -123,6 +123,12 @@ def setup(hass, config):
         for entity_id in entity_ids:
             await send_tag_cmd(hass, entity_id,"refresh")
 
+    async def reboot_tag_service(service: ServiceCall)-> None:
+        entity_ids = service.data.get("entity_id")
+
+        for entity_id in entity_ids:
+            await send_tag_cmd(hass, entity_id,"reboot")
+
 
 # register the services
     hass.services.register(DOMAIN, "dlimg", dlimg)
@@ -132,6 +138,7 @@ def setup(hass, config):
     hass.services.register(DOMAIN, "setled", setled)
     hass.services.register(DOMAIN, "clear_pending", clear_pending_service)
     hass.services.register(DOMAIN, "force_refresh", force_refresh_service)
+    hass.services.register(DOMAIN, "reboot_tag", reboot_tag_service)
     # error handling needs to be improved
     return True
 

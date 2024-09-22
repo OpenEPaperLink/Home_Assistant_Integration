@@ -20,6 +20,9 @@
     },
     "force_refresh": {
       "service": "mdi:refresh"
+    },
+    "reboot_tag": {
+      "service": "mdi:restart"
     }
   }
 }

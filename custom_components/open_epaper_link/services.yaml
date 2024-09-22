@@ -366,3 +366,9 @@ force_refresh:
   target:
     entity:
       domain: open_epaper_link
+reboot_tag:
+  name: Reboot Tag
+  description: Reboots one or more ESL tags
+  target:
+    entity:
+      domain: open_epaper_link
