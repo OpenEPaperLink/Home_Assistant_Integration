@@ -23,6 +23,9 @@
     },
     "reboot_tag": {
       "service": "mdi:restart"
+    },
+    "scan_channels": {
+      "service": "mdi:signal"
     }
   }
 }

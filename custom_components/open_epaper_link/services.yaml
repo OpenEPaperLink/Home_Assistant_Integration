@@ -372,3 +372,9 @@ reboot_tag:
   target:
     entity:
       domain: open_epaper_link
+scan_channels:
+  name: Scan Channels
+  description: Lets the ESL scan for channels
+  target:
+    entity:
+      domain: open_epaper_link
