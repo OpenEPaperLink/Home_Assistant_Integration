@@ -378,3 +378,6 @@ scan_channels:
   target:
     entity:
       domain: open_epaper_link
+reboot_ap:
+  name: Reboot AP
+  description: Reboots the AP

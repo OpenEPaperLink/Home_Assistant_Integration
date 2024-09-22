@@ -34,4 +34,17 @@ async def send_tag_cmd(hass: HomeAssistant, entity_id: str, cmd: str) -> bool:
         _LOGGER.error("Failed to send %s command to %s: %s", cmd, entity_id, e)
         return False
 
+async def reboot_ap(hass: HomeAssistant) -> bool:
+    """Reboot the ESL Access Point."""
+    ip = hass.states.get(DOMAIN + ".ip").state
+    url = f"http://{ip}/reboot"
 
+    try:
+        result = await hass.async_add_executor_job(lambda : requests.post(url))
+        if result.status_code == 200:
+            _LOGGER.info("Rebooted ESL Access Point")
+        else:
+            _LOGGER.error("Failed to reboot ESL Access Point")
+    except Exception as e:
+        _LOGGER.error("Failed to reboot ESL Access Point: %s", e)
+        return False

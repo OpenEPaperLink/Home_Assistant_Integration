@@ -9,7 +9,7 @@ import logging
 import pprint
 import time
 
-from .util import send_tag_cmd
+from .util import send_tag_cmd, reboot_ap
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -135,6 +135,9 @@ def setup(hass, config):
         for entity_id in entity_ids:
             await send_tag_cmd(hass, entity_id,"scan")
 
+    async def reboot_ap_service(service: ServiceCall)-> None:
+        await reboot_ap(hass)
+
 # register the services
     hass.services.register(DOMAIN, "dlimg", dlimg)
     hass.services.register(DOMAIN, "lines5", lines5service)
@@ -145,6 +148,7 @@ def setup(hass, config):
     hass.services.register(DOMAIN, "force_refresh", force_refresh_service)
     hass.services.register(DOMAIN, "reboot_tag", reboot_tag_service)
     hass.services.register(DOMAIN, "scan_channels", scan_channels_service)
+    hass.services.register(DOMAIN, "reboot_ap", reboot_ap_service)
     # error handling needs to be improved
     return True
 

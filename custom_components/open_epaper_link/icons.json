@@ -26,6 +26,9 @@
     },
     "scan_channels": {
       "service": "mdi:signal"
+    },
+    "reboot_ap": {
+      "service": "mdi:restart"
     }
   }
 }
