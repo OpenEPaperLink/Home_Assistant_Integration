@@ -1,13 +1,15 @@
 from __future__ import annotations
 from .imagegen import *
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from . import hub
 from .const import DOMAIN
 from datetime import datetime
 import logging
 import pprint
 import time
+
+from .util import clear_pending
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -109,14 +111,22 @@ def setup(hass, config):
             result = await hass.async_add_executor_job(requests.get, url)
             if result.status_code != 200:
                 _LOGGER.warning(result.status_code)
+    async def clear_pending_service(service: ServiceCall)-> None:
+        component: EntityComponent = hass.data[DOMAIN]
+        entity_ids = service.data.get("entity_id")
 
-    # register the services
+        for entity_id in entity_ids:
+            await clear_pending(hass, entity_id)
+
+
+# register the services
     hass.services.register(DOMAIN, "dlimg", dlimg)
     hass.services.register(DOMAIN, "lines5", lines5service)
     hass.services.register(DOMAIN, "lines4", lines4service)
     hass.services.register(DOMAIN, "drawcustom", drawcustomservice)
     hass.services.register(DOMAIN, "setled", setled)
-    # error haneling needs to be improved
+    hass.services.register(DOMAIN, "clear_pending", clear_pending_service)
+    # error handling needs to be improved
     return True
 
 def int_to_hex_string(number):
