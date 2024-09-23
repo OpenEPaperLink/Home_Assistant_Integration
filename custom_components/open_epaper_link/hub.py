@@ -15,6 +15,8 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import device_registry as dr
+
+from .button import ClearPendingTagButton
 from .const import DOMAIN
 from .hw_map import is_in_hw_map, get_hw_string, get_hw_dimensions
 
@@ -201,6 +203,6 @@ class Hub:
         return True
     #reload is reqired to add new entities
     async def reloadcfgett(self) -> bool:
-        await self._hass.config_entries.async_unload_platforms(self._cfgenty, ["sensor","camera"])
-        await self._hass.config_entries.async_forward_entry_setups(self._cfgenty, ["sensor","camera"])
+        await self._hass.config_entries.async_unload_platforms(self._cfgenty, ["sensor","camera","button"])
+        await self._hass.config_entries.async_forward_entry_setups(self._cfgenty, ["sensor","camera","button"])
         return True
