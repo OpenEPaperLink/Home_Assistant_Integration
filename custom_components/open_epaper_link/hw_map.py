@@ -45,6 +45,7 @@ HW_MAP: Dict[int, Tuple[str, int, int]] = {
     190: ["ATC MiThermometer BLE",  6, 8],
     224: ["AP display",  320, 170],
     225: ["AP display",  160, 80],
+    226: ["LILYGO TPANEL",  480, 480],    
     240: ["Segmented",  0, 0]
 }
 def is_in_hw_map(hw_type: int) -> bool:
