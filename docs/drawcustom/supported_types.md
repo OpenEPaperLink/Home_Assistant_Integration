@@ -81,7 +81,7 @@ Draws text.
 - **color** (optional) font color of text. default: black
 - **y** (optional) position on y axis
 - **y_padding** (optional) offset to last text or multiline y position. works only if y is not provided. default: 10
-- **anchor** (optional) Position from the text, which shall be used as anchor. default: `lt` (left_top). Other options include `mm` (middle_middle). See https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html
+- **anchor** (optional) Position from the text, which shall be used as anchor. default: `la` (left_ascending). Other options include `mm` (middle_middle). See https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html
 - **max_width** (optional) creates line breaks in the provided text, if text is longer than `max_width` defines
 - **spacing** (optional) if line breaks created in the provided text using `max_width`, set spacing between single lines. Default: 5
 - **stroke_width** (optional) adds stroke around text with color `stroke_fill`. Default: 0
@@ -407,7 +407,7 @@ Draws a progress bar
 - **progress** (required) progress in percent, eg. `42`
 - **direction** (optional, default `right`) direction in which the progress bar should be filled, possible values are `right`, `left` `up`, `down`
 - **background** (optional, default `white`)
-- **fill** (optional, default `red`) color of the progress bar 
+- **fill** (optional, default `red`) color of the progress bar
 - **outline** (optional, default `black`) color of outline
 - **width** (optional, default `1`) width of outline
 - **visible** (optional, default `True`) show element
