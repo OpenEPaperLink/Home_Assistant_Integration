@@ -81,7 +81,7 @@ Draws text.
 - **color** (optional) font color of text. default: black
 - **y** (optional) position on y axis
 - **y_padding** (optional) offset to last text or multiline y position. works only if y is not provided. default: 10
-- **anchor** (optional) Position from the text, which shall be used as anchor. default: `la` (left_ascending). Other options include `mm` (middle_middle). See https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html
+- **anchor** (optional) Position from the text, which shall be used as anchor. default: `lt` (left_top) for single lines, `la` (left_ascending) for mulitple lines. Other options include `mm` (middle_middle). See https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html
 - **max_width** (optional) creates line breaks in the provided text, if text is longer than `max_width` defines
 - **spacing** (optional) if line breaks created in the provided text using `max_width`, set spacing between single lines. Default: 5
 - **stroke_width** (optional) adds stroke around text with color `stroke_fill`. Default: 0
