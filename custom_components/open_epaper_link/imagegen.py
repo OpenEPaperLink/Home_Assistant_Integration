@@ -217,7 +217,7 @@ def customimage(entity_id, service, hass):
             else:
                 akt_pos_y = element['y']
             color = element.get('color', "black")
-            anchor = element.get('anchor', "lt")
+            anchor = element.get('anchor', "la")
             align = element.get('align', "left")
             spacing = element.get('spacing', 5)
             stroke_width = element.get('stroke_width', 0)
