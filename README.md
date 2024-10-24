@@ -9,99 +9,147 @@
 
 
 
-Home Assistant Integration for the <a href="https://github.com/jjwbruijn/OpenEPaperLink">OpenEPaperLink</a> project
+Home Assistant Integration for the [OpenEPaperLink](https://github.com/jjwbruijn/OpenEPaperLink) project, enabling control and monitoring of electronic shelf labels (ESLs) through Home Assistant.
 
-Feature Request and code contributions are welcome!
+## Features
 
-## Functionality
+### 🔌 Entities and Devices
+- Each tag and AP is exposed as a device in Home Assistant
+- Sensor data for each tag:
+    - Temperature
+    - Battery voltage and percentage
+    - Signal strength (RSSI)
+    - Link Quality Index (LQI)
+    - Last seen timestamp
+    - Next update/checkin time
+    - Wakeup reason
+    - Device capabilities
+- Sensor data for each AP:
+    - DBSize
+    - Free heap
+    - Free space
+    - IP address
+    - Recordcount
+    - Run state
+    - AP state
+    - Systime
+    - Temperature
+    - Wi-Fi RSSI
+    - Wi-Fi SSID
+    - Wi-Fi state
 
-### Sensors
+### ⚙️ AP Configuration Options
+- Alias
+- Bluetooth
+- IEEE 802.15.4 channel selection
+- Language selection
+- Lock tag inventory setting
+- Maximum sleep duration settings
+- No-updates time window configuration
+- AP Image preview setting
+- RGB LED brightness control
+- TFT brightness control
+- Time zone configuration
+- Wi-Fi power settings
 
-Every sensor of the tags is exposed in Home Assistant.
-Every tag and the AP is exposed as a device.
+### 🎨 Display Controls
+Several services for controlling the display content:
 
-### Services
+#### drawcustom (Recommended)
+The most flexible and powerful service for creating custom displays. Supports:
+- Text with multiple fonts and styles
+- Shapes (rectangles, circles, lines)
+- Icons from Material Design Icons
+- QR codes
+- Images from URLs
+- Plots of Home Assistant sensor data
+- Progress bars
 
-#### drawcustom
-This Service call draws a image local in home assistant, and will send it to the EPaper AP afterwards. To not draw the inside of the rectangle use `null` as the `fill` color value.
+[View full drawcustom documentation →](docs/drawcustom/supported_types.md)
 
-Example Call:
-```
+#### Legacy Services (Deprecated)
+- **dlimg**: Download and display images from URLs
+- **lines5**: Display 5 lines of text (1.54" displays only)
+- **lines4**: Display 4 lines of text (2.9" displays only)
+
+### 🚦 Device Management
+Services for managing ESL devices:
+- `clear_pending`: Clear pending updates
+- `force_refresh`: Force display refresh
+- `reboot_tag`: Reboot tag
+- `scan_channels`: Initiate channel scan
+- `reboot_ap`: Reboot the access point
+
+## Installation
+
+### Option 1: HACS Installation (Recommended)
+1. Click on HACS in the Home Assistant menu
+2. Click `Integrations`
+3. Click the `EXPLORE & DOWNLOAD REPOSITORIES` button
+4. Search for `OpenEPaperLink`
+5. Click the `DOWNLOAD` button
+6. Restart Home Assistant
+
+### Option 2: Manual Installation
+1. Download the `open_epaper_link` folder from the [latest release](https://github.com/jonasniesner/open_epaper_link_homeassistant/releases/latest)
+2. Copy it to your [`custom_components` folder](https://developers.home-assistant.io/docs/creating_integration_file_structure/#where-home-assistant-looks-for-integrations)
+3. Restart Home Assistant
+
+## Configuration
+
+### Automatic Configuration
+Add OpenEPaperLink to your Home Assistant instance using this button:
+
+[![Add Integration](https://user-images.githubusercontent.com/31328123/189550000-6095719b-ca38-4860-b817-926b19de1b32.png)](https://my.home-assistant.io/redirect/config_flow_start?domain=open_epaper_link)
+
+### Manual Configuration
+1. Browse to your Home Assistant instance
+2. Go to Settings → Devices & Services
+3. Click the `Add Integration` button in the bottom right
+4. Search for and select "OpenEPaperLink"
+5. Follow the on-screen instructions
+
+## Usage Examples
+
+### Basic Custom Display
+```yaml
 service: open_epaper_link.drawcustom
 target:
-  entity_id:
-    - open_epaper_link.0000021EC9EC743A
+  entity_id: open_epaper_link.0000021EC9EC743A
 data:
   background: white
-  rotate: 270
-  ttl: 300
+  rotate: 0
   payload:
-    - type: rectangle
-      outline: red
-      fill: white
-      width: 5
-      x_start: 10
-      y_start: 10
-      x_end: 185
-      y_end: 240   
-    - type: line
-      fill: red
-      width: 3
-      x_start: 0
-      y_start: 237
-      x_end: 196
-      y_end: 240  
     - type: text
       value: "Hello World!"
       font: "ppb.ttf"
-      x: 0
-      "y": 0
+      x: 10
+      y: 10
       size: 40
       color: red
-    - type: icon
-      value: account-cowboy-hat
-      x: 60
-      y: 120
-      size: 120
-      color: red
 ```
 
-Supported payload types, see [drawcustom payload types](docs/drawcustom/supported_types.md)
-
-#### Download Image (deprecated, use drawcustom for more options)
-
-Download an image from the provided url and if required, resized it for the esl it should be displayed on.
-
-This requires that the esl has checked in once before fo Home Assistant knows the hardware type of it so if this service fail, wait 10 to 20 minutes.
-
-#### 5 Line Display (deprecated, use drawcustom for more options)
-
-Displays 5 (or up to 10) lines of text on a small 1.54" esl. If a text line contains a newline (\n), it will be split in 2 lines.
-Only works on 1.54" M2 displays.
-
-#### 4 Line Display (deprecated, use drawcustom for more options)
-
-Displays 4 (or up to 8) lines of text on a 2.9" esl. If a text line contains a newline, it will be split in 2 lines.
-Only works on 2.9" M2 displays.
-
-#### Example Service Call
-Go to Developer Tools, Services, select the OpenEPaperLink: 4 Line Display service and paste the below in to the YAML editor. Replace the sensor names in curly brackets with values from your own system. Note that floats work better when rounded and that all numbers work better when converted to strings.
-
-```
-service: open_epaper_link.lines4
+### Progress Bar with Icon
+```yaml
+service: open_epaper_link.drawcustom
 target:
-  entity_id:
-    - open_epaper_link.0000021EDE313B15
+  entity_id: open_epaper_link.0000021EC9EC743A
 data:
-  line1: " Time: {{ states('sensor.time') | string }} " 
-  line2: " LR Temp: {{ state_attr('climate.living_room_2','current_temperature') | string }} C " 
-  line3: " Yest. Elec {{ state_attr('sensor.electricity_yesterday_previous_accumulative_consumption','total') | round(2) | string }} kWh " 
-  line4: "Car: {{ states('sensor.car_state_of_charge') | int | string }} % / {{ ((states('sensor.id_3_pro_performance_range')) | float / 1.609344) | int | string }} miles  {{ states('sensor.bins') }}  " 
-  border: r 
-  format1: mbbw 
-  format2: mrbw 
-  format3: lbrw 
-  format4: mwrb
+  background: white
+  payload:
+    - type: progress_bar
+      x_start: 10
+      y_start: 10
+      x_end: 180
+      y_end: 30
+      progress: 75
+      fill: red
+      show_percentage: true
+    - type: icon
+      value: mdi:battery-70
+      x: 190
+      y: 20
+      size: 24
 ```
 
 If a template with a numeric sensor value still does not work, try appending a non-numeric string (can't be a blank string or just a space) e.g.
@@ -109,36 +157,7 @@ If a template with a numeric sensor value still does not work, try appending a n
 " {{  (states('sensor.car_range') | float / 1.609344 ) | int }} mi "
 ```
 
-## Installation
-
-### If you use [HACS](https://hacs.xyz/):
-
-1. Click on HACS in the Home Assistant menu
-2. Click on `Integrations`
-3. Click the `EXPLORE & DOWNLOAD REPOSITORIES` button
-4. Search for `OpenEPaperLink`
-5. Click the `DOWNLOAD` button
-6. Restart Home Assistant
-
-### Manually:
-
-1. Copy `open_epaper_link` folder from [latest release](https://github.com/jonasniesner/open_epaper_link_homeassistant/releases/latest) to [`custom_components` folder](https://developers.home-assistant.io/docs/creating_integration_file_structure/#where-home-assistant-looks-for-integrations) in your config folder
-2. Restart Home Assistant
-
-## Configuration
-
-Adding OpenEPaperLink to your Home Assistant instance can be done via the user interface, by using this My button:
-
-[![image](https://user-images.githubusercontent.com/31328123/189550000-6095719b-ca38-4860-b817-926b19de1b32.png)](https://my.home-assistant.io/redirect/config_flow_start?domain=open_epaper_link)
-
-### Manual configuration steps
-If the above My button doesn’t work, you can also perform the following steps manually:
-
-1. Browse to your Home Assistant instance
-2. In the sidebar click on  Settings
-3. From the configuration menu select: Devices & Services
-4. In the bottom right, click on the `Add Integration` button
-5. From the list, search and select “OpenEPaperLink”
-6. Follow the instructions on screen to complete the setup
-
-
+## Contributing
+- Feature requests and bug reports are welcome! Please open an issue on GitHub
+- Pull requests are encouraged
+- Join the [Discord server](https://discord.com/invite/eRUHt4u5CZ) to discuss ideas and get help
