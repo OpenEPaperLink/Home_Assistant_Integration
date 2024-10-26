@@ -1,4 +1,6 @@
 from __future__ import annotations
+from typing import Final
+from homeassistant.helpers.device_registry import DeviceInfo
 from .const import DOMAIN
 import logging
 import datetime

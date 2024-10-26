@@ -11,14 +11,14 @@ import json
 import logging
 import os
 from threading import Thread
-from typing import Any
+from typing import Any, Final
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import device_registry as dr
 
 from .button import ClearPendingTagButton
 from .const import DOMAIN
-from .hw_map import is_in_hw_map, get_hw_string, get_hw_dimensions
+from .tag_types import get_hw_dimensions, get_hw_string, is_in_hw_map, get_tag_types_manager
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -48,11 +48,24 @@ class Hub:
         self.eventloop = asyncio.get_event_loop()
         self._is_fetching_config = False
         self.eventloop.create_task(self.fetch_ap_config())
+        self._tag_manager = None
+        self.tag_manager_initialized = asyncio.Event()
         thread = Thread(target=self.connection_thread)
+        self._hass.async_create_task(self._init_tag_manager())
         thread.start()
         self.online = True
+
+    async def _init_tag_manager(self) -> None:
+        """Initialize tag manager."""
+        self._tag_manager = await get_tag_types_manager(self._hass)
+        self.tag_manager_initialized.set()  # Signal that initialization is complete
+
     #parses websocket messages
     def on_message(self,ws, message) -> None:
+        # Wait for the tag manager to initialize if needed
+        if not self.tag_manager_initialized.is_set():
+            future = asyncio.run_coroutine_threadsafe(self.tag_manager_initialized.wait(), self.eventloop)
+            future.result()  # Wait until the event is set, blocking only this call
         data =  json.loads('{' + message.split("{", 1)[-1])
         if 'sys' in data:
             sys = data.get('sys')
@@ -110,8 +123,8 @@ class Hub:
             else:
                 tagname = tagmac
             #required for automations
-            if is_in_hw_map(hwType):
-                width, height = get_hw_dimensions(hwType)
+            if self._tag_manager.is_in_hw_map(hwType):
+                width, height = self._tag_manager.get_hw_dimensions(hwType)
                 self._hass.states.set(DOMAIN + "." + tagmac, hwType,{
                     "icon": "mdi:fullscreen",
                     "friendly_name": tagname,
@@ -123,12 +136,12 @@ class Hub:
                     },
                     "should_poll": False,
                     "hwtype": hwType,
-                    "hwstring": get_hw_string(hwType),
+                    "hwstring": self._tag_manager.get_hw_string(hwType),
                     "width": width,
                     "height": height,
                 })
             else:
-                _LOGGER.warning(f"ID {hwType} not in hwmap, please open an issue on github about this.")
+                _LOGGER.warning(f"ID {hwType} not in hwmap, please try refreshing tagtypes, if it persists open an issue on github about this.")
 
             self.data[tagmac] = dict()
             self.data[tagmac]["temperature"] = temperature

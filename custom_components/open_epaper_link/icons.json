@@ -29,6 +29,9 @@
     },
     "reboot_ap": {
       "service": "mdi:restart"
+    },
+    "refresh_tag_types": {
+      "service": "mdi:refresh"
     }
   }
 }

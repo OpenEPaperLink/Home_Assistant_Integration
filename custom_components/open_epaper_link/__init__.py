@@ -9,6 +9,7 @@ import logging
 import pprint
 import time
 
+from .tag_types import get_tag_types_manager
 from .util import send_tag_cmd, reboot_ap
 
 _LOGGER = logging.getLogger(__name__)
@@ -138,6 +139,24 @@ def setup(hass, config):
     async def reboot_ap_service(service: ServiceCall)-> None:
         await reboot_ap(hass)
 
+    async def refresh_tag_types_service(service: ServiceCall) -> None:
+        """Service to force refresh of tag types."""
+        manager = await get_tag_types_manager(hass)
+        # Force a refresh by clearing the last update timestamp
+        manager._last_update = None
+        await manager.ensure_types_loaded()
+        tag_types_len = len(manager.get_all_types())
+        message = f"Successfully refreshed {tag_types_len} tag types from GitHub"
+        await hass.services.async_call(
+            "persistent_notification",
+            "create",
+            {
+                "title": "Tag Types Refreshed",
+                "message:": message,
+                "notification_id": "tag_types_refresh_notification",
+            },
+        )
+
 # register the services
     hass.services.register(DOMAIN, "dlimg", dlimg)
     hass.services.register(DOMAIN, "lines5", lines5service)
@@ -149,6 +168,7 @@ def setup(hass, config):
     hass.services.register(DOMAIN, "reboot_tag", reboot_tag_service)
     hass.services.register(DOMAIN, "scan_channels", scan_channels_service)
     hass.services.register(DOMAIN, "reboot_ap", reboot_ap_service)
+    hass.services.register(DOMAIN, "refresh_tag_types", refresh_tag_types_service)
     # error handling needs to be improved
     return True
 
