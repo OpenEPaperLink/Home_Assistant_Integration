@@ -6,7 +6,7 @@ import aiohttp
 import asyncio
 import json
 import logging
-from typing import Dict, Tuple, Optional, Any, cast
+from typing import Dict, Tuple, Optional, Any, cast, List
 from datetime import datetime, timedelta
 
 from homeassistant.core import HomeAssistant
@@ -283,6 +283,40 @@ class TagTypesManager:
             return f"Unknown Type {hw_type}"
         return self._tag_types[hw_type].get('name', f'Unknown Type {hw_type}')
 
+    def get_rotate_buffer(self, hw_type: int) -> int:
+        """Get the rotate buffer for a hardware type."""
+        if hw_type not in self._tag_types:
+            return 0
+        return self._tag_types[hw_type].get('rotate_buffer')
+
+    def get_bpp(self, hw_type: int) -> int:
+        """Get the bits per pixel for a hardware type."""
+        if hw_type not in self._tag_types:
+            return 2
+        return self._tag_types[hw_type].get('bpp')
+
+    def get_color_table(self, hw_type: int) -> Dict[str, Tuple[int, int, int]]:
+        """Get the color table for a hardware type."""
+        if hw_type not in self._tag_types:
+            return {
+                'white': (255, 255, 255),
+                'black': (0, 0, 0),
+                'red': (255, 0, 0),
+            }
+        return self._tag_types[hw_type].get('color_table')
+
+    def get_short_lut(self, hw_type: int) -> int:
+        """Get the short LUT setting for a hardware type."""
+        if hw_type not in self._tag_types:
+            return 2
+        return self._tag_types[hw_type].get('short_lut')
+
+    def get_options(self, hw_type: int) -> List[str]:
+        """Get the options for a hardware type."""
+        if hw_type not in self._tag_types:
+            return []
+        return self._tag_types[hw_type].get('options', [])
+
     def is_in_hw_map(self, hw_type: int) -> bool:
         """Check if a hardware type is known."""
         return hw_type in self._tag_types
@@ -313,6 +347,40 @@ def get_hw_string(hw_type: int) -> str:
     if _INSTANCE is None:
         return f"Unknown Type {hw_type}"
     return _INSTANCE.get_hw_string(hw_type)
+
+def get_rotate_buffer(hw_type: int) -> int:
+    """Get rotate buffer synchronously."""
+    if _INSTANCE is None:
+        return 0
+    return _INSTANCE.get_rotate_buffer(hw_type)
+
+def get_bpp(hw_type: int) -> int:
+    """Get bits per pixel synchronously."""
+    if _INSTANCE is None:
+        return 2
+    return _INSTANCE.get_bpp(hw_type)
+
+def get_color_table(hw_type: int) -> Dict[str, Tuple[int, int, int]]:
+    """Get color table synchronously."""
+    if _INSTANCE is None:
+        return {
+            'white': (255, 255, 255),
+            'black': (0, 0, 0),
+            'red': (255, 0, 0),
+        }
+    return _INSTANCE.get_color_table(hw_type)
+
+def get_short_lut(hw_type: int) -> int:
+    """Get short LUT synchronously."""
+    if _INSTANCE is None:
+        return 2
+    return _INSTANCE.get_short_lut(hw_type)
+
+def get_options(hw_type: int) -> List[str]:
+    """Get options synchronously."""
+    if _INSTANCE is None:
+        return []
+    return _INSTANCE.get_options(hw_type)
 
 def is_in_hw_map(hw_type: int) -> bool:
     """Check if hardware type exists synchronously."""
