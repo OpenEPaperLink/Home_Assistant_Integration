@@ -7,7 +7,7 @@ import requests
 import json
 import logging
 
-from .hw_map import get_hw_dimensions
+from .tag_types import get_hw_dimensions, get_tag_types_manager
 from .util import send_tag_cmd, reboot_ap
 from .const import DOMAIN
 
@@ -23,6 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         buttons.append(ScanChannelsButton(hass, tag_mac, hub))
         buttons.append(IdentifyTagButton(hass,tag_mac,hub))
     buttons.append(RebootAPButton(hass, hub))
+    buttons.append(RefreshTagTypesButton(hass))
     async_add_entities(buttons)
 
 class ClearPendingTagButton(ButtonEntity):
@@ -196,3 +197,41 @@ class IdentifyTagButton(ButtonEntity):
                 _LOGGER.info(f"Sent identify command to tag {self._tag_mac}")
         except requests.RequestException as err:
             _LOGGER.error(f"Failed to send identify command to tag {self._tag_mac}: {err}")
+
+class RefreshTagTypesButton(ButtonEntity):
+    """Button to manually refresh tag types from GitHub."""
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self._hass = hass
+        self._attr_unique_id = "refresh_tag_types"
+        self._attr_name = "Refresh Tag Types"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_icon = "mdi:refresh"
+
+    @property
+    def device_info(self):
+        """Return device info."""
+        return {
+            "identifiers": {(DOMAIN, "ap")},
+            "name": "OpenEPaperLink AP",
+            "model": "esp32",
+            "manufacturer": "OpenEPaperLink",
+        }
+
+    async def async_press(self) -> None:
+        """Trigger a manual refresh of tag types."""
+        manager = await get_tag_types_manager(self._hass)
+        # Force a refresh by clearing the last update timestamp
+        manager._last_update = None
+        await manager.ensure_types_loaded()
+        tag_types_len = len(manager.get_all_types())
+        message = f"Successfully refreshed {tag_types_len} tag types from GitHub"
+        await self.hass.services.async_call(
+            "persistent_notification",
+            "create",
+            {
+                "title": "Tag Types Refreshed",
+                "message": message,
+                "notification_id": "tag_types_refresh_notification",
+            },
+        )
