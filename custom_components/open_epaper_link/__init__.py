@@ -16,7 +16,7 @@ PLATFORMS = [
     Platform.BUTTON,
     # Platform.CAMERA,
     Platform.SELECT,
-    # Platform.SWITCH,
+    Platform.SWITCH,
     Platform.TEXT,
 ]
 
