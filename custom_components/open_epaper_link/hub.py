@@ -235,7 +235,11 @@ class Hub:
             elif "logMsg" in data:
                 _LOGGER.debug("OEPL Log message: %s", data["logMsg"])
             elif "apitem" in data:
-                await self._handle_ap_config_message(data)
+                # Check if this is actually a config change message
+                if data.get("apitem", {}).get("type") == "change":
+                    await self._handle_ap_config_message(data)
+                else:
+                    _LOGGER.debug("Ignoring non-change AP message")
             else:
                 _LOGGER.debug("Unknown message type: %s", data)
 
@@ -345,13 +349,35 @@ class Hub:
     async def _handle_ap_config_message(self, config_data: dict) -> None:
         """Handle AP configuration updates."""
         try:
+            if self._shutdown.is_set():
+                return
+
             async with aiohttp.ClientSession() as session:
                 async with async_timeout.timeout(10):
                     async with session.get(f"http://{self.host}/get_ap_config") as response:
-                        if response.status == 200:
-                            self.ap_config = await response.json()
+                        if response.status != 200:
+                            _LOGGER.error("Failed to fetch AP config: HTTP %s", response.status)
+                            return
+
+                        new_config = await response.json()
+
+                        # Compare with existing config
+                        if not hasattr(self, '_last_config_hash'):
+                            self._last_config_hash = None
+
+                        # Create hash of new config for comparison
+                        new_hash = hash(frozenset(new_config.items()))
+
+                        if new_hash != self._last_config_hash:
+                            self.ap_config = new_config
+                            self._last_config_hash = new_hash
+                            _LOGGER.debug("AP config updated: %s", self.ap_config)
                             async_dispatcher_send(self.hass, f"{DOMAIN}_ap_config_update")
-                            _LOGGER.debug("Updated AP config: %s", self.ap_config)
+                        else:
+                            _LOGGER.debug("AP config unchanged, skipping update")
+
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout fetching AP config")
         except Exception as err:
             _LOGGER.error("Failed to fetch AP config: %s", err)
 
@@ -447,4 +473,4 @@ class Hub:
 
     async def async_update_ap_config(self) -> None:
         """Force update of AP configuration."""
-        await self._handle_ap_config_message({})
+        await self._handle_ap_config_message({"apitem": {"type": "change"}})

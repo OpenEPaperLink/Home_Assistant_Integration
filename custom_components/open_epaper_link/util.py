@@ -79,23 +79,29 @@ async def set_ap_config_item(hub, key: str, value: str | int) -> bool:
         _LOGGER.error("Cannot set config: AP is offline")
         return False
 
-    if key in hub.ap_config and hub.ap_config[key] != value:
-        data = {
-            key: value
-        }
-        _LOGGER.debug("Setting AP config %s = %s", key, value)
-        try:
-            response = await hub.hass.async_add_executor_job(
-                lambda: requests.post(f"http://{hub.host}/save_apcfg", data=data)
-            )
-            if response.status_code == 200:
-                hub.ap_config[key] = value
-                async_dispatcher_send(hub.hass, f"{DOMAIN}_ap_config_update")
-                return True
-            else:
-                _LOGGER.error("Failed to set AP config %s: HTTP %s", key, response.status_code)
-                return False
-        except Exception as e:
-            _LOGGER.error("Failed to set AP config %s: %s", key, str(e))
+    # Only send update if value actually changed
+    current_value = hub.ap_config.get(key)
+    if current_value == value:
+        _LOGGER.debug("Value unchanged, skipping update for %s = %s", key, value)
+        return True
+
+    data = {
+        key: value
+    }
+    _LOGGER.debug("Setting AP config %s = %s", key, value)
+    try:
+        response = await hub.hass.async_add_executor_job(
+            lambda: requests.post(f"http://{hub.host}/save_apcfg", data=data)
+        )
+        if response.status_code == 200:
+            # Update local cache immediately to prevent race conditions
+            hub.ap_config[key] = value
+            # Only dispatch update for this specific change
+            async_dispatcher_send(hub.hass, f"{DOMAIN}_ap_config_update")
+            return True
+        else:
+            _LOGGER.error("Failed to set AP config %s: HTTP %s", key, response.status_code)
             return False
-    return True
+    except Exception as e:
+        _LOGGER.error("Failed to set AP config %s: %s", key, str(e))
+        return False
