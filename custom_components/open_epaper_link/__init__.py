@@ -17,7 +17,7 @@ PLATFORMS = [
     # Platform.CAMERA,
     Platform.SELECT,
     # Platform.SWITCH,
-    # Platform.TEXT,
+    Platform.TEXT,
 ]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
