@@ -1,60 +1,93 @@
-from homeassistant.components.switch import SwitchEntity
-from homeassistant.core import callback
+"""Switch implementation for OpenEPaperLink integration."""
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from typing import Final, Callable, Any
+
+from homeassistant.components.switch import (
+    SwitchEntity,
+    SwitchEntityDescription,
+)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
 from .const import DOMAIN
-from .util import set_ap_config_item
+from .hub import Hub, SIGNAL_AP_UPDATE
+from .sensor import OpenEPaperLinkSensor
+
+_LOGGER: Final = logging.getLogger(__name__)
+
+@dataclass
+class OpenEPaperLinkSwitchEntityDescription(SwitchEntityDescription):
+    """Class describing OpenEPaperLink switch entities."""
+    key: str
+    name: str
+    icon: str
+    entity_category: EntityCategory
+    value_fn: Callable[[dict], bool]
+    set_fn: Callable[[Any, bool], None]
+
+AP_SWITCHES: tuple[OpenEPaperLinkSwitchEntityDescription, ...] = (
+    OpenEPaperLinkSwitchEntityDescription(
+        key="preview",
+        name="Preview Images",
+        icon="mdi:eye",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda config: bool(config.get("preview", 0)),
+        set_fn=lambda hub, value: hub.async_set_ap_config("preview", 1 if value else 0)
+    ),
+    OpenEPaperLinkSwitchEntityDescription(
+        key="bluetooth",
+        name="Bluetooth",
+        icon="mdi:bluetooth",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda config: bool(config.get("ble", 0)),
+        set_fn=lambda hub, value: hub.async_set_ap_config("ble", 1 if value else 0),
+    )
+)
+async def async_setup_entry(
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
+        async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up the OpenEPaperLink switches."""
+    hub: Hub = hass.data[DOMAIN][config_entry.entry_id]
+
+    entities: list[SwitchEntity] = [
+        OpenEPaperLinkAPSwitch(hub, description)
+        for description in AP_SWITCHES
+    ]
+
+    async_add_entities(entities)
 
 
-class APConfigSwitch(SwitchEntity):
-    def __init__(self, hub, key, name, icon):
+class OpenEPaperLinkAPSwitch(SwitchEntity):
+    """Switch for AP configuration options."""
+
+    def __init__(
+            self,
+            hub: Hub,
+            description: OpenEPaperLinkSwitchEntityDescription,
+    ) -> None:
+        """Initialize the switch."""
+        self.entity_description = description
         self._hub = hub
-        self._key = key
-        self._attr_name = f"AP {name}"
-        self._attr_unique_id = f"{hub._id}_{key}"
-        self._attr_icon = icon
-        self._attr_entity_category = EntityCategory.CONFIG
-
-    @property
-    def available(self) -> bool:
-        return self._hub.ap_config_loaded.is_set() and self._key in self._hub.ap_config
-
-    @property
-    def device_info(self):
-        return {
-            "identifiers": {(DOMAIN, "ap")},
-            "name": "OpenEPaperLink AP",
-            "model": "esp32",
-            "manufacturer": "OpenEPaperLink",
-        }
-
-    @property
-    def is_on(self):
-        return bool(self._hub.ap_config.get(self._key))
-
-    async def async_turn_on(self, **kwargs):
-        await set_ap_config_item(self._hub, self._key, 1)
-
-    async def async_turn_off(self, **kwargs):
-        await set_ap_config_item(self._hub, self._key, 0)
-
-    @callback
-    def _handle_ap_config_update(self):
-        self.async_write_ha_state()
-
-    async def async_added_to_hass(self):
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                f"{DOMAIN}_ap_config_update",
-                self._handle_ap_config_update,
-            )
+        self._attr_unique_id = f"ap_{description.key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, "ap")},
+            name="OpenEPaperLink AP",
+            manufacturer="OpenEPaperLink",
+            model="ESP32",
+            configuration_url=f"http://{hub.host}",
         )
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
-    hub = hass.data[DOMAIN][config_entry.entry_id]
-    entities = [
-        APConfigSwitch(hub, "preview", "Preview Images", "mdi:eye"),
-        APConfigSwitch(hub, "ble", "Bluetooth", "mdi:bluetooth"),
-    ]
-    async_add_entities(entities)
+    @property
+    def is_on(self) -> bool | None:
+        """Return True if entity is on."""
+        if self.entity_description.value_fn is None:
+            return None
+        return self.entity
