@@ -13,7 +13,6 @@ drawcustom:
         [{"type": "text", "value": "Hello World!", "x": 0, "y": 0, "size": 40}]
       selector:
         object:
-          multiple: true
     background:
       name: Background color
       description: Background color (black, white, accent, red, yellow)
