@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Final
 
+from switchbot.adv_parser import model
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -26,7 +28,7 @@ from homeassistant.helpers.typing import StateType
 
 import logging
 
-from .tag_types import get_hw_string
+from .tag_types import get_hw_string, get_hw_dimensions
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -282,7 +284,23 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("update_count"),
         icon="mdi:counter",
-    )
+    ),
+    OpenEPaperLinkSensorEntityDescription(
+        key="width",
+        name="Width",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.get("width"),
+        icon="mdi:arrow-expand-horizontal",
+    ),
+    OpenEPaperLinkSensorEntityDescription(
+        key="height",
+        name="Height",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.get("height"),
+        icon="mdi:arrow-expand-vertical",
+    ),
 )
 
 def _calculate_battery_percentage(voltage: int) -> int:
@@ -319,14 +337,20 @@ class OpenEPaperLinkTagSensor(OpenEPaperLinkBaseSensor):
 
         firmware_version = str(self._hub.get_tag_data(tag_mac).get("version", ""))
 
+        tag_data = self._hub.get_tag_data(self._tag_mac)
+        hw_type = tag_data.get("hw_type", 0)
+        hw_string = get_hw_string(hw_type)
+        width, height = get_hw_dimensions(hw_type)
+
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._tag_mac)},
             name=name_base,
             manufacturer="OpenEPaperLink",
-            model=get_hw_string(self._hub.get_tag_data(tag_mac).get("hw_type", 0)),
+            model=hw_string,
             via_device=(DOMAIN, "ap"),
             sw_version=f"0x{int(firmware_version, 16):X}" if firmware_version else "Unknown",
             serial_number=self._tag_mac,
+            hw_version=f"{width}x{height}",
         )
 
     @property

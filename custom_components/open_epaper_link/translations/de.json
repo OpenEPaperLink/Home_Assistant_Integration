@@ -14,7 +14,9 @@
                 "title": "Tag-Verwaltung",
                 "description": "Tags auswählen die ignoriert werden sollen.",
                 "data": {
-                    "blacklisted_tags": "Ignorierte Tags"
+                    "blacklisted_tags": "Ignorierte Tags",
+                    "button_debounce": "Tasten-Entstörzeit (Sekunden)",
+                    "nfc_debounce": "NFC-Entstörzeit (Sekunden)"
                 }
             }
         }

@@ -14,7 +14,9 @@
                 "title": "Tag Management",
                 "description": "Select tags to blacklist. Blacklisted tags will be hidden and ignored.",
                 "data": {
-                    "blacklisted_tags": "Blacklisted Tags"
+                    "blacklisted_tags": "Blacklisted Tags",
+                    "button_debounce": "Button Debounce Time (seconds)",
+                    "nfc_debounce": "NFC Debounce Time (seconds)"
                 }
             }
         }
