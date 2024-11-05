@@ -337,6 +337,7 @@ class Hub:
         pending = tag_data.get("pending")
         hw_type = tag_data.get("hwType")
         hw_string = get_hw_string(hw_type)
+        width, height = self._tag_manager.get_hw_dimensions(hw_type)
         content_mode = tag_data.get("contentMode")
         wakeup_reason = self._get_wakeup_reason_string(tag_data.get("wakeupReason"))
         capabilities = tag_data.get("capabilities")
@@ -364,6 +365,8 @@ class Hub:
             "battery_mv": battery_mv,
             "pending": pending,
             "hw_type": hw_type,
+            "width": width,
+            "height": height,
             "hw_string": hw_string,
             "content_mode": self._get_content_mode_string(content_mode),
             "wakeup_reason": wakeup_reason,
