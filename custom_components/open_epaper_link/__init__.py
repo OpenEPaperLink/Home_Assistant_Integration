@@ -8,13 +8,12 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN
 from .hub import Hub
 from .services import async_setup_services, async_unload_services
-
 _LOGGER: Final = logging.getLogger(__name__)
 
 PLATFORMS = [
     Platform.SENSOR,
     Platform.BUTTON,
-    # Platform.CAMERA,
+    Platform.CAMERA,
     Platform.SELECT,
     Platform.SWITCH,
     Platform.TEXT,

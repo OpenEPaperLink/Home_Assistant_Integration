@@ -7,5 +7,16 @@
                 }
             }
         }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Tag Management",
+                "description": "Select tags to blacklist. Blacklisted tags will be hidden and ignored.",
+                "data": {
+                    "blacklisted_tags": "Blacklisted Tags"
+                }
+            }
+        }
     }
 }

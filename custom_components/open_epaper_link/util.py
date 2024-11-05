@@ -4,6 +4,8 @@ import json
 from datetime import datetime
 from typing import Dict, Any
 
+from homeassistant.exceptions import HomeAssistantError
+from .hub import Hub
 from .const import DOMAIN
 import requests
 import logging
@@ -64,13 +66,13 @@ async def reboot_ap(hass: HomeAssistant) -> bool:
     try:
         result = await hass.async_add_executor_job(lambda: requests.post(url))
         if result.status_code == 200:
-            _LOGGER.info("Rebooted ESL Access Point")
+            _LOGGER.info("Rebooted OEPL Access Point")
             return True
         else:
-            _LOGGER.error("Failed to reboot ESL Access Point: HTTP %s", result.status_code)
+            _LOGGER.error("Failed to reboot OEPL Access Point: HTTP %s", result.status_code)
             return False
     except Exception as e:
-        _LOGGER.error("Failed to reboot ESL Access Point: %s", str(e))
+        _LOGGER.error("Failed to reboot OEPL Access Point: %s", str(e))
         return False
 
 async def set_ap_config_item(hub, key: str, value: str | int) -> bool:

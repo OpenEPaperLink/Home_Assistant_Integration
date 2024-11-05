@@ -32,6 +32,9 @@
     },
     "refresh_tag_types": {
       "service": "mdi:refresh"
+    },
+    "set_content_mode": {
+      "service": "mdi:format-text"
     }
   }
 }

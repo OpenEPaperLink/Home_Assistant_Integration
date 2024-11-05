@@ -98,6 +98,11 @@ LANGUAGE_MAPPING = OptionMapping({
     11: "ET Eesti"
 })
 
+DISCOVERY_MAPPING = OptionMapping({
+    0: "Multicast",
+    1: "Broadcast",
+})
+
 # Mapping of select entities to their configurations
 SELECT_ENTITIES = [
     {
@@ -133,7 +138,7 @@ SELECT_ENTITIES = [
     {
         "key": "wifipower",
         "name": "Wifi power",
-        "icon": "mdi:wifi-strength",
+        "icon": "mdi:wifi-strength-4",
         "mapping": WIFI_POWER_MAPPING,
     },
     {
@@ -142,6 +147,12 @@ SELECT_ENTITIES = [
         "icon": "mdi:translate",
         "mapping": LANGUAGE_MAPPING,
     },
+    {
+        "key": "discovery",
+        "name": "Discovery Method",
+        "icon": "mdi:access-point-network",
+        "mapping": DISCOVERY_MAPPING
+    }
 ]
 
 class APConfigSelect(SelectEntity):

@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from typing import Final
 
 import json
@@ -12,7 +12,6 @@ from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, CALLBACK_TYPE, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 import logging
 
@@ -59,6 +58,7 @@ class Hub:
         self._reconnect_task: asyncio.Task | None = None
         self._tag_manager = None
         self._tag_manager_ready = asyncio.Event()
+        self._blacklisted_tags = entry.options.get("blacklisted_tags", [])
 
     async def async_setup_initial(self) -> bool:
         """Set up hub without WebSocket connection."""
@@ -173,7 +173,7 @@ class Hub:
                             if msg.type == aiohttp.WSMsgType.TEXT:
                                 await self._handle_message(msg.data)
                             elif msg.type == aiohttp.WSMsgType.ERROR:
-                                _LOGGER.error("WebSocket error: %s", ws.exception())
+                                _LOGGER.error("WebSocket error: %s", ws)
                                 break
                             elif msg.type == aiohttp.WSMsgType.CLOSING:
                                 _LOGGER.debug("WebSocket closing")
@@ -234,6 +234,28 @@ class Hub:
                 await self._handle_tag_message(data["tags"][0])
             elif "logMsg" in data:
                 _LOGGER.debug("OEPL Log message: %s", data["logMsg"])
+            elif "errMsg" in data and data["errMsg"] == "REBOOTING":
+                _LOGGER.debug("AP is rebooting")
+                self._ap_data["ap_state"] = "Offline"
+                async_dispatcher_send(self.hass, SIGNAL_AP_UPDATE)
+                self.online = False
+                async_dispatcher_send(self.hass, f"{DOMAIN}_connection_status", False)
+
+                # Close WebSocket connection immediately
+                if self._ws_task and not self._ws_task.done():
+                    self._ws_task.cancel()
+
+                # Schedule reconnection attempt after brief delay
+                async def delayed_reconnect():
+                    await asyncio.sleep(5)
+                    if not self._shutdown.is_set():
+                        self._ws_task = self.hass.async_create_task(
+                            self._websocket_handler(),
+                            f"{DOMAIN}_websocket"
+                        )
+
+                self.hass.async_create_task(delayed_reconnect(), f"{DOMAIN}_reconnect")
+                return
             elif "apitem" in data:
                 # Check if this is actually a config change message
                 if data.get("apitem", {}).get("type") == "change":
@@ -251,6 +273,11 @@ class Hub:
     @callback
     async def _handle_system_message(self, sys_data: dict) -> None:
         """Process a system message."""
+
+        # Preserve existing values for fields that are not in every message
+        current_low_batt = self._ap_data.get("low_battery_count", 0)
+        current_timeout = self._ap_data.get("timeout_count", 0)
+
         self._ap_data = {
             "ip": self.host,
             "sys_time": sys_data.get("currtime"),
@@ -258,12 +285,16 @@ class Hub:
             "record_count": sys_data.get("recordcount"),
             "db_size": sys_data.get("dbsize"),
             "little_fs_free": sys_data.get("littlefsfree"),
+            "ps_ram_free": sys_data.get("psfree"),
             "rssi": sys_data.get("rssi"),
             "ap_state": self._get_ap_state_string(sys_data.get("apstate")),
             "run_state": self._get_ap_run_state_string(sys_data.get("runstate")),
             "temp": sys_data.get("temp"),
             "wifi_status": sys_data.get("wifistatus"),
             "wifi_ssid": sys_data.get("wifissid"),
+            "uptime": sys_data.get("uptime"),
+            "low_battery_count": sys_data.get("lowbattcount", current_low_batt),
+            "timeout_count": sys_data.get("timeoutcount", current_timeout),
         }
         async_dispatcher_send(self.hass, SIGNAL_AP_UPDATE)
 
@@ -271,7 +302,12 @@ class Hub:
     async def _handle_tag_message(self, tag_data: dict) -> None:
         """Process a tag message."""
         tag_mac = tag_data.get("mac")
-        # Fix tag name handling
+
+        # Skip blacklisted tags
+        if tag_mac in self._blacklisted_tags:
+            _LOGGER.debug("Ignoring blacklisted tag: %s", tag_mac)
+            return
+
         tag_name = tag_data.get("alias") or tag_mac
         last_seen = tag_data.get("lastseen")
         next_update = tag_data.get("nextupdate")
@@ -344,6 +380,38 @@ class Hub:
             self.hass.bus.async_fire(f"{DOMAIN}_event", {
                 "device_id": tag_mac,
                 "type": self._get_wakeup_reason_string(wakeup_reason)
+            })
+
+    async def async_reload_blacklist(self):
+        """Reload blacklist from config entry."""
+        entry = self.entry
+        old_blacklist = self._blacklisted_tags.copy()
+        self._blacklisted_tags = entry.options.get("blacklisted_tags", [])
+
+        # Remove blacklisted tags from known tags and data
+        for tag_mac in self._blacklisted_tags:
+            if tag_mac in self._known_tags:
+                self._known_tags.remove(tag_mac)
+                self._data.pop(tag_mac, None)
+                # Notify that this tag's state has changed
+                async_dispatcher_send(self.hass, f"{SIGNAL_TAG_UPDATE}_{tag_mac}")
+
+        # If the blacklist has changed, trigger cleanup
+        if set(old_blacklist) != set(self._blacklisted_tags):
+            # Trigger entity and device removal
+            async_dispatcher_send(self.hass, f"{DOMAIN}_blacklist_update")
+
+            # Give Home Assistant time to process removals
+            await asyncio.sleep(0.1)
+
+            # Force a state refresh for all remaining tags
+            for tag_mac in self._known_tags:
+                if tag_mac not in self._blacklisted_tags:
+                    async_dispatcher_send(self.hass, f"{SIGNAL_TAG_UPDATE}_{tag_mac}")
+
+            # Save updated data to storage
+            await self._store.async_save({
+                "tags": self._data
             })
 
     async def _handle_ap_config_message(self, config_data: dict) -> None:
@@ -465,6 +533,10 @@ class Hub:
     def get_tag_data(self, tag_mac: str) -> dict:
         """Get data for specific tag."""
         return self._data.get(tag_mac, {})
+
+    def get_blacklisted_tags(self) -> list[str]:
+        """Return list of blacklisted tag IDs."""
+        return self._blacklisted_tags
 
     @property
     def ap_status(self) -> dict:

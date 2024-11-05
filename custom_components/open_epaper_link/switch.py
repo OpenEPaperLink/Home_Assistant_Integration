@@ -27,6 +27,12 @@ SWITCH_ENTITIES = [
         "name": "Bluetooth",
         "icon": "mdi:bluetooth",
         "description": "Enable/disable Bluetooth"
+    },
+    {
+        "key": "nightlyreboot",
+        "name": "Nightly Reboot",
+        "icon": "mdi:restart",
+        "description": "Enable/disable automatic nightly reboot of the AP"
     }
 ]
 

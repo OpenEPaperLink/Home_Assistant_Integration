@@ -4,6 +4,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 import requests
 import json
 import logging
@@ -22,6 +24,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     async def async_add_tag_buttons(tag_mac: str) -> None:
         """Add buttons for a newly discovered tag."""
+
+        # Skip if tag is blacklisted
+        if tag_mac in hub.get_blacklisted_tags():
+            _LOGGER.debug("Skipping button creation for blacklisted tag: %s", tag_mac)
+            return
+
         if tag_mac in added_tags:
             return
 
@@ -53,6 +61,48 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         )
     )
 
+    # Listen for blacklist updates
+    async def handle_blacklist_update() -> None:
+        """Handle blacklist updates by removing buttons for blacklisted tags."""
+        # Get all buttons registered for this entry
+        device_registry = dr.async_get(hass)
+        entity_registry = er.async_get(hass)
+
+        # Track which devices need to be removed
+        devices_to_remove = set()
+
+        # Find and remove entities for blacklisted tags
+        entities_to_remove = []
+        for entity in entity_registry.entities.values():
+            if entity.config_entry_id == entry.entry_id:
+                # Check if this entity belongs to a blacklisted tag
+                device = device_registry.async_get(entity.device_id) if entity.device_id else None
+                if device:
+                    for identifier in device.identifiers:
+                        if identifier[0] == DOMAIN and identifier[1] in hub.get_blacklisted_tags():
+                            entities_to_remove.append(entity.entity_id)
+                            # Add device to removal list
+                            devices_to_remove.add(device.id)
+                            break
+
+        # Remove the entities
+        for entity_id in entities_to_remove:
+            entity_registry.async_remove(entity_id)
+            _LOGGER.debug("Removed entity %s for blacklisted tag", entity_id)
+
+        # Remove the devices
+        for device_id in devices_to_remove:
+            device_registry.async_remove_device(device_id)
+            _LOGGER.debug("Removed device %s for blacklisted tag", device_id)
+
+    entry.async_on_unload(
+        async_dispatcher_connect(
+            hass,
+            f"{DOMAIN}_blacklist_update",
+            handle_blacklist_update
+        )
+    )
+
 class ClearPendingTagButton(ButtonEntity):
     def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
         """Initialize the button."""
@@ -71,6 +121,11 @@ class ClearPendingTagButton(ButtonEntity):
         return {
             "identifiers": {(DOMAIN, self._tag_mac)},
         }
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return self._tag_mac not in self._hub.get_blacklisted_tags()
 
     async def async_press(self) -> None:
         await send_tag_cmd(self.hass, self._entity_id, "clear")
@@ -94,6 +149,11 @@ class ForceRefreshButton(ButtonEntity):
             "identifiers": {(DOMAIN, self._tag_mac)},
         }
 
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return self._tag_mac not in self._hub.get_blacklisted_tags()
+
     async def async_press(self) -> None:
         await send_tag_cmd(self.hass, self._entity_id, "refresh")
 
@@ -116,6 +176,11 @@ class RebootTagButton(ButtonEntity):
             "identifiers": {(DOMAIN, self._tag_mac)},
         }
 
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return self._tag_mac not in self._hub.get_blacklisted_tags()
+
     async def async_press(self) -> None:
         await send_tag_cmd(self.hass, self._entity_id, "reboot")
 
@@ -137,6 +202,11 @@ class ScanChannelsButton(ButtonEntity):
         return {
             "identifiers": {(DOMAIN, self._tag_mac)},
         }
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return self._tag_mac not in self._hub.get_blacklisted_tags()
 
     async def async_press(self) -> None:
         await send_tag_cmd(self.hass, self._entity_id, "scan")

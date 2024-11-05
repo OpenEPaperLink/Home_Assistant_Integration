@@ -8,8 +8,11 @@ import aiohttp
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigEntry, OptionsFlow
 from homeassistant.const import CONF_HOST
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import homeassistant.helpers.config_validation as cv
 
@@ -122,4 +125,56 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="reauth_confirm",
             description_placeholders={"host": self._host},
             errors=errors,
+        )
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        """Get the options flow for this handler."""
+        return OptionsFlowHandler(config_entry)
+
+class OptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle options flow for OpenEPaperLink."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+        self._blacklisted_tags = self.config_entry.options.get("blacklisted_tags", [])
+
+    async def async_step_init(self, user_input=None):
+        """Manage blacklisted tags."""
+        if user_input is not None:
+            # Update blacklisted tags
+            return self.async_create_entry(
+                title="",
+                data={"blacklisted_tags": user_input.get("blacklisted_tags", [])}
+            )
+
+        # Get list of all known tags from the hub
+        hub = self.hass.data[DOMAIN][self.config_entry.entry_id]
+        tags = []
+        for tag_mac in hub.tags:
+            tag_data = hub.get_tag_data(tag_mac)
+            tag_name = tag_data.get("tag_name", tag_mac)
+            tags.append(
+                selector.SelectOptionDict(
+                    value=tag_mac,
+                    label=f"{tag_name} ({tag_mac})"
+                )
+            )
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema({
+                vol.Optional(
+                    "blacklisted_tags",
+                    default=self._blacklisted_tags,
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=tags,
+                        multiple=True,
+                        mode=selector.SelectSelectorMode.DROPDOWN
+                    )
+                ),
+            }),
         )
