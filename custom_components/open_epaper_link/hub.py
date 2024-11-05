@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
-from typing import Final
+from typing import Final, Dict
 
 import json
 
@@ -13,6 +13,7 @@ from homeassistant.core import HomeAssistant, CALLBACK_TYPE, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers import device_registry as dr
 import logging
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -59,6 +60,8 @@ class Hub:
         self._tag_manager = None
         self._tag_manager_ready = asyncio.Event()
         self._blacklisted_tags = entry.options.get("blacklisted_tags", [])
+        self._last_button_press: Dict[str, datetime] = {}
+        self._debounce_interval = timedelta(seconds=0.5)  # Configurable debounce time
 
     async def async_setup_initial(self) -> bool:
         """Set up hub without WebSocket connection."""
@@ -374,13 +377,43 @@ class Hub:
         # Fire state update event
         async_dispatcher_send(self.hass, f"{SIGNAL_TAG_UPDATE}_{tag_mac}")
 
-        # Fire wakeup event if needed
+        # Handle wakeup event if needed
         wakeup_reason = tag_data.get("wakeupReason")
         if wakeup_reason is not None:
-            self.hass.bus.async_fire(f"{DOMAIN}_event", {
-                "device_id": tag_mac,
-                "type": self._get_wakeup_reason_string(wakeup_reason)
-            })
+            reason_string = self._get_wakeup_reason_string(wakeup_reason)
+
+            if reason_string in ["BUTTON1", "BUTTON2"]:
+                # Create unique key for this tag+button combination
+                debounce_key = f"{tag_mac}_{reason_string}"
+                current_time = datetime.now()
+
+                # Check if this button press is within debounce interval
+                last_press = self._last_button_press.get(debounce_key)
+                if last_press is None or (current_time - last_press) > self._debounce_interval:
+                    # Update last press time and fire event
+                    self._last_button_press[debounce_key] = current_time
+
+                    # Get device ID and fire event
+                    device_registry = dr.async_get(self.hass)
+                    device = device_registry.async_get_device(
+                        identifiers={(DOMAIN, tag_mac)}
+                    )
+                    if device:
+                        self.hass.bus.async_fire(f"{DOMAIN}_event", {
+                            "device_id": device.id,
+                            "type": reason_string
+                        })
+            else:
+                # Non-button events don't need debouncing
+                device_registry = dr.async_get(self.hass)
+                device = device_registry.async_get_device(
+                    identifiers={(DOMAIN, tag_mac)}
+                )
+                if device:
+                    self.hass.bus.async_fire(f"{DOMAIN}_event", {
+                        "device_id": device.id,
+                        "type": reason_string
+                    })
 
     async def async_reload_blacklist(self):
         """Reload blacklist from config entry."""
