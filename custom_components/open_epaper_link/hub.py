@@ -61,7 +61,22 @@ class Hub:
         self._tag_manager_ready = asyncio.Event()
         self._blacklisted_tags = entry.options.get("blacklisted_tags", [])
         self._last_button_press: Dict[str, datetime] = {}
-        self._debounce_interval = timedelta(seconds=0.5)  # Configurable debounce time
+        self._button_debounce_interval = timedelta(seconds=0.5)
+        self._nfc_last_scan: Dict[str, datetime] = {}
+        self._nfc_debounce_interval = timedelta(seconds=1)
+        self._update_debounce_interval()
+
+    def _update_debounce_interval(self) -> None:
+        """Update debounce intervals from options."""
+        button_debounce_seconds = self.entry.options.get("button_debounce", 0.5)
+        nfc_debounce_seconds = self.entry.options.get("nfc_debounce", 1.0)
+        self._button_debounce_interval = timedelta(seconds=button_debounce_seconds)
+        self._nfc_debounce_interval = timedelta(seconds=nfc_debounce_seconds)
+
+    async def async_reload_config(self) -> None:
+        """Reload configuration from config entry."""
+        await self.async_reload_blacklist()
+        self._update_debounce_interval()
 
     async def async_setup_initial(self) -> bool:
         """Set up hub without WebSocket connection."""
@@ -382,29 +397,29 @@ class Hub:
         if wakeup_reason is not None:
             reason_string = self._get_wakeup_reason_string(wakeup_reason)
 
-            if reason_string in ["BUTTON1", "BUTTON2"]:
-                # Create unique key for this tag+button combination
-                debounce_key = f"{tag_mac}_{reason_string}"
-                current_time = datetime.now()
+            should_fire = True
+            current_time = datetime.now()
 
-                # Check if this button press is within debounce interval
-                last_press = self._last_button_press.get(debounce_key)
-                if last_press is None or (current_time - last_press) > self._debounce_interval:
-                    # Update last press time and fire event
+            # Apply debouncing based on event type
+            if reason_string in ["BUTTON1", "BUTTON2"]:
+                # Button debouncing
+                debounce_key = f"{tag_mac}_{reason_string}"
+                last_event = self._last_button_press.get(debounce_key)
+                if last_event and (current_time - last_event) <= self._button_debounce_interval:
+                    should_fire = False
+                else:
                     self._last_button_press[debounce_key] = current_time
 
-                    # Get device ID and fire event
-                    device_registry = dr.async_get(self.hass)
-                    device = device_registry.async_get_device(
-                        identifiers={(DOMAIN, tag_mac)}
-                    )
-                    if device:
-                        self.hass.bus.async_fire(f"{DOMAIN}_event", {
-                            "device_id": device.id,
-                            "type": reason_string
-                        })
-            else:
-                # Non-button events don't need debouncing
+            elif reason_string == "NFC":
+                # NFC debouncing
+                debounce_key = f"{tag_mac}_NFC"
+                last_event = self._nfc_last_scan.get(debounce_key)
+                if last_event and (current_time - last_event) <= self._nfc_debounce_interval:
+                    should_fire = False
+                else:
+                    self._nfc_last_scan[debounce_key] = current_time
+
+            if should_fire:
                 device_registry = dr.async_get(self.hass)
                 device = device_registry.async_get_device(
                     identifiers={(DOMAIN, tag_mac)}

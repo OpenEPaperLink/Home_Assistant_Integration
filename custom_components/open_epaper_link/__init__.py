@@ -34,6 +34,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up services
     await async_setup_services(hass)
 
+    # Listen for changes to options
+    entry.async_on_unload(entry.add_update_listener(async_update_options))
+
     # Create an async task to start the WebSocket after HA is fully started
     async def start_websocket(_):
         """Start WebSocket connection after HA is fully started."""
@@ -47,6 +50,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, start_websocket)
 
     return True
+
+async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Update options."""
+    hub = hass.data[DOMAIN][entry.entry_id]
+    await hub.async_reload_config()
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""

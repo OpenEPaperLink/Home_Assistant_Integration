@@ -15,6 +15,7 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.selector import Selector
 
 from .const import DOMAIN
 import logging
@@ -140,6 +141,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """Initialize options flow."""
         self.config_entry = config_entry
         self._blacklisted_tags = self.config_entry.options.get("blacklisted_tags", [])
+        self._button_debounce = self.config_entry.options.get("button_debounce", 0.5)
+        self._nfc_debounce = self.config_entry.options.get("nfc_debounce", 1.0)
 
     async def async_step_init(self, user_input=None):
         """Manage blacklisted tags."""
@@ -147,7 +150,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             # Update blacklisted tags
             return self.async_create_entry(
                 title="",
-                data={"blacklisted_tags": user_input.get("blacklisted_tags", [])}
+                data={
+                    "blacklisted_tags": user_input.get("blacklisted_tags", []),
+                    "button_debounce": user_input.get("button_debounce", 0.5),
+                    "nfc_debounce": user_input.get("nfc_debounce", 1.0),
+                }
             )
 
         # Get list of all known tags from the hub
@@ -174,6 +181,30 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         options=tags,
                         multiple=True,
                         mode=selector.SelectSelectorMode.DROPDOWN
+                    )
+                ),
+                vol.Optional(
+                    "button_debounce",
+                    default=self._button_debounce,
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0.0,
+                        max=5.0,
+                        step=0.1,
+                        unit_of_measurement="s",
+                        mode=selector.NumberSelectorMode.SLIDER
+                    )
+                ),
+                vol.Optional(
+                    "nfc_debounce",
+                    default=self._nfc_debounce,
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0.0,
+                        max=5.0,
+                        step=0.1,
+                        unit_of_measurement="s",
+                        mode=selector.NumberSelectorMode.SLIDER
                     )
                 ),
             }),
