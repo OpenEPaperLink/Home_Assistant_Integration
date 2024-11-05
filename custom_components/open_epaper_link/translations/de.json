@@ -7,5 +7,16 @@
                 }
             }
         }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Tag-Verwaltung",
+                "description": "Tags auswählen die ignoriert werden sollen.",
+                "data": {
+                    "blacklisted_tags": "Ignorierte Tags"
+                }
+            }
+        }
     }
 }
