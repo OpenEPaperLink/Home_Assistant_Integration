@@ -95,18 +95,18 @@ class EPDCamera(Camera):
 
         # Set up device info
         firmware_version = str(tag_data.get("version", ""))
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._tag_mac)},
-            name=self._name,
-            manufacturer="OpenEPaperLink",
-            model=get_hw_string(tag_data.get("hw_type", 0)),
-            via_device=(DOMAIN, "ap"),
-            sw_version=f"0x{int(firmware_version, 16):X}" if firmware_version else "Unknown",
-        )
+
 
         self.content_type = "image/jpeg"
         self._image_path = get_image_path(hass, f"{DOMAIN}.{tag_mac}")
         self._last_image = None
+
+    @property
+    def device_info(self):
+        """Return device info."""
+        return {
+            "identifiers": {(DOMAIN, self._tag_mac)},
+        }
 
     @property
     def name(self) -> str:
