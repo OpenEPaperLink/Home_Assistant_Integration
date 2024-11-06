@@ -4,9 +4,11 @@ import logging
 import os
 import math
 import json
+import re
 import urllib
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple
 
 import requests
 import qrcode
@@ -99,6 +101,13 @@ def validate_element(element: Dict[str, Any]) -> ElementType:
         )
 
     return element_type
+
+@dataclass
+class TextSegment:
+    """Represents a segment of text with its color."""
+    text: str
+    color: str
+    start_x: int = 0
 
 class ImageGen:
     """Handles custom image generation for ESLs."""
@@ -322,12 +331,13 @@ class ImageGen:
         return image_data
 
     async def _draw_text(self, img: Image, element: dict, pos_y: int) -> int:
-        """Draw text element."""
+        """Enhanced draw text method supporting inline colors."""
         self.check_required_arguments(element, ["x", "value"], "text")
 
         draw = ImageDraw.Draw(img)
         draw.fontmode = "1"
 
+        # Get text properties
         size = element.get('size', 20)
         font_name = element.get('font', "ppb.ttf")
         font_path = os.path.join(os.path.dirname(__file__), font_name)
@@ -339,47 +349,61 @@ class ImageGen:
         else:
             y_pos = element['y']
 
-        # Get text properties
-        color = self.get_index_color(element.get('color', "black"))
-        anchor = element.get('anchor', '')
+        # Get alignment and default color
         align = element.get('align', "left")
-        spacing = element.get('spacing', 5)
-        stroke_width = element.get('stroke_width', 0)
-        stroke_fill = self.get_index_color(element.get('stroke_fill', 'white'))
+        default_color = self.get_index_color(element.get('color', "black"))
+        anchor = element.get('anchor', 'lt')
 
-        # Handle text wrapping
-        if "max_width" in element:
-            text = self._get_wrapped_text(str(element['value']), font, element['max_width'])
-        else:
+        # Check if color parsing is enabled
+        if element.get('parse_colors', False):
+            # Parse text into colored segments
             text = str(element['value'])
+            segments = self._parse_colored_text(text)
 
-        # Set anchor based on newlines
-        anchor = anchor or ('la' if '\n' in text else 'lt')
+            # Calculate positions based on alignment
+            segments, total_width = self._calculate_segment_positions(
+                segments, font, element['x'], align
+            )
 
-        # Draw text
-        draw.text(
-            (element['x'], y_pos),
-            text,
-            fill=color,
-            font=font,
-            anchor=anchor,
-            align=align,
-            spacing=spacing,
-            stroke_width=stroke_width,
-            stroke_fill=stroke_fill
-        )
+            # Draw each segment
+            max_y = y_pos
+            for segment in segments:
+                color = self.get_index_color(segment.color, element.get('accent_color', 'red'))
+                bbox = draw.textbbox(
+                    (segment.start_x, y_pos),
+                    segment.text,
+                    font=font,
+                    anchor=anchor
+                )
+                draw.text(
+                    (segment.start_x, y_pos),
+                    segment.text,
+                    fill=color,
+                    font=font,
+                    anchor=anchor
+                )
+                max_y = max(max_y, bbox[3])
 
-        # Calculate new position
-        text_bbox = draw.textbbox(
-            (element['x'], y_pos),
-            text,
-            font=font,
-            anchor=anchor,
-            align=align,
-            spacing=spacing,
-            stroke_width=stroke_width
-        )
-        return text_bbox[3]
+            return max_y
+        else:
+            # Draw single text without parsing color markup
+            text = str(element['value'])
+            bbox = draw.textbbox(
+                (element['x'], y_pos),
+                text,
+                font=font,
+                anchor=anchor,
+                align=align
+            )
+            draw.text(
+                (element['x'], y_pos),
+                text,
+                fill=default_color,
+                font=font,
+                anchor=anchor,
+                align=align
+            )
+            return bbox[3]
 
     @staticmethod
     def _get_wrapped_text(text: str, font: ImageFont.ImageFont, line_length: int) -> str:
@@ -392,6 +416,71 @@ class ImageGen:
             else:
                 lines.append(word)
         return '\n'.join(lines)
+
+    @staticmethod
+    def _parse_colored_text(text: str) -> List[TextSegment]:
+        """Parse text with color markup into text segments."""
+
+        segments = []
+        current_pos = 0
+        pattern = r'\[(black|white|red|yellow|accent)\](.*?)\[/\1\]'
+
+        for match in re.finditer(pattern, text):
+            # Add any text before the match with default color
+            if match.start() > current_pos:
+                segments.append(
+                    TextSegment(
+                        text=text[current_pos:match.start()],
+                        color="black"
+                    ))
+            # Add the matched text with the specified color
+            segments.append(
+                TextSegment(
+                    text=match.group(2),
+                    color=match.group(1)
+                )
+            )
+            current_pos = match.end()
+
+        # Add any remaining text with default color
+        if current_pos < len(text):
+            segments.append(TextSegment(
+                text=text[current_pos:],
+                color="black"
+            ))
+
+        return segments
+
+    @staticmethod
+    def _calculate_segment_positions(
+            segments: List[TextSegment],
+            font: ImageFont.FreeTypeFont,
+            start_x: int,
+            alignment: str = "left"
+    ) -> Tuple[List[TextSegment], int]:
+        """Calculate x positions for each text segment based on alignment.
+        Returns the modified segments and the total width."""
+
+        total_width = sum(font.getlength(segment.text) for segment in segments)
+
+        current_x = start_x
+        match alignment.lower():
+            case "left":
+                pass  # start_x is already correct
+            case "center":
+                current_x -= total_width / 2
+            case "right":
+                current_x -= total_width
+            case _:
+                # Default to left alignment for unknown values
+                _LOGGER.warning("Unknown alignment '%s', defaulting to left", alignment)
+
+        for segment in segments:
+            segment.start_x = int(current_x)
+            current_x += font.getlength(segment.text)
+
+        return segments, total_width
+
 
     async def _draw_multiline(self, img: Image, element: dict, pos_y: int) -> int:
         """Draw multiline text with delimiter."""
