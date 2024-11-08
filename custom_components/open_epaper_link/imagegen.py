@@ -499,7 +499,7 @@ class ImageGen:
         font_path = os.path.join(os.path.dirname(__file__), font_name)
         font = ImageFont.truetype(font_path, size)
         color = self.get_index_color(element.get('color', "black"))
-        anchor = element.get('anchor', "lm")
+        anchor = element.get('anchor', "lt")
         stroke_width = element.get('stroke_width', 0)
         stroke_fill = self.get_index_color(element.get('stroke_fill', 'white'))
 
