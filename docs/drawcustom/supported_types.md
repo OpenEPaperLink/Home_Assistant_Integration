@@ -100,6 +100,56 @@ Draws text.
 | `y_padding`    | Vertical offset when y not specified | No       | `10`                           | Pixels                                                                                    |
 | `visible`      | Show/hide element                    | No       | `true`                         | `true`, `false`                                                                           |
 
+### Inline Color Markup
+
+Text elements support inline color markup when `parse_colors` is enabled. This allows different parts of the text to be rendered in different colors without needing to create multiple text elements.
+
+| Parameter      | Description                 | Required | Default | Notes                                           |
+|----------------|-----------------------------|----------|---------|-------------------------------------------------|
+| `parse_colors` | Enable color markup parsing | No       | `false` | Set to `true` to enable color markup processing |
+
+Color markup syntax:
+```
+[color]text[/color]
+```
+
+Available colors:
+- `black` - Black text
+- `white` - White text
+- `red` - Red text (for red displays)
+- `yellow` - Yellow text (for yellow displays)
+- `accent` - Uses the display's accent color (red or yellow depending on hardware)
+
+Examples:
+```yaml
+# Simple colored text
+- type: text
+  value: "Temperature: [red]25°C[/red]"
+  x: 10
+  y: 10
+  parse_colors: true
+
+# Multiple colors
+- type: text
+  value: "[black]Current[/black] temp: [accent]25°C[/accent]"
+  x: 10
+  y: 40
+  parse_colors: true
+
+# With Home Assistant templates
+- type: text
+  value: "Status: [{{ 'accent' if is_state('binary_sensor.door', 'on') else 'black' }}]{{ states('binary_sensor.door') }}[/{{ 'accent' if is_state('binary_sensor.door', 'on') else 'black' }}]"
+  x: 10
+  y: 70
+  parse_colors: true
+```
+
+Notes:
+- Color markup only works when `parse_colors: true` is set
+- Without `parse_colors: true`, markup characters are treated as literal text
+- Works with Home Assistant templates
+- The `accent` color automatically adapts to the display type (red or yellow)
+
 ### Multiline Text
 Splits text into multiple lines based on a delimiter.
 
