@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime
 from typing import Final
 
 import async_timeout
@@ -51,8 +52,96 @@ async def get_entity_id_from_device_id(hass: HomeAssistant, device_id: str) -> s
 
     return f"{DOMAIN}.{domain_mac[1].lower()}"
 
+class UploadQueueHandler:
+    """Handle queued image uploads to the AP."""
+
+    def __init__(self, max_concurrent: int = 1, cooldown: float = 1.0):
+        """Initialize the upload queue handler."""
+        self._queue = asyncio.Queue()
+        self._processing = False
+        self._max_concurrent = max_concurrent
+        self._cooldown = cooldown
+        self._active_uploads = 0
+        self._last_upload = None
+        self._lock = asyncio.Lock()
+
+    def __str__(self):
+        """Return queue status string."""
+        return f"Queue(active={self._active_uploads}, size={self._queue.qsize()})"
+
+    async def add_to_queue(self, upload_func, *args, **kwargs):
+        """Add an upload task to the queue."""
+
+        entity_id = next((arg for arg in args if isinstance(arg, str) and "." in arg), "unknown")
+
+        _LOGGER.debug("Adding upload task to queue for %s. %s", entity_id, self)
+        # Add task to queue
+        await self._queue.put((upload_func, args, kwargs))
+
+        # Start processing queue if not already running
+        if not self._processing:
+            _LOGGER.debug("Starting upload queue processor for %s", entity_id)
+            asyncio.create_task(self._process_queue())
+
+    async def _process_queue(self):
+        """Process queued upload tasks."""
+        self._processing = True
+        _LOGGER.debug("Upload queue processor started. %s", self)
+
+        try:
+            while not self._queue.empty():
+                async with self._lock:
+                    # Check if the upload limit has been reached
+                    if self._active_uploads >= self._max_concurrent:
+                        _LOGGER.debug("Hit concurrent upload limit (%d). Waiting...", self._max_concurrent)
+                        await asyncio.sleep(0.1)
+                        continue
+
+                    # Check cooldown period
+                    if self._last_upload:
+                        elapsed = (datetime.now() - self._last_upload).total_seconds()
+                        if elapsed < self._cooldown:
+                            _LOGGER.debug("In cooldown period (%.1f seconds remaining)",
+                                          self._cooldown - elapsed)
+                            await asyncio.sleep(self._cooldown - elapsed)
+
+                    # Get next task from queue
+                    upload_func, args, kwargs = await self._queue.get()
+
+                    entity_id = next((arg for arg in args if isinstance(arg, str) and "." in arg), "unknown")
+
+                    try:
+                        # Increment active uploads counter
+                        self._active_uploads += 1
+                        _LOGGER.debug("Starting upload for %s. %s", entity_id, self)
+
+                        # Perform upload
+                        _LOGGER.debug("Starting queued upload task")
+                        start_time = datetime.now()
+                        await upload_func(*args, **kwargs)
+                        duration = (datetime.now() - start_time).total_seconds()
+
+                        # Update last upload timestamp
+                        self._last_upload = datetime.now()
+                        _LOGGER.debug("Upload completed for %s in %.1f seconds", entity_id, duration)
+
+                    except Exception as err:
+                        _LOGGER.error("Error processing queued upload for %s: %s", entity_id, str(err))
+                    finally:
+                        # Decrement active upload counter
+                        self._active_uploads -= 1
+                        # Mark task as done
+                        self._queue.task_done()
+                        _LOGGER.debug("Upload task for %s finished. %s", entity_id, self)
+        finally:
+            self._processing = False
+
+
+
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Set up the OpenEPaperLink services."""
+
+    upload_queue = UploadQueueHandler(max_concurrent=1, cooldown=1.0)
 
     async def get_hub():
         """Get the hub instance."""
@@ -75,11 +164,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         generator = ImageGen(hass)
         errors = []
 
-        # Validate payload before processing devices
-        payload = service.data.get("payload", [])
-        if not payload:
-            raise HomeAssistantError("No elements in payload")
-
+        # Process each device
         for device_id in device_ids:
             device_errors = []
             try:
@@ -96,7 +181,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     )
 
                     if device_errors:
-                        # Add device-specific errors to main error list
                         errors.extend([f"Device {entity_id}: {err}" for err in device_errors])
                         _LOGGER.warning(
                             "Completed with warnings for device %s:\n%s",
@@ -108,39 +192,42 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         _LOGGER.info("Dry run completed for %s", entity_id)
                         continue
 
-                    # Get tag MAC from entity ID
-                    mac = entity_id.split(".")[1].upper()
-
-                    # Upload image to tag
-                    await upload_image(
-                        hub=hub,
-                        img=image_data,
-                        mac=mac,
-                        dither=service.data.get("dither", False),
-                        ttl=service.data.get("ttl", 60),
-                        preload_type=service.data.get("preload_type", 0),
-                        preload_lut=service.data.get("preload_lut", 0)
+                    # Queue the upload
+                    await upload_queue.add_to_queue(
+                        upload_image,
+                        hub,
+                        entity_id,
+                        image_data,
+                        service.data.get("dither", False),
+                        service.data.get("ttl", 60),
+                        service.data.get("preload_type", 0),
+                        service.data.get("preload_lut", 0)
                     )
 
                 except Exception as err:
                     error_msg = f"Error processing device {entity_id}: {str(err)}"
                     errors.append(error_msg)
                     _LOGGER.error(error_msg)
-                    # Continue with next device
+                    continue
 
             except Exception as err:
-                error_msg = f"Failed to process device {entity_id}: {str(err)}"
+                error_msg = f"Failed to process device {device_id}: {str(err)}"
                 errors.append(error_msg)
                 _LOGGER.error(error_msg)
-                # Continue with next device
+                continue
 
         if errors:
             raise HomeAssistantError("\n".join(errors))
 
-    async def upload_image(hub, img: bytes, mac: str, dither: bool,
-                           ttl: int, preload_type: int = 0, preload_lut: int = 0) -> None:
+    async def upload_image(hub, entity_id: str, img: bytes, dither: bool, ttl: int,
+                           preload_type: int = 0, preload_lut: int = 0) -> None:
         """Upload image to tag through AP."""
         url = f"http://{hub.host}/imgupload"
+        mac = entity_id.split(".")[1].upper()
+
+        _LOGGER.debug("Preparing upload for %s (MAC: %s)", entity_id, mac)
+        _LOGGER.debug("Upload parameters: dither=%s, ttl=%d, preload_type=%d, preload_lut=%d",
+                      dither, ttl, preload_type, preload_lut)
 
         # Prepare multipart form data
         fields = {
@@ -150,6 +237,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             'ttl': str(ttl),
             'image': ('image.jpg', img, 'image/jpeg'),
         }
+
+        _LOGGER.debug("Image size for %s: %.1f KB", entity_id, len(img)/1024)
 
         # Add preload parameters if needed
         if preload_type > 0:
@@ -162,7 +251,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         try:
             async with async_timeout.timeout(30):  # 30 second timeout for upload
-                response = await hub.hass.async_add_executor_job(
+                response = await hass.async_add_executor_job(
                     lambda: requests.post(
                         url,
                         headers={'Content-Type': mp_encoder.content_type},
@@ -172,13 +261,13 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
             if response.status_code != 200:
                 raise HomeAssistantError(
-                    f"Image upload failed with status code: {response.status_code}"
+                    f"Image upload failed for {entity_id} with status code: {response.status_code}"
                 )
 
         except asyncio.TimeoutError:
-            raise HomeAssistantError("Image upload timed out")
+            raise HomeAssistantError(f"Image upload timed out for {entity_id}")
         except Exception as err:
-            raise HomeAssistantError(f"Failed to upload image: {str(err)}")
+            raise HomeAssistantError(f"Failed to upload image for {entity_id}: {str(err)}")
 
     async def setled_service(service: ServiceCall) -> None:
         """Handle LED pattern service calls."""
