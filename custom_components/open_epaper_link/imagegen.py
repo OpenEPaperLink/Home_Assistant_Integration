@@ -58,6 +58,70 @@ class ElementType(str, Enum):
         """Return the string value of the enum."""
         return self.value
 
+class CoordinateParser:
+    """Helper class for parsing coordinates with percentage support."""
+
+    def __init__(self, canvas_width: int, canvas_height: int):
+        """Initialize with canvas dimensions."""
+        self.width = canvas_width
+        self.height = canvas_height
+
+    @staticmethod
+    def _parse_dimension(value: str | int | float, total_dimension: int) -> int:
+        """Convert a dimension value (pixels or percentage) to absolute pixels.
+
+        Args:
+            value: The dimension value (e.g., "50%", 50, "50")
+            total_dimension: The total available dimension (width or height)
+
+        Returns:
+            int: The calculated pixel value
+        """
+        if isinstance(value, (int, float)):
+            return int(value)
+
+        value = str(value).strip()
+        if value.endswith('%'):
+            try:
+                percentage = float(value[:-1])
+                return int((percentage / 100) * total_dimension)
+            except ValueError:
+                return 0
+        try:
+            return int(float(value))
+        except ValueError:
+            return 0
+
+    def parse_x(self, value: str | int | float) -> int:
+        """Parse x coordinate value."""
+        return self._parse_dimension(value, self.width)
+
+    def parse_y(self, value: str | int | float) -> int:
+        """Parse y coordinate value."""
+        return self._parse_dimension(value, self.height)
+
+    def parse_size(self, value: str | int | float, is_width: bool = True) -> int:
+        """Parse size value."""
+        return self._parse_dimension(value, self.width if is_width else self.height)
+
+    def parse_coordinates(self, element: dict, prefix: str = '') -> tuple[int, int]:
+        """Parse x,y coordinates from element with given prefix.
+
+        Args:
+            element: Element dictionary
+            prefix: Optional prefix for coordinate keys (e.g., 'start_' or 'end_')
+
+        Returns:
+            tuple: (x, y) coordinates in pixels
+        """
+        x_key = f"{prefix}x"
+        y_key = f"{prefix}y"
+
+        x = self.parse_x(element.get(x_key, 0))
+        y = self.parse_y(element.get(y_key, 0))
+
+        return x, y
+
 # Define required fields for each element type
 REQUIRED_FIELDS: Dict[ElementType, list[str]] = {
     ElementType.TEXT: ["x", "value"],
@@ -336,18 +400,18 @@ class ImageGen:
 
         draw = ImageDraw.Draw(img)
         draw.fontmode = "1"
+        coords = CoordinateParser(img.width, img.height)
 
+        x = coords.parse_x(element['x'])
+        if "y" not in element:
+            y = pos_y + element.get('y_padding', 10)
+        else:
+            y = coords.parse_y(element['y'])
         # Get text properties
-        size = element.get('size', 20)
+        size = coords.parse_size(element.get('size', 20), is_width=False)
         font_name = element.get('font', "ppb.ttf")
         font_path = os.path.join(os.path.dirname(__file__), font_name)
         font = ImageFont.truetype(font_path, size)
-
-        # Get vertical position
-        if "y" not in element:
-            y_pos = pos_y + element.get('y_padding', 10)
-        else:
-            y_pos = element['y']
 
         # Get alignment and default color
         align = element.get('align', "left")
@@ -362,21 +426,21 @@ class ImageGen:
 
             # Calculate positions based on alignment
             segments, total_width = self._calculate_segment_positions(
-                segments, font, element['x'], align
+                segments, font, x, align
             )
 
             # Draw each segment
-            max_y = y_pos
+            max_y = y
             for segment in segments:
                 color = self.get_index_color(segment.color, element.get('accent_color', 'red'))
                 bbox = draw.textbbox(
-                    (segment.start_x, y_pos),
+                    (segment.start_x, y),
                     segment.text,
                     font=font,
                     anchor=anchor
                 )
                 draw.text(
-                    (segment.start_x, y_pos),
+                    (segment.start_x, y),
                     segment.text,
                     fill=color,
                     font=font,
@@ -389,14 +453,14 @@ class ImageGen:
             # Draw single text without parsing color markup
             text = str(element['value'])
             bbox = draw.textbbox(
-                (element['x'], y_pos),
+                (x, y),
                 text,
                 font=font,
                 anchor=anchor,
                 align=align
             )
             draw.text(
-                (element['x'], y_pos),
+                (x,y),
                 text,
                 fill=default_color,
                 font=font,
@@ -581,6 +645,13 @@ class ImageGen:
         )
 
         draw = ImageDraw.Draw(img)
+        coords = CoordinateParser(img.width, img.height)
+
+        # Coordinates
+        x_start = coords.parse_x(element['x_start'])
+        x_end = coords.parse_x(element['x_end'])
+        y_start = coords.parse_y(element['y_start'])
+        y_end = coords.parse_y(element['y_end'])
 
         # Get rectangle properties
         rect_fill = self.get_index_color(element.get('fill'))
@@ -593,8 +664,7 @@ class ImageGen:
 
         # Draw rectangle
         draw.rounded_rectangle(
-            (element['x_start'], element['y_start'],
-             element['x_end'], element['y_end']),
+            (x_start, y_start, x_end,y_end),
             fill=rect_fill,
             outline=rect_outline,
             width=rect_width,
@@ -602,7 +672,7 @@ class ImageGen:
             corners=corners
         )
 
-        return element['y_end']
+        return y_end
 
     async def _draw_rectangle_pattern(self, img: Image, element: dict, pos_y: int) -> int:
         """Draw repeated rectangle pattern."""
@@ -658,6 +728,12 @@ class ImageGen:
         )
 
         draw = ImageDraw.Draw(img)
+        coords = CoordinateParser(img.width, img.height)
+
+        # Coordinates
+        x = coords.parse_x(element['x'])
+        y = coords.parse_y(element['y'])
+
 
         # Get circle properties
         fill = self.get_index_color(element.get('fill'))
@@ -666,14 +742,13 @@ class ImageGen:
 
         # Draw circle
         draw.ellipse(
-            [(element['x'] - element['radius'], element['y'] - element['radius']),
-             (element['x'] + element['radius'], element['y'] + element['radius'])],
+            [(x - element['radius'], y - element['radius']), (x+ element['radius'], y + element['radius'])],
             fill=fill,
             outline=outline,
             width=width
         )
 
-        return element['y'] + element['radius']
+        return y + element['radius']
 
     async def _draw_ellipse(self, img: Image, element: dict, pos_y: int) -> int:
         """Draw ellipse element."""
@@ -684,6 +759,13 @@ class ImageGen:
         )
 
         draw = ImageDraw.Draw(img)
+        coords = CoordinateParser(img.width, img.height)
+
+        # Coordinates
+        x_start = coords.parse_x(element['x_start'])
+        x_end = coords.parse_x(element['x_end'])
+        y_start = coords.parse_y(element['y_start'])
+        y_end = coords.parse_y(element['y_end'])
 
         # Get ellipse properties
         fill = self.get_index_color(element.get('fill'))
@@ -692,14 +774,13 @@ class ImageGen:
 
         # Draw ellipse
         draw.ellipse(
-            [(element['x_start'], element['y_start']),
-             (element['x_end'], element['y_end'])],
+            [(x_start, y_start), (x_end, y_end)],
             fill=fill,
             outline=outline,
             width=width
         )
 
-        return element['y_end']
+        return y_end
 
     async def _draw_icon(self, img: Image, element: dict, pos_y: int) -> int:
         """Draw Material Design Icons."""
@@ -711,6 +792,12 @@ class ImageGen:
 
         draw = ImageDraw.Draw(img)
         draw.fontmode = "1"  # Enable high quality font rendering
+        coords = CoordinateParser(img.width, img.height)
+
+        # Coordinates
+        x = coords.parse_x(element['x'])
+        y = coords.parse_y(element['y'])
+
 
         # Load MDI font and metadata
         font_file = os.path.join(os.path.dirname(__file__), 'materialdesignicons-webfont.ttf')
@@ -760,7 +847,7 @@ class ImageGen:
         # Draw icon
         try:
             draw.text(
-                (element['x'], element['y']),
+                (x, y),
                 chr(int(chr_hex, 16)),
                 fill=fill,
                 font=font,
@@ -773,7 +860,7 @@ class ImageGen:
 
         # Calculate vertical position using text bounds
         bbox = draw.textbbox(
-            (element['x'], element['y']),
+            (x, y),
             chr(int(chr_hex, 16)),
             font=font,
             anchor=anchor
@@ -787,6 +874,12 @@ class ImageGen:
             ["x", "y", "data"],
             "qrcode"
         )
+
+        coords = CoordinateParser(img.width, img.height)
+
+        # Coordinates
+        x = coords.parse_x(element['x'])
+        y = coords.parse_y(element['y'])
 
         # Get QR code properties
         color = self.get_index_color(element.get('color', "black"))
@@ -812,13 +905,13 @@ class ImageGen:
             qr_img = qr_img.convert("RGBA")
 
             # Calculate position
-            position = (element['x'], element['y'])
+            position = (x, y)
 
             # Paste QR code onto main image
             img.paste(qr_img, position, qr_img)
 
             # Return bottom position
-            return element['y'] + qr_img.height
+            return y + qr_img.height
 
         except Exception as e:
             raise HomeAssistantError(f"Failed to generate QR code: {str(e)}")
@@ -1136,12 +1229,13 @@ class ImageGen:
         )
 
         draw = ImageDraw.Draw(img)
+        coords = CoordinateParser(img.width, img.height)
 
-        # Get bar properties
-        x_start = element['x_start']
-        y_start = element['y_start']
-        x_end = element['x_end']
-        y_end = element['y_end']
+        x_start = coords.parse_x(element['x_start'])
+        y_start = coords.parse_y(element['y_start'])
+        x_end = coords.parse_x(element['x_end'])
+        y_end = coords.parse_y(element['y_end'])
+
         progress = min(100, max(0, element['progress']))  # Clamp to 0-100
         direction = element.get('direction', 'right')
         background = self.get_index_color(element.get('background', 'white'))
