@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+    branches:
+      - dev
+      - main
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.12.0
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12.0
+
+      - name: Create and activate virtual environment
+        run: |
+          python -m venv venv
+          . venv/bin/activate
+          echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
+          echo "$VIRTUAL_ENV/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          pip install homeassistant
+          pip install pytest pytest-homeassistant-custom-component
+          if [ -f requirements_test.txt ]; then pip install -r requirements_test.txt; fi
+
+      - name: Run tests
+        run: |
+          PYTHONPATH=${{ github.workspace }} pytest tests
