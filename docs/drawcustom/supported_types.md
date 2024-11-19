@@ -36,6 +36,12 @@ Example payload:
 | `ttl`        | Cache time in seconds           | 60      |
 | `dry-run`    | Generate without sending        | false   |
 
+## Using Dimensions
+
+Most dimensions (positions, sizes, etc.) can be specified in two ways:
+- Absolute pixels: `x: 100`
+- Percentages: `x: "50%"`
+
 # Color Support
 
 ESLs currently come in two variants: red and yellow accent colors. You can specify colors in several ways:
@@ -86,20 +92,21 @@ Draws text.
 | Parameter      | Description                          | Required | Default                        | Notes                                                                                     |
 |----------------|--------------------------------------|----------|--------------------------------|-------------------------------------------------------------------------------------------|
 | `value`        | Text to display                      | Yes      | -                              | String                                                                                    |
-| `x`            | X position                           | Yes      | -                              | Pixels from left                                                                          |
-| `y`            | Y position                           | No       | Last text position + y_padding | Pixels from top                                                                           |
+| `x`            | X position                           | Yes      | -                              | Pixels or percentage                                                                      |
+| `y`            | Y position                           | No       | Last text position + y_padding | Pixels or percentage                                                                      |
 | `size`         | Font size                            | No       | `20`                           | Pixels                                                                                    |
 | `font`         | Font file name                       | No       | `ppb.ttf`                      | Available fonts: `ppb.ttf`, `rbm.ttf`, or custom                                          |
 | `color`        | Text color                           | No       | `black`                        | `black`, `white`, `red`,`yellow`                                                          |
 | `anchor`       | Text anchor point                    | No       | `lt` (left-top)                | [Pillow text anchors](https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html) |
-| `max_width`    | Maximum text width before wrapping   | No       | -                              | Pixels                                                                                    |
+| `max_width`    | Maximum text width before wrapping   | No       | -                              | Pixels or percentage                                                                      |
 | `spacing`      | Line spacing for wrapped text        | No       | `5`                            | Pixels                                                                                    |
 | `stroke_width` | Outline width                        | No       | `0`                            | Pixels                                                                                    |
 | `stroke_fill`  | Outline color                        | No       | `white`                        | `white`, `black`, `accent`, `red`, `yellow`                                               |
 | `align`        | Text alignment                       | No       | `left`                         | `left`, `center`, `right`                                                                 |
 | `y_padding`    | Vertical offset when y not specified | No       | `10`                           | Pixels                                                                                    |
 | `visible`      | Show/hide element                    | No       | `true`                         | `true`, `false`                                                                           |
-
+| `parse_colors` | Enable color markup in text          | No       | false                          | Enables `[color]text[/color]` syntax                                                      |
+| `truncate`     | Truncate text if exceeds max_width   | No       | false                          | Adds ellipsis (...) when truncating                                                       |
 ### Inline Color Markup
 
 Text elements support inline color markup when `parse_colors` is enabled. This allows different parts of the text to be rendered in different colors without needing to create multiple text elements.
@@ -168,9 +175,9 @@ Splits text into multiple lines based on a delimiter.
 |-------------|--------------------------------|----------|---------------------------|---------------------------------------------|
 | `value`     | Text with delimiters           | Yes      | -                         | String                                      |
 | `delimiter` | Character to split text        | Yes      | -                         | Single character                            |
-| `x`         | X position                     | Yes      | -                         | Pixels from left                            |
+| `x`         | X position                     | Yes      | -                         | Pixels or percentage                        |
 | `offset_y`  | Vertical spacing between lines | Yes      | -                         | Pixels                                      |
-| `start_y`   | Starting Y position            | No       | Last position + y_padding | Pixels from top                             |
+| `start_y`   | Starting Y position            | No       | Last position + y_padding | Pixels or percentage                        |
 | `size`      | Font size                      | No       | `20`                      | Pixels                                      |
 | `font`      | Font file name                 | No       | `ppb.ttf`                 | Available fonts: `ppb.ttf`, `rbm.ttf`       |
 | `color`     | Text color                     | No       | `black`                   | `white`, `black`, `accent`, `red`, `yellow` |
@@ -193,10 +200,10 @@ Draws a straight line.
 
 | Parameter   | Description                          | Required | Default         | Notes                                       |
 |-------------|--------------------------------------|----------|-----------------|---------------------------------------------|
-| `x_start`   | Starting X position                  | Yes      | -               | Pixels                                      |
-| `x_end`     | Ending X position                    | Yes      | -               | Pixels                                      |
-| `y_start`   | Starting Y position                  | No       | Auto-positioned | Pixels                                      |
-| `y_end`     | Ending Y position                    | No       | `y_start`       | Pixels                                      |
+| `x_start`   | Starting X position                  | Yes      | -               | Pixels or percentage                        |
+| `x_end`     | Ending X position                    | Yes      | -               | Pixels or percentage                        |
+| `y_start`   | Starting Y position                  | No       | Auto-positioned | Pixels or percentage                        |
+| `y_end`     | Ending Y position                    | No       | `y_start`       | Pixels or percentage                        |
 | `fill`      | Line color                           | No       | `black`         | `white`, `black`, `accent`, `red`, `yellow` |
 | `width`     | Line thickness                       | No       | `1`             | Pixels                                      |
 | `y_padding` | Vertical offset when auto-positioned | No       | `0`             | Pixels                                      |
@@ -218,10 +225,10 @@ Draws a rectangle with optional rounded corners.
 
 | Parameter | Description            | Required | Default | Notes                                                                                    |
 |-----------|------------------------|----------|---------|------------------------------------------------------------------------------------------|
-| `x_start` | Left position          | Yes      | -       | Pixels                                                                                   |
-| `x_end`   | Right position         | Yes      | -       | Pixels                                                                                   |
-| `y_start` | Top position           | Yes      | -       | Pixels                                                                                   |
-| `y_end`   | Bottom position        | Yes      | -       | Pixels                                                                                   |
+| `x_start` | Left position          | Yes      | -       | Pixels or percentage                                                                     |
+| `x_end`   | Right position         | Yes      | -       | Pixels or percentage                                                                     |
+| `y_start` | Top position           | Yes      | -       | Pixels or percentage                                                                     |
+| `y_end`   | Bottom position        | Yes      | -       | Pixels or percentage                                                                     |
 | `fill`    | Fill color             | No       | `null`  | `white`, `black`, `accent`, `red`, `yellow`  `null`                                      |
 | `outline` | Border color           | No       | `black` | `white`, `black`, `accent`, `red`, `yellow`                                              |
 | `width`   | Border thickness       | No       | `1`     | Pixels                                                                                   |
@@ -249,10 +256,10 @@ Draws repeated rectangles in a grid pattern.
 
 | Parameter  | Description                  | Required | Default | Notes                                                |
 |------------|------------------------------|----------|---------|------------------------------------------------------|
-| `x_start`  | Starting X position          | Yes      | -       | Pixels                                               |
+| `x_start`  | Starting X position          | Yes      | -       | Pixels or percentage                                 |
 | `x_size`   | Width of each rectangle      | Yes      | -       | Pixels                                               |
 | `x_offset` | Horizontal spacing           | Yes      | -       | Pixels                                               |
-| `y_start`  | Starting Y position          | Yes      | -       | Pixels                                               |
+| `y_start`  | Starting Y position          | Yes      | -       | Pixels or percentage                                 |
 | `y_size`   | Height of each rectangle     | Yes      | -       | Pixels                                               |
 | `y_offset` | Vertical spacing             | Yes      | -       | Pixels                                               |
 | `x_repeat` | Number of horizontal repeats | Yes      | -       | Integer                                              |
@@ -274,8 +281,8 @@ Draws a circle around a center point.
 
 | Parameter | Description       | Required | Default | Notes                                                |
 |-----------|-------------------|----------|---------|------------------------------------------------------|
-| `x`       | Center X position | Yes      | -       | Pixels                                               |
-| `y`       | Center Y position | Yes      | -       | Pixels                                               |
+| `x`       | Center X position | Yes      | -       | Pixels or percentage                                 |
+| `y`       | Center Y position | Yes      | -       | Pixels or percentage                                 |
 | `radius`  | Circle radius     | Yes      | -       | Pixels                                               |
 | `fill`    | Fill color        | No       | `null`  | `white`, `black`, `accent`, `red`, `yellow` , `null` |
 | `outline` | Border color      | No       | `black` | `white`, `black`, `accent`, `red`, `yellow`          |
@@ -295,10 +302,10 @@ Draws an ellipse inside the bounding box.
 
 | Parameter | Description       | Required | Default | Notes                                               |
 |-----------|-------------------|----------|---------|-----------------------------------------------------|
-| `x_start` | Left position     | Yes      | -       | Pixels                                              |
-| `x_end`   | Right position    | Yes      | -       | Pixels                                              |
-| `y_start` | Top position      | Yes      | -       | Pixels                                              |
-| `y_end`   | Bottom position   | Yes      | -       | Pixels                                              |
+| `x_start` | Left position     | Yes      | -       | Pixels or percentage                                |
+| `x_end`   | Right position    | Yes      | -       | Pixels or percentage                                |
+| `y_start` | Top position      | Yes      | -       | Pixels or percentage                                |
+| `y_end`   | Bottom position   | Yes      | -       | Pixels or percentage                                |
 | `fill`    | Fill color        | No       | `null`  | `white`, `black`, `accent`, `red`, `yellow`  `null` |
 | `outline` | Border color      | No       | `black` | `white`, `black`, `accent`, `red`, `yellow`         |
 | `width`   | Border thickness  | No       | `1`     | Pixels                                              |
@@ -319,8 +326,8 @@ Draws Material Design Icons.
 | Parameter | Description       | Required | Default | Notes                                                                |
 |-----------|-------------------|----------|---------|----------------------------------------------------------------------|
 | `value`   | Icon name         | Yes      | -       | From [Material Design Icons](https://pictogrammers.com/library/mdi/) |
-| `x`       | X position        | Yes      | -       | Pixels                                                               |
-| `y`       | Y position        | Yes      | -       | Pixels                                                               |
+| `x`       | X position        | Yes      | -       | Pixels or percentage                                                 |
+| `y`       | Y position        | Yes      | -       | Pixels or percentage                                                 |
 | `size`    | Icon size         | Yes      | -       | Pixels                                                               |
 | `fill`    | Icon color        | No       | `black` | `white`, `black`, `accent`, `red`, `yellow`                          |
 | `anchor`  | Icon anchor point | No       | `la`    | See text anchors                                                     |
@@ -373,8 +380,8 @@ Generates and displays a QR code.
 | Parameter | Description          | Required | Default | Notes                                       |
 |-----------|----------------------|----------|---------|---------------------------------------------|
 | `data`    | Content to encode    | Yes      | -       | String                                      |
-| `x`       | X position           | Yes      | -       | Pixels                                      |
-| `y`       | Y position           | Yes      | -       | Pixels                                      |
+| `x`       | X position           | Yes      | -       | Pixels or percentage                        |
+| `y`       | Y position           | Yes      | -       | Pixels or percentage                        |
 | `boxsize` | Size of each QR box  | No       | `2`     | Pixels                                      |
 | `border`  | QR code border width | No       | `1`     | Units                                       |
 | `color`   | QR code color        | No       | `black` | `white`, `black`, `accent`, `red`, `yellow` |
@@ -455,11 +462,11 @@ Displays a progress bar with optional percentage text.
 
 | Parameter         | Description          | Required | Default | Notes                                       |
 |-------------------|----------------------|----------|---------|---------------------------------------------|
-| `x_start`         | Left position        | Yes      | -       | Pixels                                      |
-| `y_start`         | Top position         | Yes      | -       | Pixels                                      |
-| `x_end`           | Right position       | Yes      | -       | Pixels                                      |
-| `y_end`           | Bottom position      | Yes      | -       | Pixels                                      |
-| `progress`        | Progress value       | Yes      | -       | 0-100                                       |
+| `x_start`         | Left position        | Yes      | -       | Pixels or percentage                        |
+| `y_start`         | Top position         | Yes      | -       | Pixels or percentage                        |
+| `x_end`           | Right position       | Yes      | -       | Pixels or percentage                        |
+| `y_end`           | Bottom position      | Yes      | -       | Pixels or percentage                        |
+| `progress`        | Progress value       | Yes      | -       | 0-100 (clamped)                             |
 | `direction`       | Fill direction       | No       | `right` | `right`, `left`, `up`, `down`               |
 | `background`      | Background color     | No       | `white` | `white`, `black`, `accent`, `red`, `yellow` |
 | `fill`            | Progress bar color   | No       | `red`   | `white`, `black`, `accent`, `red`, `yellow` |
