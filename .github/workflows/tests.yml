@@ -34,7 +34,8 @@ jobs:
           echo "[pytest]" > pytest.ini
           echo "asyncio_mode = auto" >> pytest.ini
           echo "testpaths = tests" >> pytest.ini
+          echo "asyncio_default_fixture_loop_scope = function" >> pytest.ini
 
       - name: Run tests
         run: |
-          pytest tests -v
+          PYTHONPATH=${{ github.workspace }} pytest tests -v
