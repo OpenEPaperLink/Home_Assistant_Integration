@@ -2,13 +2,9 @@ name: Tests
 
 on:
   push:
-    branches:
-      - dev
-      - main
+    branches: [ dev, main ]
   pull_request:
-    branches:
-      - dev
-      - main
+    branches: [ dev, main ]
 
 jobs:
   tests:
@@ -21,7 +17,7 @@ jobs:
         with:
           python-version: 3.12.0
 
-      - name: Create and activate virtual environment
+      - name: Create virtual environment
         run: |
           python -m venv venv
           . venv/bin/activate
@@ -30,10 +26,15 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install homeassistant
-          pip install pytest pytest-homeassistant-custom-component
-          if [ -f requirements_test.txt ]; then pip install -r requirements_test.txt; fi
+          pip install -r requirements.txt
+          pip install pytest pytest-homeassistant-custom-component pytest-asyncio websockets
+
+      - name: Configure pytest
+        run: |
+          echo "[pytest]" > pytest.ini
+          echo "asyncio_mode = auto" >> pytest.ini
+          echo "testpaths = tests" >> pytest.ini
 
       - name: Run tests
         run: |
-          PYTHONPATH=${{ github.workspace }} pytest tests
+          pytest tests -v
