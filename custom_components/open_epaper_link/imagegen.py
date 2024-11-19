@@ -395,7 +395,7 @@ class ImageGen:
         return image_data
 
     async def _draw_text(self, img: Image, element: dict, pos_y: int) -> int:
-        """Enhanced draw text method supporting inline colors."""
+        """Draw (coloured) text with optional wrapping or ellipsis."""
         self.check_required_arguments(element, ["x", "value"], "text")
 
         draw = ImageDraw.Draw(img)
@@ -416,20 +416,53 @@ class ImageGen:
         # Get alignment and default color
         align = element.get('align', "left")
         default_color = self.get_index_color(element.get('color', "black"))
-        anchor = element.get('anchor', 'lt')
+        anchor = element.get('anchor')
+        spacing = element.get('spacing', 5)
+        stroke_width = element.get('stroke_width', 0)
+        stroke_fill = self.get_index_color(element.get('stroke_fill', 'white'))
 
-        # Check if color parsing is enabled
+        # Process text content
+        text = str(element['value'])
+        max_width = element.get('max_width')
+
+        # Handle text wrapping if max_width is specified
+        final_text = text
+        if max_width is not None:
+            if element.get('truncate', False):
+                if draw.textlength(text, font=font) > max_width:
+                    ellipsis = "..."
+                    truncated = text
+                    while truncated and draw.textlength(truncated + ellipsis, font=font) > max_width:
+                        truncated = truncated[:-1]
+                    final_text = truncated + ellipsis
+            else:
+                words = text.split()
+                lines = []
+                current_line = []
+
+                for word in words:
+                    test_line = ' '.join(current_line + [word])
+                    if not current_line or draw.textlength(test_line, font=font) <= max_width:
+                        current_line.append(word)
+                    else:
+                        lines.append(' '.join(current_line))
+                        current_line = [word]
+
+                if current_line:
+                    lines.append(' '.join(current_line))
+                final_text = '\n'.join(lines)
+
+        # Set appropriate anchor based on line count
+        if not anchor:
+            anchor = 'la' if '\n' in final_text else 'lt'
+
+        # Draw the text
         if element.get('parse_colors', False):
-            # Parse text into colored segments
-            text = str(element['value'])
-            segments = self._parse_colored_text(text)
-
-            # Calculate positions based on alignment
+            segments = self._parse_colored_text(final_text)
             segments, total_width = self._calculate_segment_positions(
                 segments, font, x, align
             )
 
-            # Draw each segment
             max_y = y
             for segment in segments:
                 color = self.get_index_color(segment.color, element.get('accent_color', 'red'))
@@ -444,28 +477,32 @@ class ImageGen:
                     segment.text,
                     fill=color,
                     font=font,
-                    anchor=anchor
+                    anchor=anchor,
+                    spacing=spacing,
+                    stroke_width=stroke_width,
+                    stroke_fill=stroke_fill
                 )
                 max_y = max(max_y, bbox[3])
-
             return max_y
         else:
-            # Draw single text without parsing color markup
-            text = str(element['value'])
             bbox = draw.textbbox(
                 (x, y),
-                text,
+                final_text,
                 font=font,
                 anchor=anchor,
+                spacing=spacing,
                 align=align
             )
             draw.text(
-                (x,y),
-                text,
+                (x, y),
+                final_text,
                 fill=default_color,
                 font=font,
                 anchor=anchor,
-                align=align
+                align=align,
+                spacing=spacing,
+                stroke_width=stroke_width,
+                stroke_fill=stroke_fill
             )
             return bbox[3]
 
