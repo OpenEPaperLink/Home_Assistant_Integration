@@ -233,5 +233,65 @@
                 "name": "Tag-Typen aktualisieren"
             }
         }
+    },
+    "services": {
+        "drawcustom": {
+            "name": "Benutzerdefiniertes Bild zeichnen",
+            "description": "Zeichnet ein benutzerdefiniertes Bild auf einem oder mehreren Tags",
+            "fields": {
+                "payload": {
+                    "name": "Payload",
+                    "description": "Payload zum Zeichnen, siehe Dokumentation für Beispiele"
+                },
+                "background": {
+                    "name": "Hintergrundfarbe",
+                    "description": "Hintergrundfarbe (schwarz, weiß, akzent, rot, gelb)"
+                },
+                "rotate": {
+                    "name": "Rotation",
+                    "description": "Rotation in Grad (0, 90, 180, 270)"
+                },
+                "dither": {
+                    "name": "Dithering",
+                    "description": "Ob Dithering auf das Bild angewendet werden soll"
+                },
+                "ttl": {
+                    "name": "Gültigkeitsdauer",
+                    "description": "Wie lange das Bild zwischengespeichert werden soll (in Sekunden)"
+                },
+                "dry-run": {
+                    "name": "Trockenlauf",
+                    "description": "Bild wird nur lokal gespeichert und nicht an den AP gesendet"
+                }
+            }
+        },
+        "setled": {
+            "name": "LED-Muster einstellen",
+            "description": "Stellt das LED-Blinkmuster für ein oder mehrere Tags ein"
+        },
+        "clear_pending": {
+            "name": "Ausstehendes Update löschen",
+            "description": "Löscht ausstehende Updates für ein oder mehrere Tags"
+        },
+        "force_refresh": {
+            "name": "Inhalt aktualisieren erzwingen",
+            "description": "Erzwingt das Aktualisieren des Inhalts für ein oder mehrere Tags"
+        },
+        "reboot_tag": {
+            "name": "Tag neu starten",
+            "description": "Startet ein oder mehrere Tags neu"
+        },
+        "scan_channels": {
+            "name": "Kanäle scannen",
+            "description": "Tag scannt nach verfügbaren Kanälen"
+        },
+        "reboot_ap": {
+            "name": "AP neu starten",
+            "description": "Startet den AP neu"
+        },
+        "refresh_tag_types": {
+            "name": "Tag-Typen aktualisieren",
+            "description": "Aktualisiert die Tag-Typen von GitHub"
+        }
     }
 }
