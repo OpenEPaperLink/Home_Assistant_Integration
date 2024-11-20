@@ -9,6 +9,7 @@ import urllib
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Dict, Any, List, Tuple
+from functools import partial
 
 import requests
 import qrcode
@@ -20,6 +21,7 @@ from .tag_types import TagType, get_tag_types_manager
 from .util import get_image_path
 from PIL import Image, ImageDraw, ImageFont
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.history import get_significant_states
 from homeassistant.util import dt
 from datetime import timedelta, datetime
@@ -951,14 +953,14 @@ class ImageGen:
             max_v = element.get("high")
 
             # Fetch sensor data
-            all_states = await get_significant_states(
+            all_states = await get_instance(self.hass).async_add_executor_job(partial(get_significant_states,
                 self.hass,
                 start_time=start,
                 entity_ids=[plot["entity"] for plot in element["data"]],
                 significant_changes_only=False,
                 minimal_response=True,
                 no_attributes=False
-            )
+            ))
 
             # Process data and find min/max if not specified
             raw_data = []
