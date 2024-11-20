@@ -50,6 +50,7 @@ class ElementType(str, Enum):
     PLOT = "plot"
     PROGRESS_BAR = "progress_bar"
     DIAGRAM = "diagram"
+    ICON_SEQUENCE = "icon_sequence"
 
     @classmethod
     def required_fields(cls, element_type: 'ElementType') -> list[str]:
@@ -141,7 +142,8 @@ REQUIRED_FIELDS: Dict[ElementType, list[str]] = {
     ElementType.QRCODE: ["x", "y", "data"],
     ElementType.PLOT: ["data"],
     ElementType.PROGRESS_BAR: ["x_start", "x_end", "y_start", "y_end", "progress"],
-    ElementType.DIAGRAM: ["x", "height"]
+    ElementType.DIAGRAM: ["x", "height"],
+    ElementType.ICON_SEQUENCE: ["x", "y", "icons", "size"]
 }
 
 def validate_element(element: Dict[str, Any]) -> ElementType:
@@ -200,6 +202,7 @@ class ImageGen:
             ElementType.PLOT: self._draw_plot,
             ElementType.PROGRESS_BAR: self._draw_progress_bar,
             ElementType.DIAGRAM: self._draw_diagram,
+            ElementType.ICON_SEQUENCE: self._draw_icon_sequence
         }
 
     async def get_tag_info(self, entity_id: str) -> Optional[tuple[TagType, str]]:
@@ -905,6 +908,111 @@ class ImageGen:
             anchor=anchor
         )
         return bbox[3]
+
+    async def _draw_icon_sequence(self, img: Image, element: dict, pos_y: int) -> int:
+        """Draw a sequence of icons in a specified direction."""
+        self.check_required_arguments(
+            element,
+            ["x", "y", "icons", "size"],
+            "icon_sequence"
+        )
+
+        draw = ImageDraw.Draw(img)
+        draw.fontmode = "1"  # Enable high quality font rendering
+        coords = CoordinateParser(img.width, img.height)
+
+        # Get basic coordinates and properties
+        x_start = coords.parse_x(element['x'])
+        y_start = coords.parse_y(element['y'])
+        size = element['size']
+        spacing = element.get('spacing', size // 4)  # Default spacing is 1/4 of icon size
+        fill = self.get_index_color(element.get('fill', "black"))
+        anchor = element.get('anchor', "la")
+        stroke_width = element.get('stroke_width', 0)
+        stroke_fill = self.get_index_color(element.get('stroke_fill', 'white'))
+        direction = element.get('direction', 'right')  # right, down, up, left
+
+        # Load MDI font and metadata
+        font_file = os.path.join(os.path.dirname(__file__), 'materialdesignicons-webfont.ttf')
+        meta_file = os.path.join(os.path.dirname(__file__), "materialdesignicons-webfont_meta.json")
+
+        try:
+            def load_meta():
+                with open(meta_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            mdi_data = await self.hass.async_add_executor_job(load_meta)
+        except Exception as e:
+            raise HomeAssistantError(f"Failed to load MDI metadata: {str(e)}")
+
+        # Load font
+        def load_font():
+            return ImageFont.truetype(font_file, size)
+        font = await self.hass.async_add_executor_job(load_font)
+
+        max_y = y_start
+        max_x = x_start
+        current_x = x_start
+        current_y = y_start
+
+        # Draw each icon in sequence
+        for icon_name in element['icons']:
+            if icon_name.startswith("mdi:"):
+                icon_name = icon_name[4:]
+
+            # Find icon codepoint
+            chr_hex = None
+            # Search direct matches
+            for icon in mdi_data:
+                if icon['name'] == icon_name:
+                    chr_hex = icon['codepoint']
+                    break
+
+            # Search aliases if no direct match
+            if not chr_hex:
+                for icon in mdi_data:
+                    if 'aliases' in icon and icon_name in icon['aliases']:
+                        chr_hex = icon['codepoint']
+                        break
+
+            if not chr_hex:
+                _LOGGER.warning(f"Invalid icon name: {icon_name}")
+                continue
+
+            # Draw icon
+            try:
+                draw.text(
+                    (current_x, current_y),
+                    chr(int(chr_hex, 16)),
+                    fill=fill,
+                    font=font,
+                    anchor=anchor,
+                    stroke_width=stroke_width,
+                    stroke_fill=stroke_fill
+                )
+                # Calculate bounds for this icon
+                bbox = draw.textbbox(
+                    (current_x, current_y),
+                    chr(int(chr_hex, 16)),
+                    font=font,
+                    anchor=anchor
+                )
+                max_y = max(max_y, bbox[3])
+                max_x = max(max_x, bbox[2])
+
+                # Move to next position based on direction
+                if direction == 'right':
+                    current_x += size + spacing
+                elif direction == 'left':
+                    current_x -= size + spacing
+                elif direction == 'down':
+                    current_y += size + spacing
+                elif direction == 'up':
+                    current_y -= size + spacing
+
+            except ValueError as e:
+                raise HomeAssistantError(f"Failed to draw icon {icon_name}: {str(e)}")
+
+        return max(max_y, current_y)
 
     async def _draw_qrcode(self, img: Image, element: dict, pos_y: int) -> int:
         """Draw QR code element."""

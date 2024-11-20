@@ -335,6 +335,34 @@ Draws Material Design Icons.
 
 Note: Icon name can be prefixed with `mdi:` (e.g., `mdi:account-cowboy-hat`)
 
+### Icon Sequence
+Draws multiple Material Design Icons in a sequence with specified direction and spacing.
+
+```yaml
+- type: icon_sequence
+  x: 10
+  y: 10
+  icons:
+    - mdi:home
+    - mdi:arrow-right
+    - mdi:office-building
+  size: 24
+  direction: right
+```
+
+| Parameter      | Description           | Required | Default | Notes                                                                |
+|----------------|-----------------------|----------|---------|----------------------------------------------------------------------|
+| `x`            | X position            | Yes      | -       | Pixels or percentage                                                 |
+| `y`            | Y position            | Yes      | -       | Pixels or percentage                                                 |
+| `icons`        | List of icon names    | Yes      | -       | From [Material Design Icons](https://pictogrammers.com/library/mdi/) |
+| `size`         | Size of each icon     | Yes      | -       | Pixels                                                               |
+| `direction`    | Direction of sequence | No       | `right` | `right`, `left`, `up`, `down`                                        |
+| `spacing`      | Space between icons   | No       | size/4  | Pixels                                                               |
+| `fill`         | Icon color            | No       | `black` | `white`, `black`, `accent`, `red`, `yellow`                          |
+| `anchor`       | Icon anchor point     | No       | `la`    | See text anchors                                                     |
+| `visible`      | Show/hide element     | No       | `true`  | `true`, `false`                                                      |
+
+
 ### Download Image
 Downloads and displays an image from a URL.
 
