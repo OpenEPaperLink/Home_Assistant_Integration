@@ -184,7 +184,9 @@ class APConfigSelect(SelectEntity):
         """Initialize the select entity."""
         self._hub = hub
         self._key = key
-        self._attr_name = f"AP {name}"
+        # self._attr_name = f"AP {name}"
+        self._attr_has_entity_name = True
+        self._attr_translation_key = key
         self._attr_unique_id = f"{hub.entry.entry_id}_{key}"
         self._attr_icon = icon
         self._attr_entity_category = EntityCategory.CONFIG

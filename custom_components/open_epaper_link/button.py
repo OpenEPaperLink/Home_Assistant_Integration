@@ -110,7 +110,9 @@ class ClearPendingTagButton(ButtonEntity):
         self._tag_mac = tag_mac
         self._entity_id = f"{DOMAIN}.{tag_mac}"
         self._hub = hub
-        self._attr_name = f"{hub._data[tag_mac]['tag_name']} Clear Pending"
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "clear_pending"
+        # self._attr_name = f"{hub._data[tag_mac]['tag_name']} Clear Pending"
         self._attr_unique_id = f"{tag_mac}_clear_pending"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_icon = "mdi:broom"
@@ -118,8 +120,10 @@ class ClearPendingTagButton(ButtonEntity):
     @property
     def device_info(self):
         """Return device info."""
+        tag_name = self._hub._data[self._tag_mac]['tag_name']
         return {
             "identifiers": {(DOMAIN, self._tag_mac)},
+            "name": tag_name,
         }
 
     @property
@@ -137,7 +141,9 @@ class ForceRefreshButton(ButtonEntity):
         self._tag_mac = tag_mac
         self._entity_id = f"{DOMAIN}.{tag_mac}"
         self._hub = hub
-        self._attr_name = f"{hub._data[tag_mac]['tag_name']} Force Refresh"
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "force_refresh"
+        # self._attr_name = f"{hub._data[tag_mac]['tag_name']} Force Refresh"
         self._attr_unique_id = f"{tag_mac}_force_refresh"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_icon = "mdi:refresh"
@@ -145,8 +151,10 @@ class ForceRefreshButton(ButtonEntity):
     @property
     def device_info(self):
         """Return device info."""
+        tag_name = self._hub._data[self._tag_mac]['tag_name']
         return {
             "identifiers": {(DOMAIN, self._tag_mac)},
+            "name": tag_name,
         }
 
     @property
@@ -164,7 +172,9 @@ class RebootTagButton(ButtonEntity):
         self._tag_mac = tag_mac
         self._entity_id = f"{DOMAIN}.{tag_mac}"
         self._hub = hub
-        self._attr_name = f"{hub._data[tag_mac]['tag_name']} Reboot"
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "reboot_tag"
+        # self._attr_name = f"{hub._data[tag_mac]['tag_name']} Reboot"
         self._attr_unique_id = f"{tag_mac}_reboot"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_icon = "mdi:restart"
@@ -172,8 +182,10 @@ class RebootTagButton(ButtonEntity):
     @property
     def device_info(self):
         """Return device info."""
+        tag_name = self._hub._data[self._tag_mac]['tag_name']
         return {
             "identifiers": {(DOMAIN, self._tag_mac)},
+            "name": tag_name,
         }
 
     @property
@@ -191,7 +203,9 @@ class ScanChannelsButton(ButtonEntity):
         self._tag_mac = tag_mac
         self._entity_id = f"{DOMAIN}.{tag_mac}"
         self._hub = hub
-        self._attr_name = f"{hub._data[tag_mac]['tag_name']} Scan Channels"
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "scan_channels"
+        # self._attr_name = f"{hub._data[tag_mac]['tag_name']} Scan Channels"
         self._attr_unique_id = f"{tag_mac}_scan_channels"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_icon = "mdi:wifi"
@@ -199,8 +213,10 @@ class ScanChannelsButton(ButtonEntity):
     @property
     def device_info(self):
         """Return device info."""
+        tag_name = self._hub._data[self._tag_mac]['tag_name']
         return {
             "identifiers": {(DOMAIN, self._tag_mac)},
+            "name": tag_name,
         }
 
     @property
@@ -216,7 +232,9 @@ class RebootAPButton(ButtonEntity):
         """Initialize the button."""
         self.hass = hass
         self._hub = hub
-        self._attr_name = "Reboot AP"
+        # self._attr_name = "Reboot AP"
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "reboot_ap"
         self._attr_unique_id = "reboot_ap"
         self._attr_icon = "mdi:restart"
 
@@ -236,7 +254,9 @@ class RefreshTagTypesButton(ButtonEntity):
     def __init__(self, hass: HomeAssistant) -> None:
         self._hass = hass
         self._attr_unique_id = "refresh_tag_types"
-        self._attr_name = "Refresh Tag Types"
+        # self._attr_name = "Refresh Tag Types"
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "refresh_tag_types"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_icon = "mdi:refresh"
 

@@ -35,7 +35,7 @@ _LOGGER: Final = logging.getLogger(__name__)
 from .const import DOMAIN
 from .hub import Hub
 
-@dataclass( kw_only=True)
+@dataclass( kw_only=True, frozen=True)
 class OpenEPaperLinkSensorEntityDescription(SensorEntityDescription):
     """Class describing OpenEPaperLink sensor entities."""
     key: str
@@ -327,7 +327,9 @@ class OpenEPaperLinkTagSensor(OpenEPaperLinkBaseSensor):
         self._tag_mac = tag_mac
 
         name_base = self._hub.get_tag_data(tag_mac).get("tag_name", tag_mac)
-        self._attr_name = f"{name_base} {description.name}"
+        # self._attr_name = f"{name_base} {description.name}"
+        self._attr_has_entity_name = True
+        self._attr_translation_key = description.key
 
         # Set unique ID without domain
         self._attr_unique_id = f"{tag_mac}_{description.key}"
@@ -396,7 +398,9 @@ class OpenEPaperLinkAPSensor(OpenEPaperLinkBaseSensor):
         super().__init__(hub, description)
 
         # Set name and unique_id
-        self._attr_name = f"AP {description.name}"
+        # self._attr_name = f"AP {description.name}"
+        self._attr_has_entity_name = True
+        self._attr_translation_key = description.key
         self._attr_unique_id = f"{self._hub.entry.entry_id}_{description.key}"
 
         # Set device info
