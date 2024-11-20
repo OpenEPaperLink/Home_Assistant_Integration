@@ -191,7 +191,7 @@ class Hub:
                             if msg.type == aiohttp.WSMsgType.TEXT:
                                 await self._handle_message(msg.data)
                             elif msg.type == aiohttp.WSMsgType.ERROR:
-                                _LOGGER.error("WebSocket error: %s", ws)
+                                _LOGGER.info("WebSocket error: %s", ws)
                                 break
                             elif msg.type == aiohttp.WSMsgType.CLOSING:
                                 _LOGGER.debug("WebSocket closing")

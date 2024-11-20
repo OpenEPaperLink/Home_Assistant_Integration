@@ -43,7 +43,7 @@ class APConfigSwitch(SwitchEntity):
         """Initialize the switch entity."""
         self._hub = hub
         self._key = key
-        self._attr_name = f"AP {name}"
+        # self._attr_name = f"AP {name}"
         self._attr_unique_id = f"{hub.entry.entry_id}_{key}"
         self._attr_icon = icon
         self._attr_entity_category = EntityCategory.CONFIG

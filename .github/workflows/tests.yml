@@ -1,0 +1,41 @@
+name: Tests
+
+on:
+  push:
+    branches: [ dev, main ]
+  pull_request:
+    branches: [ dev, main ]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12.0
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12.0
+
+      - name: Create virtual environment
+        run: |
+          python -m venv venv
+          . venv/bin/activate
+          echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
+          echo "$VIRTUAL_ENV/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-homeassistant-custom-component pytest-asyncio websockets
+
+      - name: Configure pytest
+        run: |
+          echo "[pytest]" > pytest.ini
+          echo "asyncio_mode = auto" >> pytest.ini
+          echo "testpaths = tests" >> pytest.ini
+          echo "asyncio_default_fixture_loop_scope = function" >> pytest.ini
+
+      - name: Run tests
+        run: |
+          PYTHONPATH=${{ github.workspace }} pytest tests -v

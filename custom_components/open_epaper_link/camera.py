@@ -82,21 +82,14 @@ class EPDCamera(Camera):
     """Camera class for OpenEPaperLink tags."""
 
     def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
-        """Initialize the camera."""
         super().__init__()
-        self.hass = hass
-        self._hub = hub
         self._tag_mac = tag_mac
+        self._hub = hub
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "content"
         self._attr_unique_id = f"{tag_mac}_content"
-
-        # Get initial tag data
         tag_data = hub.get_tag_data(tag_mac)
-        self._name = f"{tag_data.get('tag_name', tag_mac)} Content"
-
-        # Set up device info
-        firmware_version = str(tag_data.get("version", ""))
-
-
+        self._name = f"{tag_data.get('tag_name', tag_mac)}"
         self.content_type = "image/jpeg"
         self._image_path = get_image_path(hass, f"{DOMAIN}.{tag_mac}")
         self._last_image = None
@@ -106,12 +99,8 @@ class EPDCamera(Camera):
         """Return device info."""
         return {
             "identifiers": {(DOMAIN, self._tag_mac)},
+            "name": self._name,
         }
-
-    @property
-    def name(self) -> str:
-        """Return the camera name."""
-        return self._name
 
     @property
     def available(self) -> bool:

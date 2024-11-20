@@ -103,6 +103,22 @@ DISCOVERY_MAPPING = OptionMapping({
     1: "Broadcast",
 })
 
+SUB_GHZ_MAPPING = OptionMapping({
+    0: "disabled",
+    100: "100 - 864.000 Mhz (Europe, etc)",
+    101: "101 - 865.006 Mhz (Europe, etc)",
+    102: "102 - 866.014 Mhz (Europe, etc)",
+    103: "103 - 867.020 Mhz (Europe, etc)",
+    104: "104 - 868.027 Mhz (Europe, etc)",
+    105: "105 - 869.034 Mhz (Europe, etc)",
+    200: "200 - 903.000 Mhz (US, etc)",
+    201: "201 - 907.027 Mhz (US, etc)",
+    202: "202 - 911.054 Mhz (US, etc)",
+    203: "203 - 915.083 Mhz (US, etc)",
+    204: "204 - 919.110 Mhz (US, etc)",
+    205: "205 - 923.138 Mhz (US, etc)"
+})
+
 # Mapping of select entities to their configurations
 SELECT_ENTITIES = [
     {
@@ -152,6 +168,12 @@ SELECT_ENTITIES = [
         "name": "Discovery Method",
         "icon": "mdi:access-point-network",
         "mapping": DISCOVERY_MAPPING
+    },
+    {
+        "key": "subghzchannel",
+        "name": "Sub-GHz channel",
+        "icon": "mdi:antenna",
+        "mapping": SUB_GHZ_MAPPING
     }
 ]
 
@@ -162,7 +184,9 @@ class APConfigSelect(SelectEntity):
         """Initialize the select entity."""
         self._hub = hub
         self._key = key
-        self._attr_name = f"AP {name}"
+        # self._attr_name = f"AP {name}"
+        self._attr_has_entity_name = True
+        self._attr_translation_key = key
         self._attr_unique_id = f"{hub.entry.entry_id}_{key}"
         self._attr_icon = icon
         self._attr_entity_category = EntityCategory.CONFIG
