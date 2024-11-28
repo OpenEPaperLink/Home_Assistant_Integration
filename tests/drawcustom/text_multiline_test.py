@@ -97,6 +97,36 @@ async def test_text_multiline_empty_line(image_gen, mock_tag_info):
         example_img = Image.open(os.path.join(TEXT_MULTILINE_IMG_PATH, 'multiline_empty_line.png'))
         assert images_equal(generated_img, example_img), "Multiline text with empty line rendering failed"
 
+@pytest.mark.asyncio
+async def test_text_multiline_delimiter_and_newline(image_gen, mock_tag_info):
+    """Test multiline with delimiter and newline rendering settings."""
+    service_data = {
+        "background": "white",
+        "rotate": 0,
+        "payload": [{
+            'type': 'multiline',
+            'x': 10,
+            'y': 10,
+            'value': 'Line 1\nNewline|Line 2\nNewline|Line 3',
+            'size': 18,
+            'color': 'black',
+            'delimiter': '|',
+            'offset_y': 25
+        }]
+    }
+
+    with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
+               return_value=mock_tag_info):
+        image_data = await image_gen.generate_custom_image(
+            "open_epaper_link.test_tag",
+            service_data
+        )
+
+        generated_img = Image.open(BytesIO(image_data))
+        save_image(image_data)
+        example_img = Image.open(os.path.join(TEXT_MULTILINE_IMG_PATH, 'text_multiline_delimiter_and_newline.png'))
+        assert images_equal(generated_img, example_img), "Multiline text with delimiter and newline rendering failed"
+
 # @pytest.mark.asyncio
 # async def test_calendar_format_multiline(image_gen, mock_tag_info):
 #     """Test calendar format with multiline text and potential blank lines."""
