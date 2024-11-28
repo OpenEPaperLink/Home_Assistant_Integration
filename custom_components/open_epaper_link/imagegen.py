@@ -610,7 +610,7 @@ class ImageGen:
         stroke_fill = self.get_index_color(element.get('stroke_fill', 'white'))
 
         # Split text using delimiter
-        lines = element['value'].replace("\\n", "").split(element["delimiter"])
+        lines = element['value'].replace("\n", "").split(element["delimiter"])
         current_y = element.get('start_y', pos_y + element.get('y_padding', 10))
 
         max_y = current_y
