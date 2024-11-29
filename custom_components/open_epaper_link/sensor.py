@@ -18,7 +18,7 @@ from homeassistant.const import (
     SIGNAL_STRENGTH_DECIBELS,
     PERCENTAGE,
     UnitOfTemperature,
-    UnitOfElectricPotential, UnitOfInformation,
+    UnitOfElectricPotential, UnitOfInformation, UnitOfTime,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -143,7 +143,7 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         name="Uptime",
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement="s",
+        native_unit_of_measurement=UnitOfTime.SECONDS,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("uptime"),
         icon="mdi:timer",
@@ -301,6 +301,32 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         value_fn=lambda data: data.get("height"),
         icon="mdi:arrow-expand-vertical",
     ),
+    OpenEPaperLinkSensorEntityDescription(
+        key="runtime",
+        name="Runtime",
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.get("runtime", 0),
+        icon="mdi:timer-outline",
+    ),
+    OpenEPaperLinkSensorEntityDescription(
+        key="boot_count",
+        name="Boot Count",
+        state_class=SensorStateClass.TOTAL,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.get("boot_count", 0),
+        icon="mdi:restart",
+    ),
+    OpenEPaperLinkSensorEntityDescription(
+        key="checkin_count",
+        name="Checkin Count",
+        state_class=SensorStateClass.TOTAL,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.get("checkin_count", 0),
+        icon="mdi:clock-check",
+    )
 )
 
 def _calculate_battery_percentage(voltage: int) -> int:
