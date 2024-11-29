@@ -370,7 +370,6 @@ class Hub:
 
         # Update tag data
         self._data[tag_mac] = {
-            **existing_data,
             "tag_mac": tag_mac,
             "tag_name": tag_name,
             "last_seen": last_seen,
@@ -408,9 +407,11 @@ class Hub:
             # Fire discovery event before saving
             async_dispatcher_send(self.hass, f"{DOMAIN}_tag_discovered", tag_mac)
             # Save to storage
-            await self._store.async_save({
-                "tags": self._data
-            })
+            # await self._store.async_save({
+            #     "tags": self._data
+            # })
+        # Always save data after any update
+        await self._store.async_save({"tags": self._data})
 
         # Fire state update event
         async_dispatcher_send(self.hass, f"{SIGNAL_TAG_UPDATE}_{tag_mac}")
