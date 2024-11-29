@@ -120,6 +120,35 @@ async def test_text_wrapping(image_gen, mock_tag_info):
         example_img = Image.open(os.path.join(TEXT_IMG_PATH, 'text_wrapping.png'))
         assert images_equal(generated_img, example_img), "Text wrapping failed"
 
+async def test_text_wrapping_with_anchor(image_gen, mock_tag_info):
+    """Test text wrapping with anchor."""
+    service_data = {
+        "background": "white",
+        "rotate": 0,
+        "payload": [{
+            "type": "text",
+            "x": "50%",
+            "y": "50%",
+            "value": "This is a long text that should wrap to multiple lines automatically",
+            "size": 16,
+            "color": "black",
+            "max_width": 200,
+            "anchor": "mm"
+        }]
+    }
+
+    with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
+               return_value=mock_tag_info):
+        image_data = await image_gen.generate_custom_image(
+            "open_epaper_link.test_tag",
+            service_data
+        )
+
+        generated_img = Image.open(BytesIO(image_data))
+        save_image(image_data)
+        example_img = Image.open(os.path.join(TEXT_IMG_PATH, 'text_wrapping_anchor.png'))
+        assert images_equal(generated_img, example_img), "Text wrapping failed"
+
 
 async def test_text_with_special_characters(image_gen, mock_tag_info):
     """Test rendering text with special characters."""
