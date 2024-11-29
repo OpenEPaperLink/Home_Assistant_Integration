@@ -326,7 +326,16 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("checkin_count", 0),
         icon="mdi:clock-check",
-    )
+    ),
+    OpenEPaperLinkSensorEntityDescription(
+        key="block_requests",
+        name="Block Requests",
+        state_class=SensorStateClass.TOTAL,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.get("block_requests", 0),
+        icon="mdi:transfer",
+    ),
+
 )
 
 def _calculate_battery_percentage(voltage: int) -> int:

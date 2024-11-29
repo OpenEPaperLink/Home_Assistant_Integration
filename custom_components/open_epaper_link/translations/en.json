@@ -172,6 +172,9 @@
             },
             "checkin_count": {
                 "name": "Checkin Count"
+            },
+            "block_requests": {
+                "name": "Block Transfer Requests"
             }
         },
         "camera": {

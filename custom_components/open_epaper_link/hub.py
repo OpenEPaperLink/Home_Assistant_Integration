@@ -252,6 +252,7 @@ class Hub:
                 await self._handle_tag_message(data["tags"][0])
             elif "logMsg" in data:
                 _LOGGER.debug("OEPL Log message: %s", data["logMsg"])
+                await self._handle_log_message(data["logMsg"])
             elif "errMsg" in data and data["errMsg"] == "REBOOTING":
                 _LOGGER.debug("AP is rebooting")
                 self._ap_data["ap_state"] = "Offline"
@@ -360,13 +361,16 @@ class Hub:
         runtime_total = existing_data.get("runtime", 0) + runtime_delta
 
         # Update boot count if this is a power-on event
-        boot_count = existing_data.get("boot_count", 0)
+        boot_count = existing_data.get("boot_count", 1)
         if tag_data.get("wakeupReason") in [1, 252, 254]:  # BOOT, FIRSTBOOT, WDT_RESET
             boot_count += 1
             runtime_total = 0  # Reset runtime on boot
 
         # Update check-in counter
         checkin_count = existing_data.get("checkin_count", 0) + 1
+
+        # Get existing block request count
+        block_requests = existing_data.get("block_requests", 0)
 
         # Update tag data
         self._data[tag_mac] = {
@@ -398,6 +402,7 @@ class Hub:
             "runtime": runtime_total,
             "boot_count": boot_count,
             "checkin_count": checkin_count,
+            "block_requests": block_requests,
         }
 
         # Handle new tag discovery
@@ -453,6 +458,19 @@ class Hub:
                         "device_id": device.id,
                         "type": reason_string
                     })
+    async def _handle_log_message(self, log_msg: str) -> None:
+        """Process a log message."""
+        if "block request" in log_msg:
+            # Extract MAC address from block request message
+            # Example: "0000000000123456 block request /current/0000000000123456_452783.pending block 0"
+            parts = log_msg.split()
+            if len(parts) > 0:
+                tag_mac = parts[0].upper()
+                if tag_mac in self._data:
+                    block_requests = self._data[tag_mac].get("block_requests", 0) + 1
+                    self._data[tag_mac]["block_requests"] = block_requests
+                    # Notify of update
+                    async_dispatcher_send(self.hass, f"{SIGNAL_TAG_UPDATE}_{tag_mac}")
 
     async def async_reload_blacklist(self):
         """Reload blacklist from config entry."""
