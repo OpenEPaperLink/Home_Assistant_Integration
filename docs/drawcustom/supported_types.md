@@ -32,7 +32,7 @@ Example payload:
 | `payload`    | List of drawing elements (YAML) | -       |
 | `background` | Background color                | white   |
 | `rotate`     | Rotation of image               | 0       |
-| `dither`     | Apply dithering to image        | false   |
+| `dither`     | Apply photo dithering to image  | false   |
 | `ttl`        | Cache time in seconds           | 60      |
 | `dry-run`    | Generate without sending        | false   |
 
@@ -47,8 +47,10 @@ Most dimensions (positions, sizes, etc.) can be specified in two ways:
 ESLs currently come in two variants: red and yellow accent colors. You can specify colors in several ways:
 
 - Using explicit colors: `"black"`, `"white"`, `"red"`, `"yellow"`
+- Using halftone colors (set `dither=false`): `"half_black"`, (or `"gray"`, or `"grey"`), `"half_red"`, `"half_yellow"`
 - Using single letter shortcuts: `"b"` (black), `"w"` (white), `"r"` (red), `"y"` (yellow)
-- Using `"accent"` to automatically use the tag's accent color (red or yellow depending on the hardware)
+- Using halftone shortcuts: `"hb"`, `"g"` (50% black), `"hr"` (50% red), `"hy"` (50% yellow)
+- Using `"accent"`, `"a"`, `"half_accent"`, or `"ha"` to automatically use the tag's accent color (red or yellow depending on the hardware)
 
 Example payload adapting to tag color:
 ```yaml
