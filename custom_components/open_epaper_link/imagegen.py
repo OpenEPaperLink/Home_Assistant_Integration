@@ -31,8 +31,11 @@ _LOGGER = logging.getLogger(__name__)
 # Color constants with alpha channel
 WHITE = (255, 255, 255, 255)
 BLACK = (0, 0, 0, 255)
+HALF_BLACK = (127, 127, 127, 255)
 RED = (255, 0, 0, 255)
+HALF_RED = (255, 127, 127, 255)
 YELLOW = (255, 255, 0, 255)
+HALF_YELLOW = (255, 255, 127, 255)
 
 class ElementType(str, Enum):
     """Enum for supported element types."""
@@ -287,12 +290,20 @@ class ImageGen:
         color_str = str(color).lower()
         if color_str in ("black", "b"):
             return BLACK
-        elif color_str in ("accent", "red", "r", "yellow", "y"):
-            # Use the tag's accent color if "accent" is specified
-            if color_str == "accent":
-                return YELLOW if accent_color == "yellow" else RED
-            # Otherwise use the specifically requested color
-            return YELLOW if color_str in ("yellow", "y") else RED
+        if color_str in ("half_black", "hb", "gray", "grey", "g"):
+            return HALF_BLACK
+        elif color_str in ("accent", "a"):
+            return YELLOW if accent_color == "yellow" else RED
+        elif color_str in ("half_accent", "ha"):
+            return HALF_YELLOW if accent_color == "yellow" else HALF_RED
+        elif color_str in ("red", "r"):
+            return RED
+        elif color_str in ("half_red", "hr"):
+            return HALF_RED
+        elif color_str in ("yellow", "y"):
+            return YELLOW
+        elif color_str in ("half_yellow", "hy"):
+            return HALF_YELLOW
         else:
             return WHITE
 
