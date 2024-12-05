@@ -233,7 +233,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         fields = {
             'mac': mac,
             'contentmode': "25",
-            'dither': "1" if dither else "0",
+            'dither': "1" if dither else "2",
             'ttl': str(ttl),
             'image': ('image.jpg', img, 'image/jpeg'),
         }
