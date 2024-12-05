@@ -163,6 +163,15 @@
             },
             "height": {
                 "name": "Height"
+            },
+            "runtime": {
+                "name": "Runtime"
+            },
+            "boot_count": {
+                "name": "Boot Count"
+            },
+            "checkin_count": {
+                "name": "Checkin Count"
             }
         },
         "camera": {

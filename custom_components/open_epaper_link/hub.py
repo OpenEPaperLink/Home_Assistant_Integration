@@ -352,8 +352,25 @@ class Hub:
 
         is_new_tag = tag_mac not in self._known_tags
 
+        # Get existing data to calculate runtime and update counters
+        existing_data = self._data.get(tag_mac, {})
+
+        # Calculate runtime delta
+        runtime_delta = self._calculate_runtime_delta(tag_data, existing_data)
+        runtime_total = existing_data.get("runtime", 0) + runtime_delta
+
+        # Update boot count if this is a power-on event
+        boot_count = existing_data.get("boot_count", 0)
+        if tag_data.get("wakeupReason") in [1, 252, 254]:  # BOOT, FIRSTBOOT, WDT_RESET
+            boot_count += 1
+            runtime_total = 0  # Reset runtime on boot
+
+        # Update check-in counter
+        checkin_count = existing_data.get("checkin_count", 0) + 1
+
         # Update tag data
         self._data[tag_mac] = {
+            **existing_data,
             "tag_mac": tag_mac,
             "tag_name": tag_name,
             "last_seen": last_seen,
@@ -378,7 +395,10 @@ class Hub:
             "lut": lut,
             "channel": channel,
             "version": version,
-            "update_count": update_count
+            "update_count": update_count,
+            "runtime": runtime_total,
+            "boot_count": boot_count,
+            "checkin_count": checkin_count,
         }
 
         # Handle new tag discovery
@@ -597,3 +617,23 @@ class Hub:
     async def async_update_ap_config(self) -> None:
         """Force update of AP configuration."""
         await self._handle_ap_config_message({"apitem": {"type": "change"}})
+
+    @staticmethod
+    def _calculate_runtime_delta(new_data: dict, existing_data: dict) -> int:
+        """Calculate runtime delta considering power cycles and valid check-in intervals."""
+        last_seen_old = existing_data.get("last_seen", 0)
+        last_seen_new = new_data.get("lastseen", 0)
+
+        if last_seen_old == 0:
+            return 0
+
+        time_diff = last_seen_new - last_seen_old
+        max_valid_interval = 600  # 10 minutes - max expected interval between check-ins
+
+        wake_reason = new_data.get("wakeupReason")
+        is_power_cycle = wake_reason in [1, 252, 254]  # BOOT, FIRSTBOOT, WDT_RESET
+
+        if is_power_cycle or time_diff > max_valid_interval:
+            return 0
+
+        return time_diff
