@@ -20,6 +20,12 @@ from .util import send_tag_cmd, reboot_ap
 
 _LOGGER: Final = logging.getLogger(__name__)
 
+DITHER_DISABLED=0
+DITHER_FLOYD_STEINBERG=1
+DITHER_ORDERED=2
+
+DITHER_DEFAULT=DITHER_ORDERED
+
 def rgb_to_rgb332(rgb):
     """Convert RGB values to RGB332 format."""
     r, g, b = [max(0, min(255, x)) for x in rgb]
@@ -198,7 +204,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         hub,
                         entity_id,
                         image_data,
-                        service.data.get("dither", False),
+                        service.data.get("dither", DITHER_DEFAULT),
                         service.data.get("ttl", 60),
                         service.data.get("preload_type", 0),
                         service.data.get("preload_lut", 0)
@@ -219,21 +225,21 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         if errors:
             raise HomeAssistantError("\n".join(errors))
 
-    async def upload_image(hub, entity_id: str, img: bytes, dither: bool, ttl: int,
+    async def upload_image(hub, entity_id: str, img: bytes, dither: int, ttl: int,
                            preload_type: int = 0, preload_lut: int = 0) -> None:
         """Upload image to tag through AP."""
         url = f"http://{hub.host}/imgupload"
         mac = entity_id.split(".")[1].upper()
 
         _LOGGER.debug("Preparing upload for %s (MAC: %s)", entity_id, mac)
-        _LOGGER.debug("Upload parameters: dither=%s, ttl=%d, preload_type=%d, preload_lut=%d",
+        _LOGGER.debug("Upload parameters: dither=%d, ttl=%d, preload_type=%d, preload_lut=%d",
                       dither, ttl, preload_type, preload_lut)
 
         # Prepare multipart form data
         fields = {
             'mac': mac,
             'contentmode': "25",
-            'dither': "1" if dither else "2",
+            'dither': str(dither),
             'ttl': str(ttl),
             'image': ('image.jpg', img, 'image/jpeg'),
         }

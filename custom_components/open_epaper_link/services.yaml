@@ -38,11 +38,14 @@ drawcustom:
           step: 90
     dither:
       name: Dither
-      description: Whether to apply dithering to the image
+      description: Dithering option to use
       required: true
-      default: false
+      default: 2
       selector:
-        boolean:
+        number:
+          min: 0
+          max: 2
+          step: 1
     ttl:
       name: Time to live
       description: How long the image should be cached (in seconds)

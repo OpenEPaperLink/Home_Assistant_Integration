@@ -262,7 +262,7 @@
                 },
                 "dither": {
                     "name": "Dithering",
-                    "description": "Ob Dithering auf das Bild angewendet werden soll"
+                    "description": "Zu verwendende Dithering-Option"
                 },
                 "ttl": {
                     "name": "Gültigkeitsdauer",
