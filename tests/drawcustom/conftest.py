@@ -57,7 +57,7 @@ def mock_service_data(payload):
     return {
         "background": "white",
         "rotate": 0,
-        "dither": False,
+        "dither": 2,
         "payload": payload
     }
 
