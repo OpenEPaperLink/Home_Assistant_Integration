@@ -4,7 +4,7 @@ With `drawcustom`, you can create an image in Home Assistant and send the render
 
 ## Basic Usage
 
-The `drawcustom` service has a simple UI with dropdown menus and toggles for most options. The `payload` field accepts YAML input defining the elements to draw.
+ESLs come in multiple variants - red and yellow are the most common accent colors. The following options are available:
 
 The payload is a list of drawing elements that define what to display. Each element must specify its type and required properties. The elements are drawn in order from first to last.
 
@@ -32,7 +32,7 @@ Example payload:
 | `payload`    | List of drawing elements (YAML) | -       |
 | `background` | Background color                | white   |
 | `rotate`     | Rotation of image               | 0       |
-| `dither`     | Dithering (see table below)      | 2       |
+| `dither`     | Dithering (see table below)     | 2       |
 | `ttl`        | Cache time in seconds           | 60      |
 | `dry-run`    | Generate without sending        | false   |
 
@@ -42,11 +42,6 @@ Example payload:
 | `1`    | Floyd-Steinberg dithering (best for photos)           |
 | `2`    | Ordered dithering (default, best for halftone colors) |
 
-## Using Dimensions
-
-Most dimensions (positions, sizes, etc.) can be specified in two ways:
-- Absolute pixels: `x: 100`
-- Percentages: `x: "50%"`
 
 # Color Support
 
@@ -510,3 +505,92 @@ Displays a progress bar with optional percentage text.
 | `width`           | Border thickness     | No       | `1`     | Pixels                                      |
 | `show_percentage` | Show percentage text | No       | `false` | `true`, `false`                             |
 | `visible`         | Show/hide element    | No       | `true`  | `true`, `false`                             |
+
+## Template Examples
+
+Basic state display:
+```yaml
+- type: "text"
+  value: "Temperature: {{ states('sensor.temperature') }}°C"
+  x: 10
+  y: 10
+```
+
+Conditional formatting:
+```yaml
+- type: "text"
+  value: >
+    Status:
+    [{{ 'red' if is_state('binary_sensor.door', 'on') else 'black' }}]
+    {{ states('binary_sensor.door') }}
+    [/{{ 'red' if is_state('binary_sensor.door', 'on') else 'black' }}]
+  parse_colors: true
+  x: 10
+  y: 10
+```
+
+Dynamic positioning:
+```yaml
+- type: "text"
+  value: "Centered"
+  x: "50%"
+  y: "50%"
+  anchor: "mm"
+```
+
+### Common Use Cases
+
+Battery status with icon:
+```yaml
+- type: "icon"
+  value: "mdi:battery"
+  x: 10
+  y: 10
+  size: 24
+  color: "{{ 'red' if states('sensor.battery')|float < 20 else 'black' }}"
+- type: "text"
+  value: "{{ states('sensor.battery') }}%"
+  x: 40
+  y: 10
+```
+
+Header with divider:
+```yaml
+- type: "text"
+  value: "Status Overview"
+  x: 10
+  y: 10
+  size: 24
+- type: "line"
+  x_start: 10
+  x_end: 286
+  y_start: 40
+  width: 2
+```
+
+Multi-sensor display:
+```yaml
+- type: "text"
+  value: "Living Room"
+  x: 10
+  y: 10
+  size: 24
+- type: "icon"
+  value: "mdi:thermometer"
+  x: 10
+  y: 40
+  size: 20
+- type: "text"
+  value: "{{ states('sensor.living_room_temperature') }}°C"
+  x: 35
+  y: 40
+- type: "icon"
+  value: "mdi:water-percent"
+  x: 10
+  y: 70
+  size: 20
+- type: "text"
+  value: "{{ states('sensor.living_room_humidity') }}%"
+  x: 35
+  y: 70
+```
