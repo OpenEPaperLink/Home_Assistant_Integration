@@ -66,13 +66,14 @@ class TagType:
             'name': data.get('name'),
             'width': data.get('width'),
             'height': data.get('height'),
-            'rotatebuffer': data.get('rotate_buffer'),
-            'bpp': data.get('bits_per_pixel'),
+            'rotate_buffer': data.get('rotate_buffer'),
+            'bpp': data.get('bpp'),
             'shortlut': data.get('short_lut'),
-            'colortable': data.get('color_table'),
+            'colortable': data.get('colortable'),
             'options': data.get('options', []),
             'contentids': data.get('content_ids', []),
             'template': data.get('template', {}),
+            'zlib_compression': data.get('zlib_compression', None),
         }
         return cls(data.get('type_id'), raw_data)
 

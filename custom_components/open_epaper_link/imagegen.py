@@ -16,7 +16,8 @@ import qrcode
 import base64
 
 from homeassistant.core import HomeAssistant
-from .const import DOMAIN
+from homeassistant.helpers.dispatcher import async_dispatcher_send
+from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
 from .tag_types import TagType, get_tag_types_manager
 from .util import get_image_path
 from PIL import Image, ImageDraw, ImageFont
@@ -404,6 +405,7 @@ class ImageGen:
                     f.write(image_data)
 
             await self.hass.async_add_executor_job(_save_file)
+            async_dispatcher_send(self.hass, f"{SIGNAL_TAG_IMAGE_UPDATE}_{entity_id.split('.')[1].upper()}", False)
 
         # Start saving files in the background
         self.hass.async_create_task(save_files())

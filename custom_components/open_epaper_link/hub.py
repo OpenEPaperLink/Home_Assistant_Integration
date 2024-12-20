@@ -18,7 +18,7 @@ import logging
 
 _LOGGER: Final = logging.getLogger(__name__)
 
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_AP_UPDATE, SIGNAL_TAG_UPDATE, SIGNAL_TAG_IMAGE_UPDATE
 from .tag_types import get_tag_types_manager, get_hw_string
 
 STORAGE_VERSION = 1
@@ -29,8 +29,7 @@ WEBSOCKET_TIMEOUT = 60
 CONNECTION_TIMEOUT = 10
 
 
-SIGNAL_TAG_UPDATE = f"{DOMAIN}_tag_update"
-SIGNAL_AP_UPDATE = f"{DOMAIN}_ap_update"
+
 
 class Hub:
 
@@ -471,6 +470,14 @@ class Hub:
                     self._data[tag_mac]["block_requests"] = block_requests
                     # Notify of update
                     async_dispatcher_send(self.hass, f"{SIGNAL_TAG_UPDATE}_{tag_mac}")
+        if "reports xfer complete" in log_msg:
+            # Extract MAC address from block request message
+            parts = log_msg.split()
+            if len(parts) > 0:
+                tag_mac = parts[0].upper()
+                if tag_mac in self._data:
+                    # Notify of update
+                    async_dispatcher_send(self.hass, f"{SIGNAL_TAG_IMAGE_UPDATE}_{tag_mac}", True)
 
     async def async_reload_blacklist(self):
         """Reload blacklist from config entry."""
