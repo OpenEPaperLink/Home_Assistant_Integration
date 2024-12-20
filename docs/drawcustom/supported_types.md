@@ -32,9 +32,15 @@ Example payload:
 | `payload`    | List of drawing elements (YAML) | -       |
 | `background` | Background color                | white   |
 | `rotate`     | Rotation of image               | 0       |
-| `dither`     | Apply photo dithering to image  | false   |
+| `dither`     | Dithering (see table below)      | 2       |
 | `ttl`        | Cache time in seconds           | 60      |
 | `dry-run`    | Generate without sending        | false   |
+
+| Dither | Description                                           |
+|--------|-------------------------------------------------------|
+| `0`    | No dithering                                          |
+| `1`    | Floyd-Steinberg dithering (best for photos)           |
+| `2`    | Ordered dithering (default, best for halftone colors) |
 
 ## Using Dimensions
 
@@ -47,7 +53,7 @@ Most dimensions (positions, sizes, etc.) can be specified in two ways:
 ESLs currently come in two variants: red and yellow accent colors. You can specify colors in several ways:
 
 - Using explicit colors: `"black"`, `"white"`, `"red"`, `"yellow"`
-- Using halftone colors (set `dither=false`): `"half_black"`, (or `"gray"`, or `"grey"`), `"half_red"`, `"half_yellow"`
+- Using halftone colors (set `dither=2`): `"half_black"`, (or `"gray"`, or `"grey"`), `"half_red"`, `"half_yellow"`
 - Using single letter shortcuts: `"b"` (black), `"w"` (white), `"r"` (red), `"y"` (yellow)
 - Using halftone shortcuts: `"hb"`, `"g"` (50% black), `"hr"` (50% red), `"hy"` (50% yellow)
 - Using `"accent"`, `"a"`, `"half_accent"`, or `"ha"` to automatically use the tag's accent color (red or yellow depending on the hardware)
