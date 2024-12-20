@@ -18,7 +18,7 @@ import logging
 
 _LOGGER: Final = logging.getLogger(__name__)
 
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_AP_UPDATE, SIGNAL_TAG_UPDATE, SIGNAL_TAG_IMAGE_UPDATE
 from .tag_types import get_tag_types_manager, get_hw_string
 
 STORAGE_VERSION = 1
@@ -29,8 +29,7 @@ WEBSOCKET_TIMEOUT = 60
 CONNECTION_TIMEOUT = 10
 
 
-SIGNAL_TAG_UPDATE = f"{DOMAIN}_tag_update"
-SIGNAL_AP_UPDATE = f"{DOMAIN}_ap_update"
+
 
 class Hub:
 
@@ -252,6 +251,7 @@ class Hub:
                 await self._handle_tag_message(data["tags"][0])
             elif "logMsg" in data:
                 _LOGGER.debug("OEPL Log message: %s", data["logMsg"])
+                await self._handle_log_message(data["logMsg"])
             elif "errMsg" in data and data["errMsg"] == "REBOOTING":
                 _LOGGER.debug("AP is rebooting")
                 self._ap_data["ap_state"] = "Offline"
@@ -360,7 +360,7 @@ class Hub:
         runtime_total = existing_data.get("runtime", 0) + runtime_delta
 
         # Update boot count if this is a power-on event
-        boot_count = existing_data.get("boot_count", 0)
+        boot_count = existing_data.get("boot_count", 1)
         if tag_data.get("wakeupReason") in [1, 252, 254]:  # BOOT, FIRSTBOOT, WDT_RESET
             boot_count += 1
             runtime_total = 0  # Reset runtime on boot
@@ -368,9 +368,11 @@ class Hub:
         # Update check-in counter
         checkin_count = existing_data.get("checkin_count", 0) + 1
 
+        # Get existing block request count
+        block_requests = existing_data.get("block_requests", 0)
+
         # Update tag data
         self._data[tag_mac] = {
-            **existing_data,
             "tag_mac": tag_mac,
             "tag_name": tag_name,
             "last_seen": last_seen,
@@ -399,6 +401,7 @@ class Hub:
             "runtime": runtime_total,
             "boot_count": boot_count,
             "checkin_count": checkin_count,
+            "block_requests": block_requests,
         }
 
         # Handle new tag discovery
@@ -408,9 +411,11 @@ class Hub:
             # Fire discovery event before saving
             async_dispatcher_send(self.hass, f"{DOMAIN}_tag_discovered", tag_mac)
             # Save to storage
-            await self._store.async_save({
-                "tags": self._data
-            })
+            # await self._store.async_save({
+            #     "tags": self._data
+            # })
+        # Always save data after any update
+        await self._store.async_save({"tags": self._data})
 
         # Fire state update event
         async_dispatcher_send(self.hass, f"{SIGNAL_TAG_UPDATE}_{tag_mac}")
@@ -452,6 +457,27 @@ class Hub:
                         "device_id": device.id,
                         "type": reason_string
                     })
+    async def _handle_log_message(self, log_msg: str) -> None:
+        """Process a log message."""
+        if "block request" in log_msg:
+            # Extract MAC address from block request message
+            # Example: "0000000000123456 block request /current/0000000000123456_452783.pending block 0"
+            parts = log_msg.split()
+            if len(parts) > 0:
+                tag_mac = parts[0].upper()
+                if tag_mac in self._data:
+                    block_requests = self._data[tag_mac].get("block_requests", 0) + 1
+                    self._data[tag_mac]["block_requests"] = block_requests
+                    # Notify of update
+                    async_dispatcher_send(self.hass, f"{SIGNAL_TAG_UPDATE}_{tag_mac}")
+        if "reports xfer complete" in log_msg:
+            # Extract MAC address from block request message
+            parts = log_msg.split()
+            if len(parts) > 0:
+                tag_mac = parts[0].upper()
+                if tag_mac in self._data:
+                    # Notify of update
+                    async_dispatcher_send(self.hass, f"{SIGNAL_TAG_IMAGE_UPDATE}_{tag_mac}", True)
 
     async def async_reload_blacklist(self):
         """Reload blacklist from config entry."""

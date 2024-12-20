@@ -215,6 +215,9 @@
             },
             "checkin_count": {
                 "name": "Check-in Anzahl"
+            },
+            "block_requests": {
+                "name": "Blockübertragungsanforderungen"
             }
         },
         "camera": {

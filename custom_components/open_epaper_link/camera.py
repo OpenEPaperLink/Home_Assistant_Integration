@@ -11,9 +11,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+import requests
 
-from .const import DOMAIN
-from .tag_types import get_hw_string
+from .tag_types import TagType
+from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
+from .image_decompressor import to_image
+from .tag_types import get_hw_string, get_tag_types_manager
 from .util import get_image_path
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -93,6 +96,8 @@ class EPDCamera(Camera):
         self.content_type = "image/jpeg"
         self._image_path = get_image_path(hass, f"{DOMAIN}.{tag_mac}")
         self._last_image = None
+        self._tag_type = None
+        self._last_error = None
 
     @property
     def device_info(self):
@@ -111,43 +116,109 @@ class EPDCamera(Camera):
                 self._tag_mac not in self._hub.get_blacklisted_tags()
         )
 
-    async def async_camera_image(
-            self, width: int | None = None, height: int | None = None
-    ) -> bytes | None:
-        """Return locally generated image."""
-        if not self.available:
-            return self._last_image
-
+    async def _fetch_raw_image(self) -> bytes | None:
+        """Fetch raw image data from AP."""
+        url = f"http://{self._hub.host}/current/{self._tag_mac}.raw"
         try:
-            # Check if image file exists
-            if not os.path.exists(self._image_path):
-                return self._last_image
+            result = await self.hass.async_add_executor_job(lambda: requests.get(url))
+            if result.status_code == 200:
+                return result.content
+            if result.status_code == 404:
+                _LOGGER.debug("No image found for %s", self._tag_mac)
+                return None
 
-            # Get file modification time
-            mod_time = os.path.getmtime(self._image_path)
-
-            # If we have a cached image, check if the file has been modified
-            if self._last_image is not None:
-                if hasattr(self, '_last_mod_time') and mod_time <= self._last_mod_time:
-                    return self._last_image
-
-            # Read and cache the new image
-            def read_image():
-                with open(self._image_path, 'rb') as f:
-                    return f.read()
-
-            self._last_image = await self.hass.async_add_executor_job(read_image)
-            self._last_mod_time = mod_time
-
-            return self._last_image
-
+            _LOGGER.error(
+                "Failed to fetch image for %s: HTTP %d",
+                self._tag_mac,
+                result.status_code
+            )
+            return None
         except Exception as err:
             _LOGGER.error(
-                "Error reading image file for %s: %s",
+                "Error fetching image for %s: %s",
                 self._tag_mac,
                 str(err)
             )
-            return self._last_image
+            return None
+
+    async def _get_tag_def(self) -> TagType | None:
+        """Get tag definition for image decoding."""
+        if self._tag_type is None:
+            try:
+                tag_data = self._hub.get_tag_data(self._tag_mac)
+                hw_type = tag_data.get("hw_type")
+                if hw_type is None:
+                    return None
+
+                tag_manager = await get_tag_types_manager(self.hass)
+                tag_type = await tag_manager.get_tag_info(hw_type)
+                if tag_type is None:
+                    return None
+                self._tag_type = tag_type
+
+            except Exception as err:
+                _LOGGER.error(
+                    "Error getting tag definition for %s: %s",
+                    self._tag_mac,
+                    str(err)
+                )
+                return None
+
+        return self._tag_type
+
+
+
+    async def async_camera_image(
+            self, width: int | None = None, height: int | None = None
+    ) -> bytes | None:
+        """Return image response."""
+        try:
+            # First check if we have an image on disk
+            if os.path.exists(self._image_path):
+                if not self._last_image:
+                    self._last_image = await self.hass.async_add_executor_job(
+                        lambda: open(self._image_path, 'rb').read()
+                    )
+                return self._last_image
+
+            # No image on disk, try to fetch and decode
+            raw_data = await self._fetch_raw_image()
+            if raw_data:
+                tag_def = await self._get_tag_def()
+                if tag_def:
+                    try:
+                        # Create decoder and process image in executor to avoid blocking
+                        def process_image():
+                            # Log first byte of raw data for debugging
+                            return to_image(raw_data, tag_def)
+
+                        jpeg_data = await self.hass.async_add_executor_job(process_image)
+
+                        # Save to disk
+                        await self.hass.async_add_executor_job(
+                            lambda: os.makedirs(os.path.dirname(self._image_path), exist_ok=True)
+                        )
+                        await self.hass.async_add_executor_job(
+                            lambda: open(self._image_path, 'wb').write(jpeg_data)
+                        )
+
+                        self._last_image = jpeg_data
+                        return jpeg_data
+                    except Exception as err:
+                        _LOGGER.error(
+                            "Error decoding image for %s: %s",
+                            self._tag_mac,
+                            str(err)
+                        )
+
+        except Exception as err:
+            _LOGGER.error(
+                "Error getting camera image for %s: %s",
+                self._tag_mac,
+                str(err)
+            )
+
+        return None
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks when entity is added."""
@@ -155,7 +226,7 @@ class EPDCamera(Camera):
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
-                f"{DOMAIN}_tag_update_{self._tag_mac}",
+                f"{SIGNAL_TAG_IMAGE_UPDATE}_{self._tag_mac}",
                 self._handle_tag_update
             )
         )
@@ -170,11 +241,15 @@ class EPDCamera(Camera):
         )
 
     @callback
-    def _handle_tag_update(self) -> None:
+    def _handle_tag_update(self, data) -> None:
         """Handle tag data updates."""
-        if self._tag_mac in self._hub.tags:
-            tag_data = self._hub.get_tag_data(self._tag_mac)
-            self._name = f"{tag_data.get('tag_name', self._tag_mac)} Display"
+        # Clear cached image to force refresh on next request
+        self._last_image = None
+        # clear image file if not dry run
+        if data:
+            if os.path.exists(self._image_path):
+                os.remove(self._image_path)
+        # Update entity state
         self.async_write_ha_state()
 
     @callback
