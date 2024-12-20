@@ -18,11 +18,11 @@ def decode_esl_raw(data: bytes, tag_type: TagType) -> bytes:
     _LOGGER.debug(f"Tag type: {tag_type.name}")
     _LOGGER.debug(f"Dimensions: {tag_type.width}x{tag_type.height}")
     _LOGGER.debug(f"BPP: {tag_type.bpp}")
-    _LOGGER.debug(f"Rotate buffer: {tag_type.rotate_buffer}")
+    _LOGGER.debug(f"Rotate buffer: {tag_type.rotatebuffer}")
 
     # Calculate expected sizes
-    width = tag_type.height if tag_type.rotate_buffer % 2 else tag_type.width
-    height = tag_type.width if tag_type.rotate_buffer % 2 else tag_type.height
+    width = tag_type.height if tag_type.rotatebuffer % 2 else tag_type.width
+    height = tag_type.width if tag_type.rotatebuffer % 2 else tag_type.height
 
     if tag_type.bpp <= 2:  # Traditional 1-2 bit plane-based format
         bytes_per_row = (width + 7) // 8
@@ -151,7 +151,7 @@ def to_image(raw_data: bytes, tag_type: TagType) -> bytes:
     # For 90/270 degree rotated displays, swap width/height before processing
     native_width = tag_type.width
     native_height = tag_type.height
-    if tag_type.rotate_buffer % 2:  # 90 or 270 degrees
+    if tag_type.rotatebuffer % 2:  # 90 or 270 degrees
         native_width, native_height = native_height, native_width
 
 
@@ -235,11 +235,11 @@ def to_image(raw_data: bytes, tag_type: TagType) -> bytes:
                         pixels[x, y] = colors_list[color_index]
 
     # Apply rotation
-    if tag_type.rotate_buffer == 1:  # 90 degrees CCW
+    if tag_type.rotatebuffer == 1:  # 90 degrees CCW
         img = img.transpose(Image.Transpose.ROTATE_270)
-    elif tag_type.rotate_buffer == 2:  # 180 degrees
+    elif tag_type.rotatebuffer == 2:  # 180 degrees
         img = img.transpose(Image.Transpose.ROTATE_180)
-    elif tag_type.rotate_buffer == 3:  # 270 degrees CCW (90 CW)
+    elif tag_type.rotatebuffer == 3:  # 270 degrees CCW (90 CW)
         img = img.transpose(Image.Transpose.ROTATE_90)
 
     # Convert to JPEG
