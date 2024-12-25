@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import os.path
-
-import aiohttp
 import asyncio
 import json
 import logging
-from typing import Dict, Tuple, Optional, Any, cast
+import os.path
 from datetime import datetime, timedelta
+from typing import Dict, Tuple, Optional, Any
 
+import aiohttp
 from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
@@ -17,6 +16,7 @@ GITHUB_API_URL = "https://api.github.com/repos/OpenEPaperLink/OpenEPaperLink/con
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/OpenEPaperLink/OpenEPaperLink/master/resources/tagtypes"
 CACHE_DURATION = timedelta(hours=48)  # Cache tag definitions for 48 hours
 STORAGE_VERSION = 1
+
 
 class TagType:
     def __init__(self, type_id: int, data: dict):
@@ -39,7 +39,6 @@ class TagType:
         self.use_template = data.get('usetemplate', None)
         self.zlib_compression = data.get('zlib_compression', None)
         self._raw_data = data
-
 
     def to_dict(self) -> dict:
         return {
@@ -79,6 +78,7 @@ class TagType:
     def get(self, attr: str, default: Any = None) -> Any:
         """Get attribute value, supporting dict-like access."""
         return getattr(self, attr, default)
+
 
 class TagTypesManager:
     """Manages tag type definitions fetched from GitHub."""
@@ -130,7 +130,6 @@ class TagTypesManager:
         # If we get here, either no stored data or invalid data
         await self._fetch_tag_types()
 
-
     async def save_to_storage(self) -> None:
         """Save tag types to storage."""
 
@@ -161,8 +160,6 @@ class TagTypesManager:
             _LOGGER.debug("Tag types saved to storage")
         except Exception as e:
             _LOGGER.error(f"Error saving tag types to storage: {str(e)}")
-
-
 
     async def ensure_types_loaded(self) -> None:
         """Ensure tag types are loaded and not too old."""
@@ -291,8 +288,10 @@ class TagTypesManager:
         """Return all known tag types."""
         return self._tag_types.copy()
 
+
 # Update the helper functions to be synchronous after initial load
 _INSTANCE: Optional[TagTypesManager] = None
+
 
 async def get_tag_types_manager(hass: HomeAssistant) -> TagTypesManager:
     """Get or create the global TagTypesManager instance."""
@@ -302,17 +301,20 @@ async def get_tag_types_manager(hass: HomeAssistant) -> TagTypesManager:
         await _INSTANCE.ensure_types_loaded()
     return _INSTANCE
 
+
 def get_hw_dimensions(hw_type: int) -> Tuple[int, int]:
     """Get dimensions synchronously."""
     if _INSTANCE is None:
         return 296, 128  # Default dimensions
     return _INSTANCE.get_hw_dimensions(hw_type)
 
+
 def get_hw_string(hw_type: int) -> str:
     """Get display name synchronously."""
     if _INSTANCE is None:
         return f"Unknown Type {hw_type}"
     return _INSTANCE.get_hw_string(hw_type)
+
 
 def is_in_hw_map(hw_type: int) -> bool:
     """Check if hardware type exists synchronously."""

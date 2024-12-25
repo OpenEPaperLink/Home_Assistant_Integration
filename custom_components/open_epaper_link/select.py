@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from html.entities import html5
+import logging
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
+
 from .const import DOMAIN
-
-import logging
-
 from .util import set_ap_config_item
 
 _LOGGER = logging.getLogger(__name__)
+
 
 class APConfigSelectBase(SelectEntity):
     def __init__(self, hub, key, name, icon, options):
@@ -34,6 +33,7 @@ class APConfigSelectBase(SelectEntity):
             "model": "esp32",
             "manufacturer": "OpenEPaperLink",
         }
+
     @property
     def available(self) -> bool:
         return self._hub.ap_config_loaded.is_set() and self._key in self._hub.ap_config
@@ -44,7 +44,7 @@ class APConfigSelectBase(SelectEntity):
         return self._options_map.get(value)
 
     async def async_select_option(self, option: str) -> None:
-        value = get_key_from_value(self._options_map,option)
+        value = get_key_from_value(self._options_map, option)
         if value is not None:
             await set_ap_config_item(self._hub, self._key, value)
 
@@ -61,6 +61,7 @@ class APConfigSelectBase(SelectEntity):
             )
         )
 
+
 class APChannelSelect(APConfigSelectBase):
     def __init__(self, hub, key, name, icon, options):
         super().__init__(hub, key, name, icon, options)
@@ -73,6 +74,7 @@ class APChannelSelect(APConfigSelectBase):
             26: "26"
         }
         self._attr_options = list(self._options_map.values())
+
 
 class APBrightnessSelect(APConfigSelectBase):
     def __init__(self, hub, key, name, icon, options):
@@ -87,6 +89,7 @@ class APBrightnessSelect(APConfigSelectBase):
         }
         self._attr_options = list(self._options_map.values())
 
+
 class APTFTBrightnessSelect(APConfigSelectBase):
     def __init__(self, hub, key, name, icon, options):
         super().__init__(hub, key, name, icon, options)
@@ -100,6 +103,7 @@ class APTFTBrightnessSelect(APConfigSelectBase):
         }
         self._attr_options = list(self._options_map.values())
 
+
 class APMaxSleepSelect(APConfigSelectBase):
     def __init__(self, hub, key, name, icon, options):
         super().__init__(hub, key, name, icon, options)
@@ -112,6 +116,7 @@ class APMaxSleepSelect(APConfigSelectBase):
         }
         self._attr_options = list(self._options_map.values())
 
+
 class APLockInventorySelect(APConfigSelectBase):
     def __init__(self, hub, key, name, icon, options):
         super().__init__(hub, key, name, icon, options)
@@ -122,6 +127,7 @@ class APLockInventorySelect(APConfigSelectBase):
 
         }
         self._attr_options = list(self._options_map.values())
+
 
 class APWifiPowerSelect(APConfigSelectBase):
     def __init__(self, hub, key, name, icon, options):
@@ -140,6 +146,7 @@ class APWifiPowerSelect(APConfigSelectBase):
             8: "2.0 dBm",
         }
         self._attr_options = list(self._options_map.values())
+
 
 class APContentLanguageSelect(APConfigSelectBase):
     def __init__(self, hub, key, name, icon, options):
@@ -160,6 +167,7 @@ class APContentLanguageSelect(APConfigSelectBase):
         }
         self._attr_options = list(self._options_map.values())
 
+
 class APTimeHourSelect(APConfigSelectBase):
     def __init__(self, hub, key, name, icon, options):
         super().__init__(hub, key, name, icon, options)
@@ -179,6 +187,7 @@ class APTimeHourSelect(APConfigSelectBase):
         """Change the selected option."""
         hour = int(option.split(':')[0])
         await set_ap_config_item(self._hub, self._key, hour)
+
 
 class APTimezoneSelect(APConfigSelectBase):
     def __init__(self, hub, key, name, icon, options):
@@ -216,6 +225,7 @@ class APTimezoneSelect(APConfigSelectBase):
         }
         self._attr_options = list(self._options_map.values())
 
+
 async def async_setup_entry(hass, config_entry, async_add_entities):
     hub = hass.data[DOMAIN][config_entry.entry_id]
     entities = [
@@ -226,12 +236,13 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         APLockInventorySelect(hub, "lock", "Lock tag inventory", "mdi:lock", []),
         APWifiPowerSelect(hub, "wifipower", "Wifi power", "wifi-strength", []),
         APContentLanguageSelect(hub, "language", "Language", "mdi:translate", []),
-        APTimeHourSelect(hub,"sleeptime1","No updates between 1 (from)","mdi:sleep",[]),
-        APTimeHourSelect(hub,"sleeptime2","No updates between 2 (to)","mdi:sleep",[]),
+        APTimeHourSelect(hub, "sleeptime1", "No updates between 1 (from)", "mdi:sleep", []),
+        APTimeHourSelect(hub, "sleeptime2", "No updates between 2 (to)", "mdi:sleep", []),
         APConfigSelectBase(hub, "subghzchannel", "Sub-GHz Channel", "mdi:radio-tower", [str(i) for i in range(0, 10)]),
         APTimezoneSelect(hub, "timezone", "Timezone", "mdi:earth-clock", [])
     ]
     async_add_entities(entities)
+
 
 def get_key_from_value(options_map, val):
     return list(options_map.keys())[list(options_map.values()).index(val)]

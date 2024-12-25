@@ -2,6 +2,7 @@ from homeassistant.components.text import TextEntity
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
+
 from .const import DOMAIN
 from .util import set_ap_config_item
 
