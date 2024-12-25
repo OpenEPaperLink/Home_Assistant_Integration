@@ -1,0 +1,11 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "data": {
+                    "host": "Värdnamn eller IP-adress"
+                }
+            }
+        }
+    }
+}
