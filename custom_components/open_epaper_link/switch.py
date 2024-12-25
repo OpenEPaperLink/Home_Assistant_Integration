@@ -2,6 +2,7 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
+
 from .const import DOMAIN
 from .util import set_ap_config_item
 
@@ -50,6 +51,7 @@ class APConfigSwitch(SwitchEntity):
                 self._handle_ap_config_update,
             )
         )
+
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     hub = hass.data[DOMAIN][config_entry.entry_id]

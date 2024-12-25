@@ -1,17 +1,19 @@
-from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.entity import EntityCategory
-import requests
 import json
 import logging
 
+import requests
+from homeassistant.components.button import ButtonEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+from .const import DOMAIN
 from .tag_types import get_hw_dimensions, get_tag_types_manager
 from .util import send_tag_cmd, reboot_ap
-from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     hub = hass.data[DOMAIN][entry.entry_id]
@@ -21,10 +23,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         buttons.append(ForceRefreshButton(hass, tag_mac, hub))
         buttons.append(RebootTagButton(hass, tag_mac, hub))
         buttons.append(ScanChannelsButton(hass, tag_mac, hub))
-        buttons.append(IdentifyTagButton(hass,tag_mac,hub))
+        buttons.append(IdentifyTagButton(hass, tag_mac, hub))
     buttons.append(RebootAPButton(hass, hub))
     buttons.append(RefreshTagTypesButton(hass))
     async_add_entities(buttons)
+
 
 class ClearPendingTagButton(ButtonEntity):
     def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
@@ -48,6 +51,7 @@ class ClearPendingTagButton(ButtonEntity):
     async def async_press(self) -> None:
         await send_tag_cmd(self.hass, self._entity_id, "clear")
 
+
 class ForceRefreshButton(ButtonEntity):
     def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
         """Initialize the button."""
@@ -69,6 +73,7 @@ class ForceRefreshButton(ButtonEntity):
 
     async def async_press(self) -> None:
         await send_tag_cmd(self.hass, self._entity_id, "refresh")
+
 
 class RebootTagButton(ButtonEntity):
     def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
@@ -92,6 +97,7 @@ class RebootTagButton(ButtonEntity):
     async def async_press(self) -> None:
         await send_tag_cmd(self.hass, self._entity_id, "reboot")
 
+
 class ScanChannelsButton(ButtonEntity):
     def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
         """Initialize the button."""
@@ -113,6 +119,7 @@ class ScanChannelsButton(ButtonEntity):
 
     async def async_press(self) -> None:
         await send_tag_cmd(self.hass, self._entity_id, "scan")
+
 
 class RebootAPButton(ButtonEntity):
     def __init__(self, hass: HomeAssistant, hub) -> None:
@@ -136,6 +143,7 @@ class RebootAPButton(ButtonEntity):
 
     async def async_press(self) -> None:
         await reboot_ap(self.hass)
+
 
 class IdentifyTagButton(ButtonEntity):
     def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
@@ -197,6 +205,7 @@ class IdentifyTagButton(ButtonEntity):
                 _LOGGER.info(f"Sent identify command to tag {self._tag_mac}")
         except requests.RequestException as err:
             _LOGGER.error(f"Failed to send identify command to tag {self._tag_mac}: {err}")
+
 
 class RefreshTagTypesButton(ButtonEntity):
     """Button to manually refresh tag types from GitHub."""
