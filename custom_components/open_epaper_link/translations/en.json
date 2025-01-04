@@ -7,5 +7,200 @@
                 }
             }
         }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Tag Management",
+                "description": "Select tags to blacklist. Blacklisted tags will be hidden and ignored.",
+                "data": {
+                    "blacklisted_tags": "Blacklisted Tags",
+                    "button_debounce": "Button Debounce Time (seconds)",
+                    "nfc_debounce": "NFC Debounce Time (seconds)"
+                }
+            }
+        }
+    },
+    "entity": {
+        "switch": {
+            "preview": {
+                "name": "Preview Images on AP"
+            },
+            "ble": {
+                "name": "Bluetooth LE"
+            },
+            "nightlyreboot": {
+                "name": "Nightly Reboot"
+            }
+        },
+        "text": {
+            "alias": {
+                "name": "Alias"
+            },
+            "repo": {
+                "name": "Repository"
+            }
+        },
+        "select": {
+            "channel": {
+                "name": "Channel"
+            },
+            "led": {
+                "name": "RGB LED brightness"
+            },
+            "tft": {
+                "name": "TFT Brightness"
+            },
+            "maxsleep": {
+                "name": "Maximum sleep"
+            },
+            "lock": {
+                "name": "Lock tag inventory"
+            },
+            "wifipower": {
+                "name": "WiFi Power"
+            },
+            "language": {
+                "name": "Language"
+            },
+            "discovery": {
+                "name": "Discovery method"
+            },
+            "subghzchannel": {
+                "name": "Sub-GHz Channel"
+            },
+            "sleeptime1": {
+                "name": "No updates between 1 (from)"
+            },
+            "sleeptime2": {
+                "name": "No updates between 2 (to)"
+            }
+        },
+        "sensor": {
+            "ip": {
+                "name": "IP Address"
+            },
+            "wifi_ssid": {
+                "name": "WiFi SSID"
+            },
+            "record_count": {
+                "name": "Tag Count"
+            },
+            "db_size": {
+                "name": "Database Size"
+            },
+            "little_fs_free": {
+                "name": "LittleFS Free"
+            },
+            "ap_state": {
+                "name": "State"
+            },
+            "run_state": {
+                "name": "Run State"
+            },
+            "wifi_rssi": {
+                "name": "WiFi RSSI"
+            },
+            "heap": {
+                "name": "Free Heap"
+            },
+            "sys_time": {
+                "name": "System Time"
+            },
+            "uptime": {
+                "name": "Uptime"
+            },
+            "low_battery_tag_count": {
+                "name": "Low Battery Tag Count"
+            },
+            "timeout_tag_count": {
+                "name": "Timed out Tag Count"
+            },
+            "ps_ram_free": {
+                "name": "PSRAM Free"
+            },
+            "temperature": {
+                "name": "Temperature"
+            },
+            "battery_voltage": {
+                "name": "Battery Voltage"
+            },
+            "battery_percentage": {
+                "name": "Battery Percentage"
+            },
+            "last_seen": {
+                "name": "Last Seen"
+            },
+            "next_update": {
+                "name": "Next Update"
+            },
+            "next_checkin": {
+                "name": "Next Checkin"
+            },
+            "lqi": {
+                "name": "Link Quality Index"
+            },
+            "rssi": {
+                "name": "RSSI"
+            },
+            "pending_updates": {
+                "name": "Pending Updates"
+            },
+            "content_mode": {
+                "name": "Content Mode"
+            },
+            "wakeup_reason": {
+                "name": "Wakeup Reason"
+            },
+            "capabilities": {
+                "name": "Capabilities"
+            },
+            "update_count": {
+                "name": "Update Count"
+            },
+            "width": {
+                "name": "Width"
+            },
+            "height": {
+                "name": "Height"
+            },
+            "runtime": {
+                "name": "Runtime"
+            },
+            "boot_count": {
+                "name": "Boot Count"
+            },
+            "checkin_count": {
+                "name": "Checkin Count"
+            },
+            "block_requests": {
+                "name": "Block Transfer Requests"
+            }
+        },
+        "camera": {
+            "content": {
+                "name": "Content"
+            }
+        },
+        "button": {
+            "clear_pending": {
+                "name": "Clear Pending Updates"
+            },
+            "force_refresh": {
+                "name": "Force Refresh Content"
+            },
+            "reboot_tag": {
+                "name": "Reboot Tag"
+            },
+            "scan_channels": {
+                "name": "Scan Channels"
+            },
+            "reboot_ap": {
+                "name": "Reboot AP"
+            },
+            "refresh_tag_types": {
+                "name": "Refresh Tag Types"
+            }
+        }
     }
 }

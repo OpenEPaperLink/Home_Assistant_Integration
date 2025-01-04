@@ -25,7 +25,7 @@ class TagType:
         self.name = data.get('name', f"Unknown Type {type_id}")
         self.width = data.get('width', 296)
         self.height = data.get('height', 128)
-        self.rotate_buffer = data.get('rotate_buffer', 0)
+        self.rotatebuffer = data.get('rotatebuffer', 0)
         self.bpp = data.get('bpp', 2)
         self.color_table = data.get('colortable', {
             'white': [255, 255, 255],
@@ -47,7 +47,7 @@ class TagType:
             'name': self.name,
             'width': self.width,
             'height': self.height,
-            'rotate_buffer': self.rotate_buffer,
+            'rotatebuffer': self.rotatebuffer,
             'bpp': self.bpp,
             'colortable': self.color_table,
             'shortlut': self.short_lut,
@@ -66,13 +66,14 @@ class TagType:
             'name': data.get('name'),
             'width': data.get('width'),
             'height': data.get('height'),
-            'rotatebuffer': data.get('rotate_buffer'),
-            'bpp': data.get('bits_per_pixel'),
+            'rotatebuffer': data.get('rotatebuffer'),
+            'bpp': data.get('bpp'),
             'shortlut': data.get('short_lut'),
-            'colortable': data.get('color_table'),
+            'colortable': data.get('colortable'),
             'options': data.get('options', []),
             'contentids': data.get('content_ids', []),
             'template': data.get('template', {}),
+            'zlib_compression': data.get('zlib_compression', None),
         }
         return cls(data.get('type_id'), raw_data)
 

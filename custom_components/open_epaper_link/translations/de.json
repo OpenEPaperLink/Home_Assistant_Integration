@@ -7,5 +7,303 @@
                 }
             }
         }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Tag-Verwaltung",
+                "description": "Tags auswählen die ignoriert werden sollen.",
+                "data": {
+                    "blacklisted_tags": "Ignorierte Tags",
+                    "button_debounce": "Tasten-Entstörzeit (Sekunden)",
+                    "nfc_debounce": "NFC-Entstörzeit (Sekunden)"
+                }
+            }
+        }
+    },
+    "entity": {
+        "switch": {
+            "preview": {
+                "name": "Bildervorschau im AP"
+            },
+            "ble": {
+                "name": "Bluetooth LE"
+            },
+            "nightlyreboot": {
+                "name": "Nächtlicher Neustart"
+            }
+        },
+        "text": {
+            "alias": {
+                "name": "Alias"
+            },
+            "repo": {
+                "name": "Repository"
+            }
+        },
+        "select": {
+            "channel": {
+                "name": "Kanal",
+                "state": {
+                    "auto": "Automatisch",
+                    "11": "11",
+                    "15": "15",
+                    "20": "20",
+                    "25": "25",
+                    "26": "26"
+                }
+            },
+            "led": {
+                "name": "RGB-LED-Helligkeit",
+                "state": {
+                    "off": "Aus",
+                    "10%": "10%",
+                    "25%": "25%",
+                    "50%": "50%",
+                    "75%": "75%",
+                    "100%": "100%"
+                }
+            },
+            "tft": {
+                "name": "TFT-Helligkeit"
+            },
+            "maxsleep": {
+                "name": "Maximale Schlafdauer",
+                "state": {
+                    "shortest (40 sec)": "kürzeste (40 Sek.)",
+                    "5 min": "5 Min.",
+                    "10 min": "10 Min.",
+                    "30 min": "30 Min.",
+                    "1 hour": "1 Stunde"
+                }
+            },
+            "lock": {
+                "name": "Tag-Inventar sperren",
+                "state": {
+                    "no": "Nein",
+                    "locked: don't add new tags": "Gesperrt: Keine neuen Tags hinzufügen",
+                    "learning: only add booting tags": "Lernend: Nur bootende Tags hinzufügen"
+                }
+            },
+            "wifipower": {
+                "name": "WLAN-Leistung"
+            },
+            "language": {
+                "name": "Sprache"
+            },
+            "discovery": {
+                "name": "Erkennungsmethode"
+            },
+            "subghzchannel": {
+                "name": "Sub-GHz-Kanal",
+                "state": {
+                    "disabled": "Deaktiviert",
+                    "100 - 864.000 Mhz (Europe, etc)": "100 - 864.000 MHz (Europa, etc)",
+                    "101 - 865.006 Mhz (Europe, etc)": "101 - 865.006 MHz (Europa, etc)",
+                    "102 - 866.014 Mhz (Europe, etc)": "102 - 866.014 MHz (Europa, etc)",
+                    "103 - 867.020 Mhz (Europe, etc)": "103 - 867.020 MHz (Europa, etc)",
+                    "104 - 868.027 Mhz (Europe, etc)": "104 - 868.027 MHz (Europa, etc)",
+                    "105 - 869.034 Mhz (Europe, etc)": "105 - 869.034 MHz (Europa, etc)",
+                    "200 - 903.000 Mhz (US, etc)": "200 - 903.000 MHz (USA, etc)",
+                    "201 - 907.027 Mhz (US, etc)": "201 - 907.027 MHz (USA, etc)",
+                    "202 - 911.054 Mhz (US, etc)": "202 - 911.054 MHz (USA, etc)",
+                    "203 - 915.083 Mhz (US, etc)": "203 - 915.083 MHz (USA, etc)",
+                    "204 - 919.110 Mhz (US, etc)": "204 - 919.110 MHz (USA, etc)",
+                    "205 - 923.138 Mhz (US, etc)": "205 - 923.138 MHz (USA, etc)"
+                }
+            },
+            "sleeptime1": {
+                "name": "Keine Updates von (1)"
+            },
+            "sleeptime2": {
+                "name": "Keine Updates bis (2)"
+            }
+        },
+        "sensor": {
+            "ip": {
+                "name": "IP-Adresse"
+            },
+            "wifi_ssid": {
+                "name": "WLAN-SSID"
+            },
+            "record_count": {
+                "name": "Tag-Anzahl"
+            },
+            "db_size": {
+                "name": "Datenbankgröße"
+            },
+            "little_fs_free": {
+                "name": "LittleFS frei"
+            },
+            "ap_state": {
+                "name": "Status"
+            },
+            "run_state": {
+                "name": "Laufstatus"
+            },
+            "wifi_rssi": {
+                "name": "WLAN-Signalstärke (RSSI)"
+            },
+            "heap": {
+                "name": "Freier Heap"
+            },
+            "sys_time": {
+                "name": "Systemzeit"
+            },
+            "uptime": {
+                "name": "Betriebszeit"
+            },
+            "low_battery_tag_count": {
+                "name": "Tags mit schwachem Akku"
+            },
+            "timeout_tag_count": {
+                "name": "Tags mit Zeitüberschreitung"
+            },
+            "ps_ram_free": {
+                "name": "Freier PSRAM"
+            },
+            "temperature": {
+                "name": "Temperatur"
+            },
+            "battery_voltage": {
+                "name": "Batteriespannung"
+            },
+            "battery_percentage": {
+                "name": "Batterieprozentsatz"
+            },
+            "last_seen": {
+                "name": "Zuletzt gesehen"
+            },
+            "next_update": {
+                "name": "Nächstes Update"
+            },
+            "next_checkin": {
+                "name": "Nächste Anmeldung"
+            },
+            "lqi": {
+                "name": "Linkqualitätsindex (LQI)"
+            },
+            "rssi": {
+                "name": "Signalstärke (RSSI)"
+            },
+            "pending_updates": {
+                "name": "Ausstehende Updates"
+            },
+            "content_mode": {
+                "name": "Inhaltsmodus"
+            },
+            "wakeup_reason": {
+                "name": "Aufwachgrund"
+            },
+            "capabilities": {
+                "name": "Fähigkeiten"
+            },
+            "update_count": {
+                "name": "Update-Anzahl"
+            },
+            "width": {
+                "name": "Breite"
+            },
+            "height": {
+                "name": "Höhe"
+            },
+            "runtime": {
+                "name": "Laufzeit"
+            },
+            "boot_count": {
+                "name": "Neustartanzahl"
+            },
+            "checkin_count": {
+                "name": "Check-in Anzahl"
+            },
+            "block_requests": {
+                "name": "Blockübertragungsanforderungen"
+            }
+        },
+        "camera": {
+            "content": {
+                "name": "Inhalt"
+            }
+        },
+        "button": {
+            "clear_pending": {
+                "name": "Ausstehende Updates löschen"
+            },
+            "force_refresh": {
+                "name": "Inhalt aktualisieren erzwingen"
+            },
+            "reboot_tag": {
+                "name": "Tag neu starten"
+            },
+            "scan_channels": {
+                "name": "Kanäle scannen"
+            },
+            "reboot_ap": {
+                "name": "AP neu starten"
+            },
+            "refresh_tag_types": {
+                "name": "Tag-Typen aktualisieren"
+            }
+        }
+    },
+    "services": {
+        "drawcustom": {
+            "name": "Benutzerdefiniertes Bild zeichnen",
+            "description": "Zeichnet ein benutzerdefiniertes Bild auf einem oder mehreren Tags",
+            "fields": {
+                "payload": {
+                    "name": "Payload",
+                    "description": "Payload zum Zeichnen, siehe Dokumentation für Beispiele"
+                },
+                "background": {
+                    "name": "Hintergrundfarbe",
+                    "description": "Hintergrundfarbe (schwarz, weiß, akzent, rot, gelb)"
+                },
+                "rotate": {
+                    "name": "Rotation",
+                    "description": "Rotation in Grad (0, 90, 180, 270)"
+                },
+                "dither": {
+                    "name": "Dithering",
+                    "description": "Zu verwendende Dithering-Option"
+                },
+                "ttl": {
+                    "name": "Gültigkeitsdauer",
+                    "description": "Wie lange das Bild zwischengespeichert werden soll (in Sekunden)"
+                },
+                "dry-run": {
+                    "name": "Trockenlauf",
+                    "description": "Bild wird nur lokal gespeichert und nicht an den AP gesendet"
+                }
+            }
+        },
+        "setled": {
+            "name": "LED-Muster einstellen",
+            "description": "Stellt das LED-Blinkmuster für ein oder mehrere Tags ein"
+        },
+        "clear_pending": {
+            "name": "Ausstehendes Update löschen",
+            "description": "Löscht ausstehende Updates für ein oder mehrere Tags"
+        },
+        "force_refresh": {
+            "name": "Inhalt aktualisieren erzwingen",
+            "description": "Erzwingt das Aktualisieren des Inhalts für ein oder mehrere Tags"
+        },
+        "reboot_tag": {
+            "name": "Tag neu starten",
+            "description": "Startet ein oder mehrere Tags neu"
+        },
+        "scan_channels": {
+            "name": "Kanäle scannen",
+            "description": "Tag scannt nach verfügbaren Kanälen"
+        },
+        "reboot_ap": {
+            "name": "AP neu starten",
+            "description": "Startet den AP neu"
+        },
+        "refresh_tag_types": {
+            "name": "Tag-Typen aktualisieren",
+            "description": "Aktualisiert die Tag-Typen von GitHub"
+        }
     }
 }

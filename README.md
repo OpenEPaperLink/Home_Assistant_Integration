@@ -11,49 +11,24 @@
 
 Home Assistant Integration for the [OpenEPaperLink](https://github.com/jjwbruijn/OpenEPaperLink) project, enabling control and monitoring of electronic shelf labels (ESLs) through Home Assistant.
 
+## Requirements
+
+### Hardware
+- OpenEPaperLink Access Point (ESP32-based)
+- Compatible Electronic Shelf Labels
+
 ## Features
 
-### 🔌 Entities and Devices
-- Each tag and AP is exposed as a device in Home Assistant
-- Sensor data for each tag:
-    - Temperature
-    - Battery voltage and percentage
-    - Signal strength (RSSI)
-    - Link Quality Index (LQI)
-    - Last seen timestamp
-    - Next update/checkin time
-    - Wakeup reason
-    - Device capabilities
-- Sensor data for each AP:
-    - DBSize
-    - Free heap
-    - Free space
-    - IP address
-    - Recordcount
-    - Run state
-    - AP state
-    - Systime
-    - Temperature
-    - Wi-Fi RSSI
-    - Wi-Fi SSID
-    - Wi-Fi state
+### 🔌 Device Integration
+- Each tag and AP appears as a device in Home Assistant
+- Device triggers for buttons, NFC, and GPIO
+- Automatic tag discovery and configuration
 
-### ⚙️ AP Configuration Options
-- Alias
-- Bluetooth
-- IEEE 802.15.4 channel selection
-- Language selection
-- Lock tag inventory setting
-- Maximum sleep duration settings
-- No-updates time window configuration
-- AP Image preview setting
-- RGB LED brightness control
-- TFT brightness control
-- Time zone configuration
-- Wi-Fi power settings
+### ⚙️ Configuration Controls
+- AP settings management (WiFi, Bluetooth, language, etc.)
+- Tag inventory and blacklist management
 
 ### 🎨 Display Controls
-Several services for controlling the display content:
 
 #### drawcustom (Recommended)
 The most flexible and powerful service for creating custom displays. Supports:
@@ -65,20 +40,25 @@ The most flexible and powerful service for creating custom displays. Supports:
 - Plots of Home Assistant sensor data
 - Progress bars
 
-[View full drawcustom documentation →](docs/drawcustom/supported_types.md)
+[View full drawcustom documentation](docs/drawcustom/supported_types.md)
 
 #### Legacy Services (Deprecated)
+The following services have been deprecated in favor of drawcustom:
 - **dlimg**: Download and display images from URLs
 - **lines5**: Display 5 lines of text (1.54" displays only)
 - **lines4**: Display 4 lines of text (2.9" displays only)
 
+These legacy services were removed in the 1.0 release. Please migrate to using drawcustom.
+
 ### 🚦 Device Management
-Services for managing ESL devices:
 - `clear_pending`: Clear pending updates
 - `force_refresh`: Force display refresh
 - `reboot_tag`: Reboot tag
 - `scan_channels`: Initiate channel scan
 - `reboot_ap`: Reboot the access point
+- Automatic tag detection and configuration
+- Support for tag blacklisting to ignore unwanted devices
+- Hardware capability detection for buttons, NFC, and GPIO features
 
 ## Installation
 
@@ -109,53 +89,120 @@ Add OpenEPaperLink to your Home Assistant instance using this button:
 4. Search for and select "OpenEPaperLink"
 5. Follow the on-screen instructions
 
+### Integration Options
+After setup, you can configure additional options through the integration's option flow:
+
+#### Tag Management
+- **Blacklisted Tags**: Select tags to hide and ignore.
+- **Button Debounce Time**: Adjust sensitivity of button triggers (0.0-5.0 seconds)
+- **NFC Debounce Time**: Adjust sensitivity of NFC triggers (0.0-5.0 seconds)
+
+#### Tag Discovery
+Tags are automatically discovered when they check in with your AP. New tags will appear as devices with their MAC address as the identifier or alias if available. You can rename these in the device settings.
+
 ## Usage Examples
 
-### Basic Custom Display
+### Basic Text Display
 ```yaml
-service: open_epaper_link.drawcustom
-target:
-  entity_id: open_epaper_link.0000021EC9EC743A
-data:
-  background: white
-  rotate: 0
-  payload:
-    - type: text
-      value: "Hello World!"
-      font: "ppb.ttf"
-      x: 10
-      y: 10
-      size: 40
-      color: red
+- type: "text"
+  value: "Hello World!"
+  x: 10
+  y: 10
+  size: 40
+  color: "red"
 ```
 
 ### Progress Bar with Icon
 ```yaml
-service: open_epaper_link.drawcustom
-target:
-  entity_id: open_epaper_link.0000021EC9EC743A
-data:
-  background: white
-  payload:
-    - type: progress_bar
-      x_start: 10
-      y_start: 10
-      x_end: 180
-      y_end: 30
-      progress: 75
-      fill: red
-      show_percentage: true
-    - type: icon
-      value: mdi:battery-70
-      x: 190
-      y: 20
-      size: 24
+- type: "progress_bar"
+  x_start: 10
+  y_start: 10
+  x_end: 180
+  y_end: 30
+  progress: 75
+  fill: "red"
+  show_percentage: true
+- type: "icon"
+  value: "mdi:battery-70"
+  x: 190
+  y: 20
+  size: 24
 ```
 
-If a template with a numeric sensor value still does not work, try appending a non-numeric string (can't be a blank string or just a space) e.g.
+### Sensor Display
+```yaml
+- type: "text"
+  value: "Temperature: {{ states('sensor.temperature') }}°C"
+  x: 10
+  y: 10
+  size: 24
+  color: "black"
+- type: "text"
+  value: "Humidity: {{ states('sensor.humidity') }}%"
+  x: 10
+  y: 40
+  size: 24
+  color: "black"
 ```
-" {{  (states('sensor.car_range') | float / 1.609344 ) | int }} mi "
+## Migrating to Version 1.0
+
+### Breaking Changes
+
+1. **Service Changes**
+   - `dlimg`, `lines4`, and `lines5` services have been deprecated
+   - All image/text display should now use `drawcustom` service
+   - Service target now uses device ID instead of entity ID
+2. **Entity Changes**
+    - Entities for each device have also changed significantly
+
+**To make sure no potential bugs carry over from the old version, please remove the old integration and re-add it. This will ensure that all entities are correctly setup.**
+
+
+
+### Service Migration
+
+#### Text Display
+Old format (`lines5` service):
+```yaml
+line1: "Hello"
+line2: "World"
 ```
+
+New format (`drawcustom` payload):
+```yaml
+- type: "text"
+  value: "Hello"
+  x: 10
+  y: 10
+  size: 24
+- type: "text"
+  value: "World"
+  x: 10
+  y: 40
+  size: 24
+```
+
+#### Image Display
+Old format (`dlimg` service):
+```yaml
+url: "https://example.com/image.jpg"
+x: 0
+y: 0
+xsize: 296
+ysize: 128
+```
+
+New format (`drawcustom` payload):
+```yaml
+- type: "dlimg"
+  url: "https://example.com/image.jpg"
+  x: 0
+  y: 0
+  xsize: 296
+  ysize: 128
+```
+
+The device selection, background color, rotation, and other options are now configured through dropdown menus in the service UI.
 
 ## Contributing
 - Feature requests and bug reports are welcome! Please open an issue on GitHub
