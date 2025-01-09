@@ -379,20 +379,21 @@ Downloads and displays an image from a URL.
   rotate: 0
 ```
 
-| Parameter | Description       | Required | Default | Notes                                   |
-|-----------|-------------------|----------|---------|-----------------------------------------|
-| `url`     | Image URL or path | Yes      | -       | HTTP/HTTPS URL, Data URI, or local path |
-| `x`       | X position        | Yes      | -       | Pixels                                  |
-| `y`       | Y position        | Yes      | -       | Pixels                                  |
-| `xsize`   | Target width      | Yes      | -       | Pixels                                  |
-| `ysize`   | Target height     | Yes      | -       | Pixels                                  |
-| `rotate`  | Rotation angle    | No       | `0`     | Degrees                                 |
-| `visible` | Show/hide element | No       | `true`  | `true`, `false`                         |
+| Parameter | Description       | Required | Default | Notes                                                       |
+|-----------|-------------------|----------|---------|-------------------------------------------------------------|
+| `url`     | Image URL or path | Yes      | -       | HTTP/HTTPS URL, Data URI, local path or camera/image entity |
+| `x`       | X position        | Yes      | -       | Pixels                                                      |
+| `y`       | Y position        | Yes      | -       | Pixels                                                      |
+| `xsize`   | Target width      | Yes      | -       | Pixels                                                      |
+| `ysize`   | Target height     | Yes      | -       | Pixels                                                      |
+| `rotate`  | Rotation angle    | No       | `0`     | Degrees                                                     |
+| `visible` | Show/hide element | No       | `true`  | `true`, `false`                                             |
 
 Notes:
 - Local images must be in `/config/media/`
 - Data URIs supported (e.g., `data:image/gif;base64,...`)
 - External images must be publicly accessible
+- Camera entities (e.g. `camera.p1s_camera`) must have a `entity_picture` attribute
 
 ### QR Code
 Generates and displays a QR code.

@@ -17,6 +17,7 @@ import base64
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.network import get_url
 from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
 from .tag_types import TagType, get_tag_types_manager
 from .util import get_image_path
@@ -1090,6 +1091,26 @@ class ImageGen:
             pos_y = element['y']
             target_size = (element['xsize'], element['ysize'])
             rotate = element.get('rotate', 0)
+
+            # Check if URL is an image entity
+            if element['url'].startswith('image.') or element['url'].startswith('camera.'):
+                # Get state of the image entity
+                state = self.hass.states.get(element['url'])
+                if not state:
+                    raise HomeAssistantError(f"Image entity {element['url']} not found")
+
+                # Get image URL from entity attributes
+                image_url = state.attributes.get("entity_picture")
+                if not image_url:
+                    raise HomeAssistantError(f"No image URL found for entity {element['url']}")
+
+                # If the URL is relative, make it absolute using HA's base URL
+                if image_url.startswith("/"):
+                    base_url = get_url(self.hass)
+                    image_url = f"{base_url}{image_url}"
+
+                # Update URL to the actual image URL
+                element['url'] = image_url
 
             # Load image based on URL type
             if element['url'].startswith(('http://', 'https://')):
