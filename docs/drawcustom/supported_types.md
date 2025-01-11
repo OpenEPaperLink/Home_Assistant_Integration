@@ -105,7 +105,6 @@ Draws text.
 | `spacing`      | Line spacing for wrapped text        | No       | `5`                            | Pixels                                                                                    |
 | `stroke_width` | Outline width                        | No       | `0`                            | Pixels                                                                                    |
 | `stroke_fill`  | Outline color                        | No       | `white`                        | `white`, `black`, `accent`, `red`, `yellow`                                               |
-| `align`        | Text alignment                       | No       | `left`                         | `left`, `center`, `right`                                                                 |
 | `y_padding`    | Vertical offset when y not specified | No       | `10`                           | Pixels                                                                                    |
 | `visible`      | Show/hide element                    | No       | `true`                         | `true`, `false`                                                                           |
 | `parse_colors` | Enable color markup in text          | No       | false                          | Enables `[color]text[/color]` syntax                                                      |
@@ -185,7 +184,6 @@ Splits text into multiple lines based on a delimiter.
 | `font`      | Font file name                 | No       | `ppb.ttf`                 | Available fonts: `ppb.ttf`, `rbm.ttf`       |
 | `color`     | Text color                     | No       | `black`                   | `white`, `black`, `accent`, `red`, `yellow` |
 | `spacing`   | Additional line spacing        | No       | `0`                       | Pixels                                      |
-| `align`     | Text alignment                 | No       | `left`                    | `left`, `center`, `right`                   |
 | `visible`   | Show/hide element              | No       | `true`                    | `true`, `false`                             |
 
 ### Line
