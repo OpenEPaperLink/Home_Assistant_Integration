@@ -660,15 +660,97 @@ class ImageGen:
         # Get line properties
         fill = self.get_index_color(element.get('fill', "black"))
         width = element.get('width', 1)
+        dashed = element.get('dashed', False)
+        dash_length = element.get('dash_length', 5)
+        space_length = element.get('space_length', 3)
 
-        # Draw line
-        draw.line(
-            [(element['x_start'], y_start), (element['x_end'], y_end)],
-            fill=fill,
-            width=width
-        )
+        x_start = element["x_start"]
+        x_end = element["x_end"]
+
+        if dashed:
+            self._draw_dashed_line(
+                draw,
+                (x_start, y_start),
+                (x_end, y_end),
+                dash_length,
+                space_length,
+                fill, width)
+        else:
+            draw.line(
+                [(element['x_start'], y_start), (element['x_end'], y_end)],
+                fill=fill,
+                width=width
+            )
 
         return max(y_start, y_end)
+
+    @staticmethod
+    def _draw_dashed_line(draw: ImageDraw.ImageDraw,
+                                start: tuple[int, int],
+                                end: tuple[int, int],
+                                dash_length: int,
+                                space_length: int,
+                                fill: tuple[int, int, int, int] = BLACK,
+                                width: int = 1,
+                                ) -> None:
+        """Draw dashed line."""
+        x1, y1 = start
+        x2, y2 = end
+
+        dx = x2 - x1
+        dy = y2 - y1
+        line_length = (dx**2 + dy**2) ** 0.5
+
+        step_x = dx / line_length
+        step_y = dy / line_length
+
+        current_pos = 0.0
+
+        while True:
+            # 1) Draw a dash segment
+            dash_end = current_pos + dash_length
+
+            if dash_end >= line_length:
+                # We have a partial dash that ends exactly or beyond the line_end
+                dash_end = line_length
+                segment_len = dash_end - current_pos
+
+                segment_start_x = x1 + step_x * current_pos
+                segment_start_y = y1 + step_y * current_pos
+                segment_end_x = x1 + step_x * dash_end
+                segment_end_y = y1 + step_y * dash_end
+
+                draw.line(
+                    [(segment_start_x, segment_start_y), (segment_end_x, segment_end_y)],
+                    fill=fill,
+                    width=width
+                )
+                # We're done, because we've reached the end of the line
+                break
+            else:
+                # Normal full dash
+                segment_start_x = x1 + step_x * current_pos
+                segment_start_y = y1 + step_y * current_pos
+                segment_end_x = x1 + step_x * dash_end
+                segment_end_y = y1 + step_y * dash_end
+
+                draw.line(
+                    [(segment_start_x, segment_start_y), (segment_end_x, segment_end_y)],
+                    fill=fill,
+                    width=width
+                )
+
+                # 2) Move current_pos forward past this dash
+                current_pos = dash_end
+
+            # 3) Skip the space segment
+            space_end = current_pos + space_length
+            if space_end >= line_length:
+                # The space would exceed the line's end, so we're done
+                break
+            else:
+                # Jump over the space
+                current_pos = space_end
 
     @staticmethod
     def _get_rounded_corners(corner_string: str) -> tuple[bool, bool, bool, bool]:

@@ -199,16 +199,19 @@ Draws a straight line.
   fill: red
 ```
 
-| Parameter   | Description                          | Required | Default         | Notes                                       |
-|-------------|--------------------------------------|----------|-----------------|---------------------------------------------|
-| `x_start`   | Starting X position                  | Yes      | -               | Pixels or percentage                        |
-| `x_end`     | Ending X position                    | Yes      | -               | Pixels or percentage                        |
-| `y_start`   | Starting Y position                  | No       | Auto-positioned | Pixels or percentage                        |
-| `y_end`     | Ending Y position                    | No       | `y_start`       | Pixels or percentage                        |
-| `fill`      | Line color                           | No       | `black`         | `white`, `black`, `accent`, `red`, `yellow` |
-| `width`     | Line thickness                       | No       | `1`             | Pixels                                      |
-| `y_padding` | Vertical offset when auto-positioned | No       | `0`             | Pixels                                      |
-| `visible`   | Show/hide element                    | No       | `true`          | `true`, `false`                             |
+| Parameter      | Description                          | Required | Default         | Notes                                       |
+|----------------|--------------------------------------|----------|-----------------|---------------------------------------------|
+| `x_start`      | Starting X position                  | Yes      | -               | Pixels or percentage                        |
+| `x_end`        | Ending X position                    | Yes      | -               | Pixels or percentage                        |
+| `y_start`      | Starting Y position                  | No       | Auto-positioned | Pixels or percentage                        |
+| `y_end`        | Ending Y position                    | No       | `y_start`       | Pixels or percentage                        |
+| `fill`         | Line color                           | No       | `black`         | `white`, `black`, `accent`, `red`, `yellow` |
+| `width`        | Line thickness                       | No       | `1`             | Pixels                                      |
+| `y_padding`    | Vertical offset when auto-positioned | No       | `0`             | Pixels                                      |
+| `dashed`       | Enable dashed line behaviour         | No       | `False`         | `False`, `True`                             |
+| `dash_length`  | Length of dashes                     | No       | 5               | Pixels                                      |
+| `space_length` | Length of spaces between dashes      | No       | 3               | Pixels                                      |
+| `visible`      | Show/hide element                    | No       | `True`          | `True`, `False`                             |
 
 ### Rectangle
 Draws a rectangle with optional rounded corners.
