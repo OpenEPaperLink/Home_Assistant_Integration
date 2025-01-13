@@ -49,6 +49,7 @@ class ElementType(str, Enum):
     RECTANGLE_PATTERN = "rectangle_pattern"
     CIRCLE = "circle"
     ELLIPSE = "ellipse"
+    ARC = "arc"
     ICON = "icon"
     DLIMG = "dlimg"
     QRCODE = "qrcode"
@@ -143,6 +144,7 @@ REQUIRED_FIELDS: Dict[ElementType, list[str]] = {
     ],
     ElementType.CIRCLE: ["x", "y", "radius"],
     ElementType.ELLIPSE: ["x_start", "x_end", "y_start", "y_end"],
+    ElementType.ARC: ["x", "y", "radius", "start_angle", "end_angle"],
     ElementType.ICON: ["x", "y", "value", "size"],
     ElementType.DLIMG: ["x", "y", "url", "xsize", "ysize"],
     ElementType.QRCODE: ["x", "y", "data"],
@@ -203,6 +205,7 @@ class ImageGen:
             ElementType.RECTANGLE_PATTERN: self._draw_rectangle_pattern,
             ElementType.CIRCLE: self._draw_circle,
             ElementType.ELLIPSE: self._draw_ellipse,
+            ElementType.ARC: self._draw_arc,
             ElementType.ICON: self._draw_icon,
             ElementType.DLIMG: self._draw_downloaded_image,
             ElementType.QRCODE: self._draw_qrcode,
@@ -922,6 +925,59 @@ class ImageGen:
         )
 
         return y_end
+
+    async def _draw_arc(self, img: Image, element: dict, pos_y: int):
+        """Draw an arc or pie slice."""
+        self.check_required_arguments(
+            element,
+            ["x", "y", "radius", "start_angle", "end_angle"],
+            "arc"
+        )
+
+        draw = ImageDraw.Draw(img)
+        coords = CoordinateParser(img.width, img.height)
+
+        # Parse center coordinates and radius
+        x = coords.parse_x(element["x"])
+        y = coords.parse_y(element["y"])
+        radius = coords.parse_size(element["radius"], is_width=True)
+
+        # Parse angles
+        start_angle = element["start_angle"]
+        end_angle = element["end_angle"]
+
+        # Calculate bounding box of the circle/ellipse
+        bbox = [
+            (x - radius, y - radius),
+            (x + radius, y + radius)
+        ]
+
+        # Get arc properties
+        fill = self.get_index_color(element.get("fill"))  # Used for pie slices
+        outline = self.get_index_color(element.get("outline", "black"))
+        width = element.get("width", 1)
+
+        # Draw the arc
+        if fill:
+            # Filled pie slice
+            draw.pieslice(
+                bbox,
+                start=start_angle,
+                end=end_angle,
+                fill=fill,
+                outline=outline
+            )
+        else:
+            # Outline-only arc
+            draw.arc(
+                bbox,
+                start=start_angle,
+                end=end_angle,
+                fill=outline,
+                width=width
+            )
+
+        return pos_y
 
     async def _draw_icon(self, img: Image, element: dict, pos_y: int) -> int:
         """Draw Material Design Icons."""
@@ -1738,9 +1794,6 @@ class ImageGen:
                 label_text = str(x)
                 draw.text((x + 2, 2), label_text, fill=label_color, font=font)
 
-        # A debug grid does not really advance the pos_y flow.
-        # You can just return pos_y so that elements after the grid keep their normal flow,
-        # or return height if you prefer. We'll just return pos_y here.
         return pos_y
 
 

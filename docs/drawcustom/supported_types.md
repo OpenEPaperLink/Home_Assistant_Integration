@@ -334,6 +334,35 @@ Draws an ellipse inside the bounding box.
 | `width`   | Border thickness  | No       | `1`     | Pixels                                              |
 | `visible` | Show/hide element | No       | `true`  | `true`, `false`                                     |
 
+### Arc/ Pie Slice
+Draws an arc (outline-only) or a pie slice (filled) based on the specified center, radius, and angles.
+```yaml
+- type: arc
+  x: 100
+  y: 75
+  radius: 50
+  start_angle: 0
+  end_angle: 90
+  fill: red
+- type: arc
+  x: 100
+  y: 75
+  radius: 50
+  start_angle: 90
+  end_angle: 0
+```
+| Parameter     | Description                          | Required | Default | Notes                       |
+|---------------|--------------------------------------|----------|---------|-----------------------------|
+| `x`           | X coordinate of the center           | Yes      | -       | Pixels or percentage        |
+| `y`           | Y coordinate of the center           | Yes      | -       | Pixels or percentage        |
+| `radius`      | Radius of the arc or pie slice       | Yes      | -       | Pixels                      |
+| `start_angle` | Starting angle of the arc            | Yes      | -       | 0 degrees = right           |
+| `end_angle`   | Ending angle af the arc              | Yes      | -       | Clockwise direction         |
+| `fill`        | Foll color for the pie slices        | No       | `none`  | Use to make a pie slice     |
+| `outline`     | Outline color for arcs or pie slices | No       | `black` |                             |
+| `width`       | Width of the outline                 | No       | `1`     | Ignored if fill is provided |
+
+
 ### Icon
 Draws Material Design Icons.
 

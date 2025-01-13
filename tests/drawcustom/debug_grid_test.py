@@ -101,7 +101,7 @@ async def test_debug_grid_without_labels(image_gen, mock_tag_info):
             "open_epaper_link.test_tag",
             service_data
         )
-        save_image(image_data)
+
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(DEBUG_GRID_IMG_PATH, 'debug_grid_without_labels.png'))
         assert images_equal(generated_img, example_img), "Debug grid without labels rendering failed"
