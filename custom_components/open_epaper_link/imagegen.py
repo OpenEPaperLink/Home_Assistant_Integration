@@ -56,6 +56,7 @@ class ElementType(str, Enum):
     PROGRESS_BAR = "progress_bar"
     DIAGRAM = "diagram"
     ICON_SEQUENCE = "icon_sequence"
+    DEBUG_GRID = "debug_grid"
 
     @classmethod
     def required_fields(cls, element_type: 'ElementType') -> list[str]:
@@ -148,7 +149,8 @@ REQUIRED_FIELDS: Dict[ElementType, list[str]] = {
     ElementType.PLOT: ["data"],
     ElementType.PROGRESS_BAR: ["x_start", "x_end", "y_start", "y_end", "progress"],
     ElementType.DIAGRAM: ["x", "height"],
-    ElementType.ICON_SEQUENCE: ["x", "y", "icons", "size"]
+    ElementType.ICON_SEQUENCE: ["x", "y", "icons", "size"],
+    ElementType.DEBUG_GRID: []
 }
 
 def validate_element(element: Dict[str, Any]) -> ElementType:
@@ -207,7 +209,8 @@ class ImageGen:
             ElementType.PLOT: self._draw_plot,
             ElementType.PROGRESS_BAR: self._draw_progress_bar,
             ElementType.DIAGRAM: self._draw_diagram,
-            ElementType.ICON_SEQUENCE: self._draw_icon_sequence
+            ElementType.ICON_SEQUENCE: self._draw_icon_sequence,
+            ElementType.DEBUG_GRID: self._draw_debug_grid
         }
 
     async def get_tag_info(self, entity_id: str) -> Optional[tuple[TagType, str]]:
@@ -1676,3 +1679,68 @@ class ImageGen:
                     continue
 
         return pos_y + height
+
+    async def _draw_debug_grid(self, img: Image, element: dict, pos_y: int) -> int:
+
+        draw = ImageDraw.Draw(img)
+        width, height = img.size
+
+        spacing = element.get("spacing", 20)
+        line_color = self.get_index_color(element.get("line_color", "black"))
+        dashed = element.get("dashed", True)
+        dash_length = element.get("dash_length", 2)
+        space_length = element.get("space_length", 4)
+
+        show_labels = element.get("show_labels", True)
+        label_step = element.get("label_step", spacing*2)
+        label_color = self.get_index_color(element.get("label_color", "black"))
+        label_font_size = element.get("label_font_size", 12)
+        font_name = element.get("font", "ppb.ttf")
+
+        # Load a font for labels
+        font_path = os.path.join(os.path.dirname(__file__), font_name)
+        try:
+            font = ImageFont.truetype(font_path, label_font_size)
+        except OSError:
+            font = ImageFont.load_default()
+
+        # Helper to draw one line as dashed or solid
+        def draw_line_segment(p1, p2):
+            if dashed:
+                self._draw_dashed_line(
+                    draw,
+                    p1,
+                    p2,
+                    dash_length,
+                    space_length,
+                    fill=line_color,
+                    width=1
+                )
+            else:
+                draw.line([p1, p2], fill=line_color, width=1)
+
+        # Horizontal lines
+        for y in range(0, height, spacing):
+            draw_line_segment((0, y), (width, y))
+
+            # Labels
+            if show_labels and (y % label_step == 0):
+                label_text = str(y)
+                # Slight offset so text isn't on the line
+                draw.text((2, y + 2), label_text, fill=label_color, font=font)
+
+        # Vertical lines
+        for x in range(0, width, spacing):
+            draw_line_segment((x, 0), (x, height))
+
+            # Labels
+            if show_labels and (x % label_step == 0):
+                label_text = str(x)
+                draw.text((x + 2, 2), label_text, fill=label_color, font=font)
+
+        # A debug grid does not really advance the pos_y flow.
+        # You can just return pos_y so that elements after the grid keep their normal flow,
+        # or return height if you prefer. We'll just return pos_y here.
+        return pos_y
+
+

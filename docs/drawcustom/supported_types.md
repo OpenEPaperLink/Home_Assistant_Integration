@@ -79,6 +79,25 @@ Using `"accent"` is recommended for portable scripts that should work with both 
 
 ## Types
 
+### debug_grid
+The `debug_grid` draw type overlays a grid on the image canvas to help with layout debugging.
+
+```yaml
+- type: debug_grid
+```
+| Parameter         | Description                                 | Required | Default            | Notes               |
+|-------------------|---------------------------------------------|----------|--------------------|---------------------|
+| `spacing`         | Distance between grid lines                 | No       | `20`               | Pixels              |
+| `line_color`      | Color of the grid lines                     | No       | `black`            | Any supported color |
+| `dashed`          | Whether to use dashed lines for the grid    | No       | `True`             | `True`, `False`     |
+| `dash_length`     | Length of dash segments (if dashed)         | No       | `2`                | Pixels              |
+| `space_length`    | Space between the dashes (if dashed)        | No       | `4`                | Pixels              |
+| `show_labels`     | Wheteher to label coordinates at grid lines | No       | `True`             | `True`, `False`     |
+| `label_step`      | Frequency of labels (every Nth) grid line   | No       | `40` (2*`spacing`) | Pixels              |
+| `label_color`     | Color of the coordinate labels              | No       | `black`            | Any supported color |
+| `label_font_size` | Font size for coordinate labels             | No       | `12`               | Pixels              |
+| `font`            | Font for labels                             | No       | `ppb.ttf`          | -                   |
+
 ### text
 Draws text.
 
