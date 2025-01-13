@@ -123,7 +123,6 @@ async def test_text_multiline_delimiter_and_newline(image_gen, mock_tag_info):
         )
 
         generated_img = Image.open(BytesIO(image_data))
-        save_image(image_data)
         example_img = Image.open(os.path.join(TEXT_MULTILINE_IMG_PATH, 'text_multiline_delimiter_and_newline.png'))
         assert images_equal(generated_img, example_img), "Multiline text with delimiter and newline rendering failed"
 

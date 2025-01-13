@@ -79,6 +79,25 @@ Using `"accent"` is recommended for portable scripts that should work with both 
 
 ## Types
 
+### debug_grid
+The `debug_grid` draw type overlays a grid on the image canvas to help with layout debugging.
+
+```yaml
+- type: debug_grid
+```
+| Parameter         | Description                                | Required | Default            | Notes               |
+|-------------------|--------------------------------------------|----------|--------------------|---------------------|
+| `spacing`         | Distance between grid lines                | No       | `20`               | Pixels              |
+| `line_color`      | Color of the grid lines                    | No       | `black`            | Any supported color |
+| `dashed`          | Whether to use dashed lines for the grid   | No       | `True`             | `True`, `False`     |
+| `dash_length`     | Length of dash segments (if dashed)        | No       | `2`                | Pixels              |
+| `space_length`    | Space between the dashes (if dashed)       | No       | `4`                | Pixels              |
+| `show_labels`     | Whether to label coordinates at grid lines | No       | `True`             | `True`, `False`     |
+| `label_step`      | Frequency of labels (every Nth) grid line  | No       | `40` (2*`spacing`) | Pixels              |
+| `label_color`     | Color of the coordinate labels             | No       | `black`            | Any supported color |
+| `label_font_size` | Font size for coordinate labels            | No       | `12`               | Pixels              |
+| `font`            | Font for labels                            | No       | `ppb.ttf`          | -                   |
+
 ### text
 Draws text.
 
@@ -199,16 +218,19 @@ Draws a straight line.
   fill: red
 ```
 
-| Parameter   | Description                          | Required | Default         | Notes                                       |
-|-------------|--------------------------------------|----------|-----------------|---------------------------------------------|
-| `x_start`   | Starting X position                  | Yes      | -               | Pixels or percentage                        |
-| `x_end`     | Ending X position                    | Yes      | -               | Pixels or percentage                        |
-| `y_start`   | Starting Y position                  | No       | Auto-positioned | Pixels or percentage                        |
-| `y_end`     | Ending Y position                    | No       | `y_start`       | Pixels or percentage                        |
-| `fill`      | Line color                           | No       | `black`         | `white`, `black`, `accent`, `red`, `yellow` |
-| `width`     | Line thickness                       | No       | `1`             | Pixels                                      |
-| `y_padding` | Vertical offset when auto-positioned | No       | `0`             | Pixels                                      |
-| `visible`   | Show/hide element                    | No       | `true`          | `true`, `false`                             |
+| Parameter      | Description                          | Required | Default         | Notes                                       |
+|----------------|--------------------------------------|----------|-----------------|---------------------------------------------|
+| `x_start`      | Starting X position                  | Yes      | -               | Pixels or percentage                        |
+| `x_end`        | Ending X position                    | Yes      | -               | Pixels or percentage                        |
+| `y_start`      | Starting Y position                  | No       | Auto-positioned | Pixels or percentage                        |
+| `y_end`        | Ending Y position                    | No       | `y_start`       | Pixels or percentage                        |
+| `fill`         | Line color                           | No       | `black`         | `white`, `black`, `accent`, `red`, `yellow` |
+| `width`        | Line thickness                       | No       | `1`             | Pixels                                      |
+| `y_padding`    | Vertical offset when auto-positioned | No       | `0`             | Pixels                                      |
+| `dashed`       | Enable dashed line behaviour         | No       | `False`         | `False`, `True`                             |
+| `dash_length`  | Length of dashes                     | No       | 5               | Pixels                                      |
+| `space_length` | Length of spaces between dashes      | No       | 3               | Pixels                                      |
+| `visible`      | Show/hide element                    | No       | `True`          | `True`, `False`                             |
 
 ### Rectangle
 Draws a rectangle with optional rounded corners.
@@ -270,6 +292,25 @@ Draws repeated rectangles in a grid pattern.
 | `width`    | Border thickness             | No       | `1`     | Pixels                                               |
 | `visible`  | Show/hide element            | No       | `true`  | `true`, `false`                                      |
 
+### Polygon
+
+Draws a filled or outlined polygon based on the provided points.
+
+```yaml
+- type: polygon
+  points: [[10, 10], [50, 10], [50, 50], [10, 50]]
+  fill: "red"
+  outline: "black"
+```
+
+| Parameter | Description                              | Required | Default | Notes                    |
+|-----------|------------------------------------------|----------|---------|--------------------------|
+| `points`  | List of coordinate pairs for the polygon | Yes      | -       | Example: [[x1, y1], ...] |
+| `fill`    | Fill color for the polygon               | No       | `none`  | Any supported color      |
+| `outline` | Outline color for the polygon            | No       | `black` | Any supported color      |
+| `width`   | Width of the outline                     | No       | `1`     | Pixels                   |
+
+
 ### Circle
 Draws a circle around a center point.
 
@@ -311,6 +352,35 @@ Draws an ellipse inside the bounding box.
 | `outline` | Border color      | No       | `black` | `white`, `black`, `accent`, `red`, `yellow`         |
 | `width`   | Border thickness  | No       | `1`     | Pixels                                              |
 | `visible` | Show/hide element | No       | `true`  | `true`, `false`                                     |
+
+### Arc/ Pie Slice
+Draws an arc (outline-only) or a pie slice (filled) based on the specified center, radius, and angles.
+```yaml
+- type: arc
+  x: 100
+  y: 75
+  radius: 50
+  start_angle: 0
+  end_angle: 90
+  fill: red
+- type: arc
+  x: 100
+  y: 75
+  radius: 50
+  start_angle: 90
+  end_angle: 0
+```
+| Parameter     | Description                          | Required | Default | Notes                       |
+|---------------|--------------------------------------|----------|---------|-----------------------------|
+| `x`           | X coordinate of the center           | Yes      | -       | Pixels or percentage        |
+| `y`           | Y coordinate of the center           | Yes      | -       | Pixels or percentage        |
+| `radius`      | Radius of the arc or pie slice       | Yes      | -       | Pixels                      |
+| `start_angle` | Starting angle of the arc            | Yes      | -       | 0 degrees = right           |
+| `end_angle`   | Ending angle af the arc              | Yes      | -       | Clockwise direction         |
+| `fill`        | Foll color for the pie slices        | No       | `none`  | Use to make a pie slice     |
+| `outline`     | Outline color for arcs or pie slices | No       | `black` |                             |
+| `width`       | Width of the outline                 | No       | `1`     | Ignored if fill is provided |
+
 
 ### Icon
 Draws Material Design Icons.
