@@ -18,8 +18,8 @@ jobs:
       - name: Update manifest.json
         run: |
           VERSION=${{ steps.extract_version.outputs.version }}
-          jq ".version = \"$VERSION\"" manifest.json > manifest.tmp.json
-          mv manifest.tmp.json manifest.json
+          jq ".version = \"$VERSION\"" custom_components/open_epaper_link/manifest.json > manifest.tmp.json
+          mv manifest.tmp.json custom_components/open_epaper_link/manifest.json
         shell: bash
 
       - name: Commit changes
