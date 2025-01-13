@@ -2,6 +2,25 @@
 
 With `drawcustom`, you can create an image in Home Assistant and send the rendered image to an OpenEpaperLink AP.
 
+## List of draw types
+- [Debug Grid](#debug_grid)
+- [Text](#text)
+- [Multiline Text](#multiline-text)
+- [Line](#line)
+- [Rectangle](#rectangle)
+- [Rectangle Pattern](#rectangle-pattern)
+- [Polygon](#polygon)
+- [Circle](#circle)
+- [Ellipse](#ellipse)
+- [Arc/ Pie Slice](#arc-pie-slice)
+- [Icon](#icon)
+- [Icon Sequence](#icon-sequence)
+- [Download Image](#download-image)
+- [QR Code](#qr-code)
+- [Plot](#plot)
+- [Progress Bar](#progress-bar)
+- [Template Examples](#template-examples)
+
 ## Basic Usage
 
 ESLs come in multiple variants - red and yellow are the most common accent colors. The following options are available:
