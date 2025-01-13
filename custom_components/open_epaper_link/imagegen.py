@@ -47,6 +47,7 @@ class ElementType(str, Enum):
     LINE = "line"
     RECTANGLE = "rectangle"
     RECTANGLE_PATTERN = "rectangle_pattern"
+    POLYGON = "polygon"
     CIRCLE = "circle"
     ELLIPSE = "ellipse"
     ARC = "arc"
@@ -142,6 +143,7 @@ REQUIRED_FIELDS: Dict[ElementType, list[str]] = {
         "x_start", "x_size", "y_start", "y_size",
         "x_repeat", "y_repeat", "x_offset", "y_offset"
     ],
+    ElementType.POLYGON: ["points"],
     ElementType.CIRCLE: ["x", "y", "radius"],
     ElementType.ELLIPSE: ["x_start", "x_end", "y_start", "y_end"],
     ElementType.ARC: ["x", "y", "radius", "start_angle", "end_angle"],
@@ -203,6 +205,7 @@ class ImageGen:
             ElementType.LINE: self._draw_line,
             ElementType.RECTANGLE: self._draw_rectangle,
             ElementType.RECTANGLE_PATTERN: self._draw_rectangle_pattern,
+            ElementType.POLYGON: self._draw_polygon,
             ElementType.CIRCLE: self._draw_circle,
             ElementType.ELLIPSE: self._draw_ellipse,
             ElementType.ARC: self._draw_arc,
@@ -862,6 +865,29 @@ class ImageGen:
                 max_y = max(max_y, y_pos + element['y_size'])
 
         return max_y
+
+    async def _draw_polygon(self, img: Image, element: dict, pos_y: int) -> int:
+        """Draw a polygon."""
+        self.check_required_arguments(element, ["points"], "polygon")
+
+        draw = ImageDraw.Draw(img)
+
+        # Parse vertices
+        coords = CoordinateParser(img.width, img.height)
+        vertices = [
+            (coords.parse_x(x), coords.parse_y(y))
+            for x, y in element["points"]
+        ]
+
+        # Get polygon properties
+        fill = self.get_index_color(element.get("fill"))
+        outline = self.get_index_color(element.get("outline", "black"))
+        width = element.get("width", 1)
+
+        # Draw the polygon
+        draw.polygon(vertices, fill=fill, outline=outline)
+
+        return pos_y
 
     async def _draw_circle(self, img: Image, element: dict, pos_y: int) -> int:
         """Draw circle element."""

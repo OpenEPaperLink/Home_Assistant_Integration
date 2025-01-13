@@ -292,6 +292,25 @@ Draws repeated rectangles in a grid pattern.
 | `width`    | Border thickness             | No       | `1`     | Pixels                                               |
 | `visible`  | Show/hide element            | No       | `true`  | `true`, `false`                                      |
 
+### Polygon
+
+Draws a filled or outlined polygon based on the provided points.
+
+```yaml
+- type: polygon
+  points: [[10, 10], [50, 10], [50, 50], [10, 50]]
+  fill: "red"
+  outline: "black"
+```
+
+| Parameter | Description                              | Required | Default | Notes                    |
+|-----------|------------------------------------------|----------|---------|--------------------------|
+| `points`  | List of coordinate pairs for the polygon | Yes      | -       | Example: [[x1, y1], ...] |
+| `fill`    | Fill color for the polygon               | No       | `none`  | Any supported color      |
+| `outline` | Outline color for the polygon            | No       | `black` | Any supported color      |
+| `width`   | Width of the outline                     | No       | `1`     | Pixels                   |
+
+
 ### Circle
 Draws a circle around a center point.
 

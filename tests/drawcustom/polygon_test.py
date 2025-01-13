@@ -1,4 +1,4 @@
-"""Tests for arc rendering in ImageGen."""
+"""Tests for polygon rendering in ImageGen."""
 import os
 from io import BytesIO
 import pytest
@@ -7,21 +7,17 @@ from PIL import Image
 
 from conftest import BASE_IMG_PATH, images_equal, save_image
 
-ARC_IMG_PATH = os.path.join(BASE_IMG_PATH, 'arc')
+POLYGON_IMG_PATH = os.path.join(BASE_IMG_PATH, 'polygon')
 
 @pytest.mark.asyncio
-async def test_arc_basic(image_gen, mock_tag_info):
-    """Test basic arc rendering with default settings."""
+async def test_polygon_basic(image_gen, mock_tag_info):
+    """Test basic polygon rendering with default settings."""
     service_data = {
         "background": "white",
         "rotate": 0,
         "payload": [{
-            "type": "arc",
-            "x": 100,
-            "y": 75,
-            "radius": 50,
-            "start_angle": 0,
-            "end_angle": 180,
+            "type": "polygon",
+            "points": [[10, 10], [50, 10], [50, 50], [10, 50]],
         }]
     }
 
@@ -33,23 +29,19 @@ async def test_arc_basic(image_gen, mock_tag_info):
         )
 
         generated_img = Image.open(BytesIO(image_data))
-        example_img = Image.open(os.path.join(ARC_IMG_PATH, 'arc_basic.png'))
-        assert images_equal(generated_img, example_img), "Basic arc rendering failed"
+        example_img = Image.open(os.path.join(POLYGON_IMG_PATH, 'polygon_basic.png'))
+        assert images_equal(generated_img, example_img), "Basic polygon rendering failed"
 
 @pytest.mark.asyncio
-async def test_pie_slice_basic(image_gen, mock_tag_info):
-    """Test basic arc rendering with default settings."""
+async def test_polygon_filled(image_gen, mock_tag_info):
+    """Test filled polygon rendering with default settings."""
     service_data = {
         "background": "white",
         "rotate": 0,
         "payload": [{
-            "type": "arc",
-            "x": 100,
-            "y": 75,
-            "radius": 50,
-            "start_angle": 0,
-            "end_angle": 180,
-            "fill": "red",
+            "type": "polygon",
+            "points": [[10, 10], [50, 10], [50, 50], [10, 70]],
+            "fill": "hr"
         }]
     }
 
@@ -59,7 +51,6 @@ async def test_pie_slice_basic(image_gen, mock_tag_info):
             "open_epaper_link.test_tag",
             service_data
         )
-
         generated_img = Image.open(BytesIO(image_data))
-        example_img = Image.open(os.path.join(ARC_IMG_PATH, 'pie_slice_basic.png'))
-        assert images_equal(generated_img, example_img), "Basic pie slice rendering failed"
+        example_img = Image.open(os.path.join(POLYGON_IMG_PATH, 'polygon_filled.png'))
+        assert images_equal(generated_img, example_img), "Filled polygon rendering failed"
