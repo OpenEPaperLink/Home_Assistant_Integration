@@ -39,6 +39,9 @@
             },
             "repo": {
                 "name": "Repository"
+            },
+            "tag_alias": {
+                "name": "Alias"
             }
         },
         "select": {
