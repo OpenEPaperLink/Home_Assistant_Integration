@@ -241,6 +241,9 @@
             "scan_channels": {
                 "name": "Kanäle scannen"
             },
+            "deep_sleep": {
+                "name": "Tiefschlaf"
+            },
             "reboot_ap": {
                 "name": "AP neu starten"
             },
