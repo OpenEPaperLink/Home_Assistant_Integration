@@ -27,14 +27,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install pytest pytest-homeassistant-custom-component pytest-asyncio websockets
-
-      - name: Configure pytest
-        run: |
-          echo "[pytest]" > pytest.ini
-          echo "asyncio_mode = auto" >> pytest.ini
-          echo "testpaths = tests" >> pytest.ini
-          echo "asyncio_default_fixture_loop_scope = function" >> pytest.ini
+          pip install -r requirements_test.txt
 
       - name: Run tests
         run: |

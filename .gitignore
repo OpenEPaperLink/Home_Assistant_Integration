@@ -166,3 +166,5 @@ config/
 
 custom_components/open_epaper_link/*.jpg
 custom_components/open_epaper_link/lastapinteraction.txt
+
+tests/drawcustom/test_images/rename_me.png
