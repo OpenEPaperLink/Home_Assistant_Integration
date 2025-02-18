@@ -628,6 +628,7 @@ class ImageGen:
         font_path = os.path.join(os.path.dirname(__file__), font_name)
         font = ImageFont.truetype(font_path, size)
         color = self.get_index_color(element.get('color', "black"))
+        align = element.get('align', "left")
         anchor = element.get('anchor', "lm")
         stroke_width = element.get('stroke_width', 0)
         stroke_fill = self.get_index_color(element.get('stroke_fill', 'white'))
@@ -638,15 +639,46 @@ class ImageGen:
 
         max_y = current_y
         for line in lines:
-            draw.text(
-                (element['x'], current_y),
-                str(line),
-                fill=color,
-                font=font,
-                anchor=anchor,
-                stroke_width=stroke_width,
-                stroke_fill=stroke_fill
-            )
+            if element.get('parse_colors', False):
+                segments = self._parse_colored_text(str(line))
+                segments, total_width = self._calculate_segment_positions(
+                    segments, font, element["x"], align
+                )
+
+                for segment in segments:
+                    color = self.get_index_color(segment.color, element.get('accent_color', 'red'))
+                    bbox = draw.textbbox(
+                        (segment.start_x, current_y),
+                        segment.text,
+                        font=font,
+                        anchor=anchor
+                    )
+                    draw.text(
+                        (segment.start_x, current_y),
+                        segment.text,
+                        fill=color,
+                        font=font,
+                        anchor=anchor,
+                        stroke_width=stroke_width,
+                        stroke_fill=stroke_fill
+                    )
+            else:
+                bbox = draw.textbbox(
+                    (element['x'], current_y),
+                    str(line),
+                    font=font,
+                    anchor=anchor,
+                    align=align
+                )
+                draw.text(
+                    (element['x'], current_y),
+                    str(line),
+                    fill=color,
+                    font=font,
+                    anchor=anchor,
+                    stroke_width=stroke_width,
+                    stroke_fill=stroke_fill
+                )
             current_y += element['offset_y']
             max_y = current_y
 
