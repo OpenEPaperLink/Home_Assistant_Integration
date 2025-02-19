@@ -355,6 +355,21 @@ class Hub:
         # Get existing data to calculate runtime and update counters
         existing_data = self._data.get(tag_mac, {})
 
+        # Check if name has changed
+        old_name = existing_data.get("tag_name")
+        if old_name and old_name != tag_name:
+            _LOGGER.debug("Tag name changed from '%s' to '%s'", old_name, tag_name)
+            # Update device name in device registry
+            device_registry = dr.async_get(self.hass)
+            device = device_registry.async_get_device(
+                identifiers={(DOMAIN, tag_mac)}
+            )
+            if device:
+                device_registry.async_update_device(
+                    device.id,
+                    name=tag_name
+                )
+
         # Calculate runtime delta
         runtime_delta = self._calculate_runtime_delta(tag_data, existing_data)
         runtime_total = existing_data.get("runtime", 0) + runtime_delta

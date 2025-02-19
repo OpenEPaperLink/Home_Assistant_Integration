@@ -39,6 +39,9 @@
             },
             "repo": {
                 "name": "Repository"
+            },
+            "tag_alias": {
+                "name": "Alias"
             }
         },
         "select": {
@@ -194,6 +197,9 @@
             },
             "scan_channels": {
                 "name": "Scan Channels"
+            },
+            "deep_sleep": {
+                "name": "Deep Sleep"
             },
             "reboot_ap": {
                 "name": "Reboot AP"
