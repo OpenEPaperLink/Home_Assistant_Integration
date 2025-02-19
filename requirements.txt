@@ -1,7 +1,8 @@
 colorlog==6.7.0
-homeassistant==2024.2.0
+homeassistant
 pip>=21.0,<23.2
 ruff==0.0.292
 qrcode[pil]==7.4.2
 requests_toolbelt==1.0.0
+websockets
 websocket-client==1.7.0
