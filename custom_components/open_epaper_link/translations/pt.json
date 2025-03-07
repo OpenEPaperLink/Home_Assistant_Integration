@@ -1,11 +1,212 @@
 {
-    "config": {
-        "step": {
-            "user": {
-                "data": {
-                    "host": "nome da maquina ou IP"
-                }
-            }
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "host": "Host ou IP"
         }
+      }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Gestão de Etiquetas",
+        "description": "Selecione as etiquetas para lista negra. Etiquetas na lista negra serão ocultadas e ignoradas.",
+        "data": {
+          "blacklisted_tags": "Etiquetas na Lista Negra",
+          "button_debounce": "Tempo de Debounce do Botão (segundos)",
+          "nfc_debounce": "Tempo de Debounce NFC (segundos)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "preview": {
+        "name": "Pré-visualizar Imagens no AP"
+      },
+      "ble": {
+        "name": "Bluetooth LE"
+      },
+      "nightlyreboot": {
+        "name": "Reinício Noturno"
+      }
+    },
+    "text": {
+      "alias": {
+        "name": "Alias"
+      },
+      "repo": {
+        "name": "Repositório"
+      },
+      "tag_alias": {
+        "name": "Alias"
+      }
+    },
+    "select": {
+      "channel": {
+        "name": "Canal"
+      },
+      "led": {
+        "name": "Brilho do LED RGB"
+      },
+      "tft": {
+        "name": "Brilho do TFT"
+      },
+      "maxsleep": {
+        "name": "Tempo máximo de sono"
+      },
+      "lock": {
+        "name": "Bloquear inventário de etiquetas"
+      },
+      "wifipower": {
+        "name": "Potência do WiFi"
+      },
+      "language": {
+        "name": "Idioma"
+      },
+      "discovery": {
+        "name": "Método de Descoberta"
+      },
+      "subghzchannel": {
+        "name": "Canal Sub-GHz"
+      },
+      "sleeptime1": {
+        "name": "Sem atualizações entre 1 (de)"
+      },
+      "sleeptime2": {
+        "name": "Sem atualizações entre 2 (para)"
+      }
+    },
+    "sensor": {
+      "ip": {
+        "name": "Endereço IP"
+      },
+      "wifi_ssid": {
+        "name": "WiFi SSID"
+      },
+      "record_count": {
+        "name": "Contagem de Etiquetas"
+      },
+      "db_size": {
+        "name": "Tamanho da Base de Dados"
+      },
+      "little_fs_free": {
+        "name": "LittleFS Livre"
+      },
+      "ap_state": {
+        "name": "Estado"
+      },
+      "run_state": {
+        "name": "Estado de Execução"
+      },
+      "wifi_rssi": {
+        "name": "WiFi RSSI"
+      },
+      "heap": {
+        "name": "Heap Livre"
+      },
+      "sys_time": {
+        "name": "Hora do Sistema"
+      },
+      "uptime": {
+        "name": "Tempo de Atividade"
+      },
+      "low_battery_tag_count": {
+        "name": "Contagem de Etiquetas com Bateria Fraca"
+      },
+      "timeout_tag_count": {
+        "name": "Contagem de Etiquetas Expiradas"
+      },
+      "ps_ram_free": {
+        "name": "PSRAM Livre"
+      },
+      "temperature": {
+        "name": "Temperatura"
+      },
+      "battery_voltage": {
+        "name": "Voltagem da Bateria"
+      },
+      "battery_percentage": {
+        "name": "Percentagem da Bateria"
+      },
+      "last_seen": {
+        "name": "Última Vez Visto"
+      },
+      "next_update": {
+        "name": "Próxima Atualização"
+      },
+      "next_checkin": {
+        "name": "Próximo Checkin"
+      },
+      "lqi": {
+        "name": "Índice de Qualidade de Ligação"
+      },
+      "rssi": {
+        "name": "RSSI"
+      },
+      "pending_updates": {
+        "name": "Atualizações Pendentes"
+      },
+      "content_mode": {
+        "name": "Modo de Conteúdo"
+      },
+      "wakeup_reason": {
+        "name": "Razão de Despertar"
+      },
+      "capabilities": {
+        "name": "Capacidades"
+      },
+      "update_count": {
+        "name": "Contagem de Atualizações"
+      },
+      "width": {
+        "name": "Largura"
+      },
+      "height": {
+        "name": "Altura"
+      },
+      "runtime": {
+        "name": "Tempo de Execução"
+      },
+      "boot_count": {
+        "name": "Contagem de Arranques"
+      },
+      "checkin_count": {
+        "name": "Contagem de Checkins"
+      },
+      "block_requests": {
+        "name": "Bloquear Pedidos de Transferência"
+      }
+    },
+    "camera": {
+      "content": {
+        "name": "Conteúdo"
+      }
+    },
+    "button": {
+      "clear_pending": {
+        "name": "Limpar Atualizações Pendentes"
+      },
+      "force_refresh": {
+        "name": "Forçar Atualização de Conteúdo"
+      },
+      "reboot_tag": {
+        "name": "Reiniciar Etiqueta"
+      },
+      "scan_channels": {
+        "name": "Analisar Canais"
+      },
+      "deep_sleep": {
+        "name": "Sono Profundo"
+      },
+      "reboot_ap": {
+        "name": "Reiniciar AP"
+      },
+      "refresh_tag_types": {
+        "name": "Atualizar Tipos de Etiqueta"
+      }
+    }
+  }
 }
