@@ -552,7 +552,7 @@ class ImageGen:
 
         segments = []
         current_pos = 0
-        pattern = r'\[(black|white|red|yellow|accent)\](.*?)\[/\1\]'
+        pattern = r'\[(black|white|red|yellow|accent|half_black|half_red|half_yellow|half_accent|gray|grey|g|hb|hr|hy|ha)\](.*?)\[/\1\]'
 
         for match in re.finditer(pattern, text):
             # Add any text before the match with default color
