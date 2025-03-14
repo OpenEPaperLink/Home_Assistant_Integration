@@ -2,12 +2,14 @@
 import os
 import sys
 import pytest
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock
+from PIL import ImageFont
 
 from PIL import ImageChops
 
 from homeassistant.core import HomeAssistant
 from custom_components.open_epaper_link.imagegen import ImageGen
+from custom_components.open_epaper_link.const import DOMAIN
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 BASE_IMG_PATH = os.path.join(current_dir, "test_images")
@@ -21,10 +23,20 @@ def mock_hass():
     hass.async_add_executor_job = AsyncMock()
 
     # Mock async_create_task to properly await coroutines
-    async def mock_create_task(coro):
+    async def mock_create_task(coro, name=None):
         await coro
         return None
     hass.async_create_task = mock_create_task
+
+    # Setup data attribute with required domain structure
+    mock_entry = MagicMock()
+    mock_entry.entry_id = "test_entry_id"
+    mock_entry.options = {"custom_font_dirs": ""}
+
+    mock_hub = MagicMock()
+    mock_hub.entry = mock_entry
+
+    hass.data = {DOMAIN: {"test_entry_id": mock_hub}}
 
     return hass
 
@@ -45,7 +57,52 @@ def mock_tag_info():
 @pytest.fixture
 def image_gen(mock_hass):
     """Create an ImageGen instance with mocked Home Assistant."""
-    return ImageGen(mock_hass)
+    # Find the real ppb.ttf font path in the integration directory
+    integration_dir = os.path.dirname(os.path.dirname(current_dir))
+    font_path = os.path.join(integration_dir, "custom_components", "open_epaper_link", "ppb.ttf")
+
+    # Check if the path exists, otherwise use a fallback approach
+    if not os.path.exists(font_path):
+        # Try to find it relative to the current file
+        possible_locations = [
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(current_dir))),
+                         "custom_components", "open_epaper_link", "ppb.ttf"),
+            # Add more possible locations if needed
+        ]
+        for path in possible_locations:
+            if os.path.exists(path):
+                font_path = path
+                break
+
+    # Create ImageGen instance
+    instance = ImageGen(mock_hass)
+
+    # Mock the get_tag_info method to return mock_tag_info
+    async def mock_get_tag_info(entity_id):
+        tag_type = MagicMock()
+        tag_type.width = 296
+        tag_type.height = 128
+        tag_type.color_table = {
+            "white": [255, 255, 255],
+            "black": [0, 0, 0],
+            "red": [255, 0, 0],
+            "accent": [255, 0, 0]
+        }
+        return tag_type, "red"
+
+    instance.get_tag_info = mock_get_tag_info
+
+    # Mock the FontManager.get_font method
+    if os.path.exists(font_path):
+        def mock_get_font(font_name, size):
+            return ImageFont.truetype(font_path, size)
+
+        instance._font_manager.get_font = mock_get_font
+    else:
+        # If we can't find the real font, at least log the issue
+        print(f"WARNING: Could not find ppb.ttf at {font_path}. Font rendering may not work correctly.")
+
+    return instance
 
 # Helper functions that might be needed across multiple test files
 def get_test_image_path(filename):
