@@ -2,8 +2,8 @@
 import os
 import sys
 import pytest
-from unittest.mock import AsyncMock, MagicMock
-from PIL import ImageFont
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from PIL import Image, ImageFont, ImageDraw
 
 from PIL import ImageChops
 
@@ -27,6 +27,13 @@ def mock_hass():
         await coro
         return None
     hass.async_create_task = mock_create_task
+
+    # Mock config.path
+    mock_config = MagicMock()
+    def mock_path(*args):
+        return os.path.join("/mock_path", *args)
+    mock_config.path = mock_path
+    hass.config = mock_config
 
     # Setup data attribute with required domain structure
     mock_entry = MagicMock()
@@ -74,35 +81,43 @@ def image_gen(mock_hass):
                 font_path = path
                 break
 
-    # Create ImageGen instance
-    instance = ImageGen(mock_hass)
+    # Create a patch for FontManager to avoid filesystem operations
+    with patch('custom_components.open_epaper_link.imagegen.FontManager', autospec=True) as MockFontManager:
+        # Configure the mock FontManager
+        font_manager_instance = MockFontManager.return_value
 
-    # Mock the get_tag_info method to return mock_tag_info
-    async def mock_get_tag_info(entity_id):
-        tag_type = MagicMock()
-        tag_type.width = 296
-        tag_type.height = 128
-        tag_type.color_table = {
-            "white": [255, 255, 255],
-            "black": [0, 0, 0],
-            "red": [255, 0, 0],
-            "accent": [255, 0, 0]
-        }
-        return tag_type, "red"
+        # If we found the font file, use it for get_font
+        if os.path.exists(font_path):
+            def mock_get_font(font_name, size):
+                return ImageFont.truetype(font_path, size)
+            font_manager_instance.get_font.side_effect = mock_get_font
+        else:
+            # Fallback - create a mock font
+            mock_font = MagicMock()
+            mock_font.getbbox.return_value = (0, 0, 10, 10)  # Minimal bbox
+            mock_font.getlength.return_value = 10  # Default text length
+            font_manager_instance.get_font.return_value = mock_font
+            print(f"WARNING: Could not find ppb.ttf. Using mock font objects.")
 
-    instance.get_tag_info = mock_get_tag_info
+        # Create the ImageGen instance with our mock setup
+        instance = ImageGen(mock_hass)
 
-    # Mock the FontManager.get_font method
-    if os.path.exists(font_path):
-        def mock_get_font(font_name, size):
-            return ImageFont.truetype(font_path, size)
+        # Mock the get_tag_info method
+        async def mock_get_tag_info(entity_id):
+            tag_type = MagicMock()
+            tag_type.width = 296
+            tag_type.height = 128
+            tag_type.color_table = {
+                "white": [255, 255, 255],
+                "black": [0, 0, 0],
+                "red": [255, 0, 0],
+                "accent": [255, 0, 0]
+            }
+            return tag_type, "red"
 
-        instance._font_manager.get_font = mock_get_font
-    else:
-        # If we can't find the real font, at least log the issue
-        print(f"WARNING: Could not find ppb.ttf at {font_path}. Font rendering may not work correctly.")
+        instance.get_tag_info = mock_get_tag_info
 
-    return instance
+        return instance
 
 # Helper functions that might be needed across multiple test files
 def get_test_image_path(filename):
