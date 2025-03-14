@@ -4,6 +4,7 @@ import sys
 import pytest
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from PIL import Image, ImageFont, ImageDraw
+from io import BytesIO
 
 from PIL import ImageChops
 
@@ -64,40 +65,59 @@ def mock_tag_info():
 @pytest.fixture
 def image_gen(mock_hass):
     """Create an ImageGen instance with mocked Home Assistant."""
-    # Find the real ppb.ttf font path in the integration directory
+    # Find the real font paths in the integration directory
     integration_dir = os.path.dirname(os.path.dirname(current_dir))
-    font_path = os.path.join(integration_dir, "custom_components", "open_epaper_link", "ppb.ttf")
+    component_dir = os.path.join(integration_dir, "custom_components", "open_epaper_link")
 
-    # Check if the path exists, otherwise use a fallback approach
-    if not os.path.exists(font_path):
-        # Try to find it relative to the current file
-        possible_locations = [
-            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(current_dir))),
-                         "custom_components", "open_epaper_link", "ppb.ttf"),
-            # Add more possible locations if needed
-        ]
-        for path in possible_locations:
-            if os.path.exists(path):
-                font_path = path
-                break
+    # Try different paths for finding the font directory
+    possible_component_dirs = [
+        component_dir,
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(current_dir))),
+                     "custom_components", "open_epaper_link"),
+        # Add more possible locations if needed
+    ]
+
+    # Find the first valid component directory
+    for dir_path in possible_component_dirs:
+        if os.path.exists(dir_path):
+            component_dir = dir_path
+            break
+
+    # Define font paths
+    font_paths = {
+        "ppb.ttf": os.path.join(component_dir, "ppb.ttf"),
+        "rbm.ttf": os.path.join(component_dir, "rbm.ttf")
+    }
+
+    # Check if fonts exist
+    fonts_exist = all(os.path.exists(path) for path in font_paths.values())
+    if not fonts_exist:
+        print(f"WARNING: Some font files not found in {component_dir}")
+        print(f"Available files in directory: {os.listdir(component_dir) if os.path.exists(component_dir) else 'Directory not found'}")
 
     # Create a patch for FontManager to avoid filesystem operations
     with patch('custom_components.open_epaper_link.imagegen.FontManager', autospec=True) as MockFontManager:
         # Configure the mock FontManager
         font_manager_instance = MockFontManager.return_value
 
-        # If we found the font file, use it for get_font
-        if os.path.exists(font_path):
-            def mock_get_font(font_name, size):
-                return ImageFont.truetype(font_path, size)
-            font_manager_instance.get_font.side_effect = mock_get_font
-        else:
-            # Fallback - create a mock font
-            mock_font = MagicMock()
-            mock_font.getbbox.return_value = (0, 0, 10, 10)  # Minimal bbox
-            mock_font.getlength.return_value = 10  # Default text length
-            font_manager_instance.get_font.return_value = mock_font
-            print(f"WARNING: Could not find ppb.ttf. Using mock font objects.")
+        # Define the get_font method
+        def mock_get_font(font_name, size):
+            if font_name in font_paths and os.path.exists(font_paths[font_name]):
+                # Use the actual font if available
+                return ImageFont.truetype(font_paths[font_name], size)
+            elif font_name == "rbm.ttf" and os.path.exists(font_paths["ppb.ttf"]):
+                # Fallback to ppb.ttf for rbm.ttf if needed
+                print(f"WARNING: Using ppb.ttf as a fallback for {font_name}")
+                return ImageFont.truetype(font_paths["ppb.ttf"], size)
+            else:
+                # Last resort: create a mock font
+                mock_font = MagicMock()
+                mock_font.getbbox.return_value = (0, 0, 10 * len("Mocked Text"), 10)
+                mock_font.getlength.return_value = 10 * len("Mocked Text")
+                print(f"WARNING: Creating mock font for {font_name}")
+                return mock_font
+
+        font_manager_instance.get_font.side_effect = mock_get_font
 
         # Create the ImageGen instance with our mock setup
         instance = ImageGen(mock_hass)
