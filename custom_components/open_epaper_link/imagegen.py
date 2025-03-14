@@ -11,12 +11,9 @@ from enum import Enum
 from typing import Optional, Dict, Any, List, Tuple
 from functools import partial
 
-import numpy as np
 import requests
 import qrcode
 import base64
-
-from pre_commit.yaml import yaml_load, yaml_compose
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
