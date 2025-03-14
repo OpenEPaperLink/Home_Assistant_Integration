@@ -16,7 +16,8 @@
                 "data": {
                     "blacklisted_tags": "Ignorierte Tags",
                     "button_debounce": "Tasten-Entstörzeit (Sekunden)",
-                    "nfc_debounce": "NFC-Entstörzeit (Sekunden)"
+                    "nfc_debounce": "NFC-Entstörzeit (Sekunden)",
+                    "custom_font_dirs": "Benutzerdefinierte Schriftarten-Verzeichnisse"
                 }
             }
         }

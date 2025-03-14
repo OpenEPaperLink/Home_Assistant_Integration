@@ -96,6 +96,96 @@ All elements that support colors (text, shapes, icons, etc.) accept the followin
 
 Using `"accent"` is recommended for portable scripts that should work with both red and yellow tags.
 
+# Font support
+
+Custom fonts are supported for text elements. The integration provides several ways to specify fonts:
+
+### Specifying fonts
+
+```yaml
+# Using the default font (ppb.ttf)
+- type: text
+  value: Default font
+  font: ppb.ttf # Optional, you can also omit this line
+  x: 10
+  y: 10
+  
+# Using just the filename (searched in all font directories)
+- type: text
+  value: "Custom Font"
+  font: "CustomFont.ttf"
+  x: 10
+  y: 50
+
+# Using the absolute path (direct access)
+- type: text
+  value: "Custom Font with Path"
+  font: "/media/GothamBold-Rnd.ttf"
+  x: 10
+  y: 90
+```
+
+### Font locations
+
+The integration searches for fonts in these locations in order:
+
+1. **Custom font directories** (configured in the integration options)
+2. **Integration directory** - contains default fonts (`ppb.ttf`, `rbm.ttf`)
+3. **Web directory** - (`/config/www/fonts/`)
+4. **Media directory** - (`/media/fonts/`)
+
+> **Note:** The `/config/www/fonts/` and `/media/fonts/` directories do not exist by default. You'll need to create them if you want to use them.
+
+#### Setting Up Font Directories
+
+To create the standard font directories:
+
+```bash
+# Create the www/fonts directory
+mkdir -p /config/www/fonts
+
+# Create the media/fonts directory
+mkdir -p /media/fonts
+```
+
+You can access these directories:
+- Through the Home Assistant File Editor or the VSCode Addon by navigating to `/config/www/fonts/`
+- Via SFTP/SSH if you have direct access to your Home Assistant server
+- Through Samba shares if configured
+
+### Default fonts
+
+The integration provides two default fonts:
+- `ppb.ttf`
+- `rbm.ttf`
+
+These are always available and will be used as fallbacks if specified fonts cannot be found.
+
+### Configuring custom font directories
+
+You can add custom font directories in the integrations configuration:
+
+1. Go to **Settings** → **Devices & Services**
+2. Find the OpenEPaperLink integration and click **Configure**
+3. Enter custom font directories, separated by semicolons (must be absolute paths)
+   ```
+   /config/custom/fonts;/usr/share/fonts;/home/homeassistant/fonts
+   ```
+4. Click **Submit**
+
+### Font not found
+
+If a font can't be found, the integration:
+1. Logs a warning message
+2. Falls back to the default `ppb.ttf` font
+
+Check the Home Assistant logs for messages like:
+```
+Font 'myfont.ttf' not found in any of the standard locations.
+Place fonts in /config/www/fonts/ or /media/fonts/ or provide absolute path.
+Falling back to default font.
+```
+
 ## Types
 
 ### debug_grid
@@ -521,9 +611,10 @@ Renders historical data from Home Assistant entities as a line plot.
   y_start: 20
   x_end: 199
   y_end: 119
-  duration: 36000
+  duration: 36000 # 10 hours in seconds
   low: 10
   high: 20
+  font: "ppb.ttf"
   data:
     - entity: sensor.temperature
       width: 3
@@ -531,40 +622,179 @@ Renders historical data from Home Assistant entities as a line plot.
       color: red
   ```
 
-| Parameter  | Description              | Required | Default       | Notes           |
-|------------|--------------------------|----------|---------------|-----------------|
-| `x_start`  | Left position            | No       | `0`           | Pixels          |
-| `y_start`  | Top position             | No       | `0`           | Pixels          |
-| `x_end`    | Right position           | No       | Canvas width  | Pixels          |
-| `y_end`    | Bottom position          | No       | Canvas height | Pixels          |
-| `duration` | Time range               | No       | `86400`       | Seconds         |
-| `low`      | Minimum Y value          | No       | Auto          | Number          |
-| `high`     | Maximum Y value          | No       | Auto          | Number          |
-| `font`     | Font file                | No       | `ppb.ttf`     | Font name       |
-| `size`     | Font size                | No       | `10`          | Pixels          |
-| `debug`    | Show debug borders       | No       | `false`       | `true`, `false` |
-| `data`     | List of entities to plot | Yes      | -             | Array           |
-| `visible`  | Show/hide element        | No       | `true`        | `true`, `false` |
+| Parameter      | Description               | Required | Default       | Notes                                     |
+|----------------|---------------------------|----------|---------------|-------------------------------------------|
+| `data`         | List of entities to plot  | Yes      | -             | Array                                     |
+| `ylegend`      | Y-axis legend options     | No       | -             | See [Y-Legend Options](#Y-Legend-Options) |
+| `yaxis`        | Y-axis options            | No       | -             | See [Y-Axis Options](#Y-Axis-Options)     |
+| `xlegend`      | X-axis legend options     | No       | -             | See [X-Legend Options](#X-Legend-Options) |
+| `xaxis`        | X-axis options            | No       | -             | See [X-Axis Options](#X-Axis-Options)     |
+| `x_start`      | Left position             | No       | `0`           | Pixels                                    |
+| `y_start`      | Top position              | No       | `0`           | Pixels                                    |
+| `x_end`        | Right position            | No       | Canvas width  | Pixels                                    |
+| `y_end`        | Bottom position           | No       | Canvas height | Pixels                                    |
+| `duration`     | Time range                | No       | `86400`       | Seconds                                   |
+| `low`          | Minimum Y value           | No       | Auto          | Number                                    |
+| `high`         | Maximum Y value           | No       | Auto          | Number                                    |
+| `font`         | Font for Legend Text      | No       | `ppb.ttf`     | Font name                                 |
+| `round_values` | Round min/max to integers | No       | `false`       | `true`, `false`                           |
+| `size`         | Font size                 | No       | `10`          | Pixels                                    |
+| `debug`        | Show debug borders        | No       | `false`       | `true`, `false`                           |
+| `visible`      | Show/hide element         | No       | `true`        | `true`, `false`                           |
 
-#### Plot Legend Options
+#### Line Options (per entity)
+Each entry in the `data` array can have these options:
+```yaml
+- entity: sensor.temperature  
+  color: red
+  width: 2
+  smooth: true
+  show_points: true
+  point_size: 3
+  point_color: black
+  value_scale: 1.0
+```
+| Parameter     | Description                   | Required | Default | Notes               |
+|---------------|-------------------------------|----------|---------|---------------------|
+| `entity`      | Entity ID to plot             | Yes      | -       | String              |
+| `color`       | Line color                    | No       | `black` | Any supported color |
+| `width`       | Line width                    | No       | `1`     | Pixels              |
+| `smooth`      | Curve smoothing               | No       | `false` | `true`, `false`     |
+| `show_points` | Show data points              | No       | `false` | `true`, `false`     |
+| `point_size`  | Data point size               | No       | `3`     | Pixels              |
+| `point_color` | Data point color              | No       | `black` | Any supported color |
+| `value_scale` | Scale data points by a factor | No       | `1.0`   | Float               |
+
+#### Y-Legend Options
 ```yaml
 ylegend:
-  width: -1        # Auto width if -1
-  color: black     # Legend color
-  position: left   # left or right
-  font: ppb.ttf   # Legend font
-  size: 10        # Legend font size
+  width: -1
+  color: black
+  position: left
+  size: 10
 ```
+| Parameter  | Description     | Required | Default | Notes                         |
+|------------|-----------------|----------|---------|-------------------------------|
+| `width`    | Legend width    | No       | -1      | Pixels or `-1` for auto width |
+| `color`    | Legend color    | No       | `black` | Any supported color           |
+| `position` | Legend position | No       | `left`  | `left`, `right`               |
+| `size`     | Font size       | No       | `10`    | Pixels                        |
 
-#### Plot Axis Options
+
+#### Y-Axis Options
 ```yaml
 yaxis:
-  width: 1         # Axis line width
-  color: black     # Axis color
-  tick_width: 2    # Width of tick marks
-  tick_every: 1.0  # Tick interval
-  grid: 5         # Grid point spacing
-  grid_color: black # Grid color
+  width: 1
+  color: black
+  tick_width: 2
+  tick_every: 1.0
+  grid: 5
+  grid_color: black
+  grid_style: dotted
+```
+| Parameter    | Description     | Required | Default   | Notes                                  |
+|--------------|-----------------|----------|-----------|----------------------------------------|
+| `width`      | Axis line width | No       | `1`       | Pixels                                 |
+| `color`      | Axis color      | No       | `black`   | Any supported color                    |
+| `tick_width` | Tick mark width | No       | `2`       | Pixels                                 |
+| `tick_every` | Tick interval   | No       | `1.0`     | Float                                  |
+| `grid`       | Enable Grid     | No       | `true`    | Boolean                                |
+| `grid_color` | Grid color      | No       | `black`   | Any supported color                    |
+| `grid_style` | Grid line style | No       | `dotted`  | `dotted`, `dashed`, or `lines` (solid) |
+
+#### X-Legend Options
+```yaml
+xlegend:
+  width: -1
+  format: "%H:%M"
+  interval: 3600
+  snap_to_hours: true
+  size: 10
+  position: bottom
+  color: black
+```
+| Parameter       | Description                | Required | Default  | Notes                                           |
+|-----------------|----------------------------|----------|----------|-------------------------------------------------|
+| `width`         | Legend width               | No       | -1       | Pixels or `-1` for auto width                   |
+| `format`        | Time label format          | No       | `%H:%M`  | [Python strftime format](https://strftime.org/) |
+| `interval`      | Time interval in seconds   | No       | `3600`   | Seconds                                         |
+| `snap_to_hours` | Align time labels to hours | No       | `true`   | `true`, `false`                                 |
+| `size`          | Font size for time labels  | No       | `10`     | Pixels                                          |
+| `position`      | Position of time labels    | No       | `bottom` | `bottom` or `top`                               |
+| `color`         | Color for time labels      | No       | `black`  | Any supported color                             |
+
+#### X-Axis Options
+```yaml
+xaxis:
+  width: 1
+  color: black
+  tick_width: 2
+  tick_length: 4
+  tick_every: 1.0
+  grid: true
+  grid_color: black
+  grid_style: dotted
+```
+| Parameter     | Description      | Required | Default  | Notes                                  |
+|---------------|------------------|----------|----------|----------------------------------------|
+| `width`       | Axis line width  | No       | `1`      | Pixels                                 |
+| `color`       | Axis color       | No       | `black`  | Any supported color                    |
+| `tick_width`  | Tick mark width  | No       | `2`      | Pixels                                 |
+| `tick_length` | Tick mark length | No       | `4`      | Pixels                                 |
+| `tick_every`  | Tick interval    | No       | `1.0`    | Float                                  |
+| `grid`        | Enable grid      | No       | `true`   | Boolean                                |
+| `grid_color`  | Grid color       | No       | `black`  | Any supported color                    |
+| `grid_style`  | Grid line style  | No       | `dotted` | `dotted`, `dashed`, or `lines` (solid) |
+
+#### Example with Full Configuration
+```yaml
+- type: plot
+  x_start: 10
+  y_start: 20
+  x_end: 290
+  y_end: 120
+  duration: 86400
+  font: "ppb.ttf"
+  round_values: true
+  ylegend:
+    color: black
+    position: left
+    size: 12
+    width: -1
+  yaxis:
+    width: 1
+    color: black
+    grid: 5
+    grid_color: gray
+    grid_style: dotted
+    tick_width: 2
+    tick_every: 1.0
+  xlegend:
+    format: "%H:%M"
+    interval: 3600
+    snap_to_hours: true
+    color: black
+    position: bottom
+    size: 12
+    width: -1
+  xaxis:
+    width: 1
+    color: black
+    grid: 5
+    grid_color: gray
+    grid_style: dotted
+    tick_width: 2
+    tick_length: 4
+    tick_every: 1.0
+  data:
+    - entity: sensor.temperature
+      color: red
+      width: 2
+      smooth: true
+      show_points: true
+      point_size: 3
+      point_color: black
+      value_scale: 1.0
 ```
 
 ### Progress Bar
@@ -582,22 +812,24 @@ Displays a progress bar with optional percentage text.
   progress: 42
   direction: right
   show_percentage: true
+  font: "ppb.ttf"
 ```
 
-| Parameter         | Description          | Required | Default | Notes                                       |
-|-------------------|----------------------|----------|---------|---------------------------------------------|
-| `x_start`         | Left position        | Yes      | -       | Pixels or percentage                        |
-| `y_start`         | Top position         | Yes      | -       | Pixels or percentage                        |
-| `x_end`           | Right position       | Yes      | -       | Pixels or percentage                        |
-| `y_end`           | Bottom position      | Yes      | -       | Pixels or percentage                        |
-| `progress`        | Progress value       | Yes      | -       | 0-100 (clamped)                             |
-| `direction`       | Fill direction       | No       | `right` | `right`, `left`, `up`, `down`               |
-| `background`      | Background color     | No       | `white` | `white`, `black`, `accent`, `red`, `yellow` |
-| `fill`            | Progress bar color   | No       | `red`   | `white`, `black`, `accent`, `red`, `yellow` |
-| `outline`         | Border color         | No       | `black` | `white`, `black`, `accent`, `red`, `yellow` |
-| `width`           | Border thickness     | No       | `1`     | Pixels                                      |
-| `show_percentage` | Show percentage text | No       | `false` | `true`, `false`                             |
-| `visible`         | Show/hide element    | No       | `true`  | `true`, `false`                             |
+| Parameter         | Description               | Required | Default   | Notes                                       |
+|-------------------|---------------------------|----------|-----------|---------------------------------------------|
+| `x_start`         | Left position             | Yes      | -         | Pixels or percentage                        |
+| `y_start`         | Top position              | Yes      | -         | Pixels or percentage                        |
+| `x_end`           | Right position            | Yes      | -         | Pixels or percentage                        |
+| `y_end`           | Bottom position           | Yes      | -         | Pixels or percentage                        |
+| `progress`        | Progress value            | Yes      | -         | 0-100 (clamped)                             |
+| `direction`       | Fill direction            | No       | `right`   | `right`, `left`, `up`, `down`               |
+| `background`      | Background color          | No       | `white`   | `white`, `black`, `accent`, `red`, `yellow` |
+| `fill`            | Progress bar color        | No       | `red`     | `white`, `black`, `accent`, `red`, `yellow` |
+| `outline`         | Border color              | No       | `black`   | `white`, `black`, `accent`, `red`, `yellow` |
+| `width`           | Border thickness          | No       | `1`       | Pixels                                      |
+| `show_percentage` | Show percentage text      | No       | `false`   | `true`, `false`                             |
+| `font`            | Percentage text font      | No       | `ppb.ttf` | Font name                                   |
+| `visible`         | Show/hide element         | No       | `true`    | `true`, `false`                             |
 
 ## Template Examples
 

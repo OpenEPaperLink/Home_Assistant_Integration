@@ -16,7 +16,8 @@
         "data": {
           "blacklisted_tags": "Etiquetas na Lista Negra",
           "button_debounce": "Tempo de Debounce do Botão (segundos)",
-          "nfc_debounce": "Tempo de Debounce NFC (segundos)"
+          "nfc_debounce": "Tempo de Debounce NFC (segundos)",
+          "custom_font_dirs": "Diretórios de Fontes Personalizadas"
         }
       }
     }
