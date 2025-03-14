@@ -521,9 +521,10 @@ Renders historical data from Home Assistant entities as a line plot.
   y_start: 20
   x_end: 199
   y_end: 119
-  duration: 36000
+  duration: 36000 # 10 hours in seconds
   low: 10
   high: 20
+  font: "ppb.ttf"
   data:
     - entity: sensor.temperature
       width: 3
@@ -531,40 +532,179 @@ Renders historical data from Home Assistant entities as a line plot.
       color: red
   ```
 
-| Parameter  | Description              | Required | Default       | Notes           |
-|------------|--------------------------|----------|---------------|-----------------|
-| `x_start`  | Left position            | No       | `0`           | Pixels          |
-| `y_start`  | Top position             | No       | `0`           | Pixels          |
-| `x_end`    | Right position           | No       | Canvas width  | Pixels          |
-| `y_end`    | Bottom position          | No       | Canvas height | Pixels          |
-| `duration` | Time range               | No       | `86400`       | Seconds         |
-| `low`      | Minimum Y value          | No       | Auto          | Number          |
-| `high`     | Maximum Y value          | No       | Auto          | Number          |
-| `font`     | Font file                | No       | `ppb.ttf`     | Font name       |
-| `size`     | Font size                | No       | `10`          | Pixels          |
-| `debug`    | Show debug borders       | No       | `false`       | `true`, `false` |
-| `data`     | List of entities to plot | Yes      | -             | Array           |
-| `visible`  | Show/hide element        | No       | `true`        | `true`, `false` |
+| Parameter      | Description               | Required | Default       | Notes                                     |
+|----------------|---------------------------|----------|---------------|-------------------------------------------|
+| `data`         | List of entities to plot  | Yes      | -             | Array                                     |
+| `ylegend`      | Y-axis legend options     | No       | -             | See [Y-Legend Options](#Y-Legend-Options) |
+| `yaxis`        | Y-axis options            | No       | -             | See [Y-Axis Options](#Y-Axis-Options)     |
+| `xlegend`      | X-axis legend options     | No       | -             | See [X-Legend Options](#X-Legend-Options) |
+| `xaxis`        | X-axis options            | No       | -             | See [X-Axis Options](#X-Axis-Options)     |
+| `x_start`      | Left position             | No       | `0`           | Pixels                                    |
+| `y_start`      | Top position              | No       | `0`           | Pixels                                    |
+| `x_end`        | Right position            | No       | Canvas width  | Pixels                                    |
+| `y_end`        | Bottom position           | No       | Canvas height | Pixels                                    |
+| `duration`     | Time range                | No       | `86400`       | Seconds                                   |
+| `low`          | Minimum Y value           | No       | Auto          | Number                                    |
+| `high`         | Maximum Y value           | No       | Auto          | Number                                    |
+| `font`         | Font for Legend Text      | No       | `ppb.ttf`     | Font name                                 |
+| `round_values` | Round min/max to integers | No       | `false`       | `true`, `false`                           |
+| `size`         | Font size                 | No       | `10`          | Pixels                                    |
+| `debug`        | Show debug borders        | No       | `false`       | `true`, `false`                           |
+| `visible`      | Show/hide element         | No       | `true`        | `true`, `false`                           |
 
-#### Plot Legend Options
+#### Line Options (per entity)
+Each entry in the `data` array can have these options:
+```yaml
+- entity: sensor.temperature  
+  color: red
+  width: 2
+  smooth: true
+  show_points: true
+  point_size: 3
+  point_color: black
+  value_scale: 1.0
+```
+| Parameter     | Description                   | Required | Default | Notes               |
+|---------------|-------------------------------|----------|---------|---------------------|
+| `entity`      | Entity ID to plot             | Yes      | -       | String              |
+| `color`       | Line color                    | No       | `black` | Any supported color |
+| `width`       | Line width                    | No       | `1`     | Pixels              |
+| `smooth`      | Curve smoothing               | No       | `false` | `true`, `false`     |
+| `show_points` | Show data points              | No       | `false` | `true`, `false`     |
+| `point_size`  | Data point size               | No       | `3`     | Pixels              |
+| `point_color` | Data point color              | No       | `black` | Any supported color |
+| `value_scale` | Scale data points by a factor | No       | `1.0`   | Float               |
+
+#### Y-Legend Options
 ```yaml
 ylegend:
-  width: -1        # Auto width if -1
-  color: black     # Legend color
-  position: left   # left or right
-  font: ppb.ttf   # Legend font
-  size: 10        # Legend font size
+  width: -1
+  color: black
+  position: left
+  size: 10
 ```
+| Parameter  | Description     | Required | Default | Notes                         |
+|------------|-----------------|----------|---------|-------------------------------|
+| `width`    | Legend width    | No       | -1      | Pixels or `-1` for auto width |
+| `color`    | Legend color    | No       | `black` | Any supported color           |
+| `position` | Legend position | No       | `left`  | `left`, `right`               |
+| `size`     | Font size       | No       | `10`    | Pixels                        |
 
-#### Plot Axis Options
+
+#### Y-Axis Options
 ```yaml
 yaxis:
-  width: 1         # Axis line width
-  color: black     # Axis color
-  tick_width: 2    # Width of tick marks
-  tick_every: 1.0  # Tick interval
-  grid: 5         # Grid point spacing
-  grid_color: black # Grid color
+  width: 1
+  color: black
+  tick_width: 2
+  tick_every: 1.0
+  grid: 5
+  grid_color: black
+  grid_style: dotted
+```
+| Parameter    | Description     | Required | Default   | Notes                                  |
+|--------------|-----------------|----------|-----------|----------------------------------------|
+| `width`      | Axis line width | No       | `1`       | Pixels                                 |
+| `color`      | Axis color      | No       | `black`   | Any supported color                    |
+| `tick_width` | Tick mark width | No       | `2`       | Pixels                                 |
+| `tick_every` | Tick interval   | No       | `1.0`     | Float                                  |
+| `grid`       | Enable Grid     | No       | `true`    | Boolean                                |
+| `grid_color` | Grid color      | No       | `black`   | Any supported color                    |
+| `grid_style` | Grid line style | No       | `dotted`  | `dotted`, `dashed`, or `lines` (solid) |
+
+#### X-Legend Options
+```yaml
+xlegend:
+  width: -1
+  format: "%H:%M"
+  interval: 3600
+  snap_to_hours: true
+  size: 10
+  position: bottom
+  color: black
+```
+| Parameter       | Description                | Required | Default  | Notes                                           |
+|-----------------|----------------------------|----------|----------|-------------------------------------------------|
+| `width`         | Legend width               | No       | -1       | Pixels or `-1` for auto width                   |
+| `format`        | Time label format          | No       | `%H:%M`  | [Python strftime format](https://strftime.org/) |
+| `interval`      | Time interval in seconds   | No       | `3600`   | Seconds                                         |
+| `snap_to_hours` | Align time labels to hours | No       | `true`   | `true`, `false`                                 |
+| `size`          | Font size for time labels  | No       | `10`     | Pixels                                          |
+| `position`      | Position of time labels    | No       | `bottom` | `bottom` or `top`                               |
+| `color`         | Color for time labels      | No       | `black`  | Any supported color                             |
+
+#### X-Axis Options
+```yaml
+xaxis:
+  width: 1
+  color: black
+  tick_width: 2
+  tick_length: 4
+  tick_every: 1.0
+  grid: true
+  grid_color: black
+  grid_style: dotted
+```
+| Parameter     | Description      | Required | Default  | Notes                                  |
+|---------------|------------------|----------|----------|----------------------------------------|
+| `width`       | Axis line width  | No       | `1`      | Pixels                                 |
+| `color`       | Axis color       | No       | `black`  | Any supported color                    |
+| `tick_width`  | Tick mark width  | No       | `2`      | Pixels                                 |
+| `tick_length` | Tick mark length | No       | `4`      | Pixels                                 |
+| `tick_every`  | Tick interval    | No       | `1.0`    | Float                                  |
+| `grid`        | Enable grid      | No       | `true`   | Boolean                                |
+| `grid_color`  | Grid color       | No       | `black`  | Any supported color                    |
+| `grid_style`  | Grid line style  | No       | `dotted` | `dotted`, `dashed`, or `lines` (solid) |
+
+#### Example with Full Configuration
+```yaml
+- type: plot
+  x_start: 10
+  y_start: 20
+  x_end: 290
+  y_end: 120
+  duration: 86400
+  font: "ppb.ttf"
+  round_values: true
+  ylegend:
+    color: black
+    position: left
+    size: 12
+    width: -1
+  yaxis:
+    width: 1
+    color: black
+    grid: 5
+    grid_color: gray
+    grid_style: dotted
+    tick_width: 2
+    tick_every: 1.0
+  xlegend:
+    format: "%H:%M"
+    interval: 3600
+    snap_to_hours: true
+    color: black
+    position: bottom
+    size: 12
+    width: -1
+  xaxis:
+    width: 1
+    color: black
+    grid: 5
+    grid_color: gray
+    grid_style: dotted
+    tick_width: 2
+    tick_length: 4
+    tick_every: 1.0
+  data:
+    - entity: sensor.temperature
+      color: red
+      width: 2
+      smooth: true
+      show_points: true
+      point_size: 3
+      point_color: black
+      value_scale: 1.0
 ```
 
 ### Progress Bar

@@ -11,9 +11,12 @@ from enum import Enum
 from typing import Optional, Dict, Any, List, Tuple
 from functools import partial
 
+import numpy as np
 import requests
 import qrcode
 import base64
+
+from pre_commit.yaml import yaml_load, yaml_compose
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -1389,37 +1392,11 @@ class ImageGen:
             end = dt.utcnow()
             start = end - duration
 
-            # Set up fonts
-            size = element.get("size", 10)
-            font_file = element.get("font", "ppb.ttf")
-            font_path = os.path.join(os.path.dirname(__file__), font_file)
-            font = ImageFont.truetype(font_path, size)
+            # Set up font
+            font_name = element.get("font", "ppb.ttf")
+            font_path = os.path.join(os.path.dirname(__file__), font_name)
 
-            # Configure legend
-            ylegend = element.get("ylegend", {})
-            ylegend_width = ylegend.get("width", -1) if ylegend else 0
-            if ylegend:
-                ylegend_color = self.get_index_color(ylegend.get("color", "black"))
-                ylegend_pos = ylegend.get("position", "left")
-                if ylegend_pos not in ("left", "right", None):
-                    ylegend_pos = "left"
-
-                ylegend_font = font
-                if ylegend.get("font") != font_file or ylegend.get("size") != size:
-                    ylegend_path = os.path.join(os.path.dirname(__file__), ylegend.get("font", font_file))
-                    ylegend_font = ImageFont.truetype(ylegend_path, ylegend.get("size", size))
-
-            # Configure axis
-            yaxis = element.get("yaxis", {})
-            if yaxis:
-                yaxis_width = yaxis.get("width", 1)
-                yaxis_color = self.get_index_color(yaxis.get("color", "black"))
-                yaxis_tick_width = yaxis.get("tick_width", 2)
-                yaxis_tick_every = float(yaxis.get("tick_every", 1))
-                yaxis_grid = yaxis.get("grid", 5)
-                yaxis_grid_color = self.get_index_color(yaxis.get("grid_color", "black"))
-
-            # Get min/max values
+            # Get min/max values from config
             min_v = element.get("low")
             max_v = element.get("high")
 
@@ -1448,9 +1425,10 @@ class ImageGen:
 
                 # Convert states to points
                 points = []
+                value_scale = plot.get("value_scale", 1.0)
                 for state in states:
                     try:
-                        value = float(state["state"])
+                        value = float(state["state"]) * value_scale
                         timestamp = datetime.fromisoformat(state["last_changed"])
                         points.append((timestamp, value))
                     except (ValueError, TypeError):
@@ -1476,25 +1454,115 @@ class ImageGen:
             if not raw_data:
                 raise HomeAssistantError("No valid data points found")
 
-            # Adjust min/max
-            max_v = math.ceil(max_v)
-            min_v = math.floor(min_v)
+            # Apply rounding if requested
+            if element.get("round_values", False):
+                max_v = math.ceil(max_v)
+                min_v = math.floor(min_v)
             if max_v == min_v:
                 min_v -= 1
             spread = max_v - min_v
 
-            # Calculate legend width
-            if ylegend_width == -1:
-                ylegend_width = math.ceil(max(
-                    draw.textlength(str(max_v), font=ylegend_font),
-                    draw.textlength(str(min_v), font=ylegend_font)
-                ))
+            # Configure y legend
+            y_legend = element.get("ylegend", {})
+            y_legend_width = -1
+            y_legend_pos = None
+            y_legend_color = None
+            y_legend_size = None
+            y_legend_font = None
+
+            if y_legend:
+                y_legend_width = y_legend.get("width", -1)
+                y_legend_color = self.get_index_color(y_legend.get("color", "black"))
+                y_legend_pos = y_legend.get("position", "left")
+                if y_legend_pos not in ("left", "right", None):
+                    y_legend_pos = "left"
+                y_legend_size = y_legend.get("size", 10)
+
+            # Calculate y legend width if auto width is requested
+            if y_legend and y_legend_width == -1:
+                y_legend_font = ImageFont.truetype(font_path, y_legend_size)
+                max_bbox = y_legend_font.getbbox(str(max_v))
+                min_bbox = y_legend_font.getbbox(str(min_v))
+                max_width = max_bbox[2] - max_bbox[0]
+                min_width = min_bbox[2] - min_bbox[0]
+                y_legend_width = math.ceil(max(max_width, min_width) )  # Add padding
+
+            # Configure y axis
+            y_axis = element.get("yaxis")
+            y_axis_width = -1
+            y_axis_color = None
+            y_axis_tick_length = 0
+            y_axis_tick_width = 1
+            y_axis_tick_every = 0
+            y_axis_grid = None
+            y_axis_grid_color = None
+            y_axis_grid_style = None
+
+            if y_axis:
+                y_axis_width = y_axis.get("width", 1)
+                y_axis_color = self.get_index_color(y_axis.get("color", "black"))
+                y_axis_tick_length = y_axis.get("tick_length", 4)
+                y_axis_tick_width = y_axis.get("tick_width", 2)
+                y_axis_tick_every = float(y_axis.get("tick_every", 1))
+                y_axis_grid = y_axis.get("grid", True)
+                y_axis_grid_color = self.get_index_color(y_axis.get("grid_color", "black"))
+                y_axis_grid_style = y_axis.get("grid_style", "dotted")
+
+            # Configure x legend
+            x_legend = element.get("xlegend", {})
+            time_format = "%H:%M"
+            time_interval = duration.total_seconds() / 4  # Default to 4 labels
+            time_font = None
+            time_color = None
+            time_position = None
+            x_legend_height = None
+
+            if x_legend:
+                time_format = x_legend.get("format", "%H:%M")
+                time_interval = x_legend.get("interval", time_interval)
+                time_size = x_legend.get("size", 10)
+                time_font = ImageFont.truetype(font_path, time_size)
+                time_color = self.get_index_color(x_legend.get("color", "black"))
+                time_position = x_legend.get("position", "bottom")
+                x_legend_height = x_legend.get("height", -1)
+                if time_position not in ("top", "bottom", None):
+                    time_position = "bottom"
+
+            # Configure x axis
+            x_axis = element.get("xaxis", {})
+            x_axis_width = 1
+            x_axis_color = None
+            x_axis_tick_length = 0
+            x_axis_tick_width = 0
+            x_axis_grid = None
+            x_axis_grid_color = None
+            x_axis_grid_style = None
+
+            if x_axis:
+                x_axis_width = x_axis.get("width", 1)
+                x_axis_color = self.get_index_color(x_axis.get("color", "black"))
+                x_axis_tick_length = x_axis.get("tick_length", 4)
+                x_axis_tick_width = x_axis.get("tick_width", 2)
+                x_axis_grid = x_axis.get("grid", True)
+                x_axis_grid_color = self.get_index_color(x_axis.get("grid_color", "black"))
+                x_axis_grid_style = x_axis.get("grid_style", "dotted")
+
+            x_label_height = 0
+            if x_legend:
+                if x_legend_height == 0:
+                    x_label_height = 0
+                else:
+                    if x_legend_height > 0:
+                        x_label_height = x_legend_height
+                    else:
+                        x_label_height = time_font.getbbox("00:00")[3]
+                        x_label_height += x_axis_tick_width + 2
 
             # Calculate effective diagram dimensions
-            diag_x = x_start + (ylegend_width if ylegend_pos == "left" else 0)
-            diag_y = y_start
-            diag_width = width - ylegend_width
-            diag_height = height
+            diag_x = x_start + (y_legend_width if y_legend_pos == "left" else 0)
+            diag_y = y_start + (x_label_height if time_position == "top" and x_legend_height != 0 else 0)
+            diag_width = width - (y_legend_width if y_legend_pos == "left" or y_legend_pos == "right" else 0)
+            diag_height = height - x_label_height
 
             # Draw debug borders if requested
             if element.get("debug", False):
@@ -1510,21 +1578,342 @@ class ImageGen:
                     outline=self.get_index_color("red"),
                     width=1
                 )
+            # Draw y legend
+            if y_legend:
 
-            # Draw grid
-            if yaxis and yaxis_grid is not None:
-                grid_points = []
-                curr = min_v
-                while curr <= max_v:
-                    curr_y = round(diag_y + (1 - ((curr - min_v) / spread)) * (diag_height - 1))
-                    grid_points.extend(
-                        (x, curr_y)
-                        for x in range(diag_x, diag_x + diag_width, yaxis_grid)
+                top_y = y_start
+                bottom_y = y_end - x_label_height
+                if time_position == "top" and x_legend_height != 0:
+                    top_y += x_label_height
+                    bottom_y += x_label_height
+
+                # Draw labels for each grid line
+                if y_axis_tick_every > 0:
+                    curr = min_v
+                    # Track if we've drawn the max value
+                    max_value_drawn = False
+
+                    while curr <= max_v:
+                        # Calculate y position for this value
+                        curr_y = round(diag_y + (1 - ((curr - min_v) / spread)) * (diag_height - 1))
+
+                        # Format the value with appropriate rounding
+                        formatted_value = curr
+                        if isinstance(curr, float):
+                            # Check if it's a whole number
+                            if curr.is_integer():
+                                formatted_value = int(curr)
+                            else:
+                                # Round to 2 decimal places
+                                formatted_value = round(curr, 2)
+                                # Remove trailing zeros
+                                formatted_value = float(f"{formatted_value:.2f}".rstrip('0').rstrip('.') if '.' in f"{formatted_value:.2f}" else formatted_value)
+
+                        if y_legend_pos == "left":
+                            draw.text(
+                                (x_start, curr_y),
+                                str(formatted_value),
+                                fill=y_legend_color,
+                                font=y_legend_font,
+                                anchor="lm"  # Left-middle alignment
+                            )
+                        elif y_legend_pos == "right":
+                            draw.text(
+                                (x_end, curr_y),
+                                str(formatted_value),
+                                fill=y_legend_color,
+                                font=y_legend_font,
+                                anchor="rm"  # Right-middle alignment
+                            )
+
+                        # Check if this is the max value or very close to it
+                        if abs(curr - max_v) < 0.0001:
+                            max_value_drawn = True
+
+                        curr += y_axis_tick_every
+
+                    # If we haven't drawn the max value and it's not equal to min_v, draw it now
+                    if not max_value_drawn and abs(max_v - min_v) > 0.0001:
+                        # Calculate y position for max value
+                        max_y = round(diag_y + (1 - ((max_v - min_v) / spread)) * (diag_height - 1))
+
+                        # Format the max value with appropriate rounding
+                        formatted_max = max_v
+                        if isinstance(max_v, float):
+                            # Check if it's a whole number
+                            if max_v.is_integer():
+                                formatted_max = int(max_v)
+                            else:
+                                # Round to 2 decimal places
+                                formatted_max = round(max_v, 2)
+                                # Remove trailing zeros
+                                formatted_max = float(f"{formatted_max:.2f}".rstrip('0').rstrip('.') if '.' in f"{formatted_max:.2f}" else formatted_max)
+
+                        if y_legend_pos == "left":
+                            draw.text(
+                                (x_start, max_y),
+                                str(formatted_max),
+                                fill=y_legend_color,
+                                font=y_legend_font,
+                                anchor="lm"  # Left-middle alignment
+                            )
+                        elif y_legend_pos == "right":
+                            draw.text(
+                                (x_end, max_y),
+                                str(formatted_max),
+                                fill=y_legend_color,
+                                font=y_legend_font,
+                                anchor="rm"  # Right-middle alignment
+                            )
+                else:
+                    # Fallback to just min/max if no tick interval is defined
+                    # Format the min/max values with appropriate rounding
+                    formatted_max = max_v
+                    formatted_min = min_v
+
+                    if isinstance(max_v, float):
+                        # Check if it's a whole number
+                        if max_v.is_integer():
+                            formatted_max = int(max_v)
+                        else:
+                            # Round to 2 decimal places
+                            formatted_max = round(max_v, 2)
+                            # Remove trailing zeros
+                            formatted_max = float(f"{formatted_max:.2f}".rstrip('0').rstrip('.') if '.' in f"{formatted_max:.2f}" else formatted_max)
+
+                    if isinstance(min_v, float):
+                        # Check if it's a whole number
+                        if min_v.is_integer():
+                            formatted_min = int(min_v)
+                        else:
+                            # Round to 2 decimal places
+                            formatted_min = round(min_v, 2)
+                            # Remove trailing zeros
+                            formatted_min = float(f"{formatted_min:.2f}".rstrip('0').rstrip('.') if '.' in f"{formatted_min:.2f}" else formatted_min)
+
+                    if y_legend_pos == "left":
+                        draw.text(
+                            (x_start, top_y),
+                            str(formatted_max),
+                            fill=y_legend_color,
+                            font=y_legend_font,
+                            anchor="lt"
+                        )
+                        draw.text(
+                            (x_start, bottom_y),
+                            str(formatted_min),
+                            fill=y_legend_color,
+                            font=y_legend_font,
+                            anchor="ls"
+                        )
+                    elif y_legend_pos == "right":
+                        draw.text(
+                            (x_end, top_y),
+                            str(formatted_max),
+                            fill=y_legend_color,
+                            font=y_legend_font,
+                            anchor="rt"
+                        )
+                        draw.text(
+                            (x_end, bottom_y),
+                            str(formatted_min),
+                            fill=y_legend_color,
+                            font=y_legend_font,
+                            anchor="rs"
+                        )
+
+            # Draw y-axis and grid
+            if y_axis:
+                # Y Axis line
+                if y_axis_width > 0 and y_axis_color:
+                    draw.rectangle(
+                        (diag_x, diag_y, diag_x + y_axis_width - 1, diag_y + diag_height - 1),
+                        fill=y_axis_color
                     )
-                    curr += yaxis_tick_every
-                if grid_points:
-                    draw.point(grid_points, fill=yaxis_grid_color)
+                # Y Tick marks
+                if y_axis_tick_length > 0 and y_axis_color:
+                    curr = min_v
+                    while curr <= max_v:
+                        curr_y = round(diag_y + (1 - ((curr - min_v) / spread)) * (diag_height - 1))
+                        draw.line(
+                            (diag_x, curr_y, diag_x + y_axis_tick_length - 1, curr_y),
+                            fill=y_axis_color,
+                            width=y_axis_tick_width
+                        )
+                        curr += y_axis_tick_every
 
+                # Y Grid
+                if y_axis_grid and y_axis_grid_color:
+                    curr = min_v
+                    while curr <= max_v:
+                        curr_y = round(diag_y + (1 - ((curr - min_v) / spread)) * (diag_height - 1))
+
+                        if y_axis_grid_style == "lines":
+                            # Solid line
+                            draw.line(
+                                [(diag_x, curr_y), (diag_x + diag_width, curr_y)],
+                                fill=y_axis_grid_color,
+                                width=1
+                            )
+                        elif y_axis_grid_style == "dashed":
+                            # Dashed line
+                            x_pos = diag_x
+                            dash_length = 5
+                            gap_length = 3
+                            while x_pos < diag_x + diag_width:
+                                end_x = min(x_pos + dash_length, diag_x + diag_width)
+                                draw.line(
+                                    [(x_pos, curr_y), (end_x, curr_y)],
+                                    fill=y_axis_grid_color,
+                                    width=1
+                                )
+                                x_pos += dash_length + gap_length
+                        elif y_axis_grid_style == "dotted":
+                            # Dotted line
+                            for x in range(int(diag_x), int(diag_x + diag_width), 5):
+                                draw.point((x, curr_y), fill=y_axis_grid_color)
+                        curr += y_axis_tick_every
+
+
+            # Determine time range for x-axis labels and grid
+            if x_legend and x_legend_height != 0 and x_legend.get("snap_to_hours", True):
+                # Round start time to the nearest hour
+                curr_time = start.replace(minute=0, second=0, microsecond=0)
+                # Round end time to the nearest hour
+                end_time = end.replace(minute=0, second=0, microsecond=0)
+                if end > end_time:
+                    end_time += timedelta(hours=1)
+            else:
+                curr_time = start
+                end_time = end
+
+            # Draw X Axis and grid
+            if x_axis:
+                # X Axis line
+                if x_axis_width > 0 and x_axis_color:
+                    draw.line(
+                        [(diag_x, diag_y + diag_height), (diag_x + diag_width, diag_y + diag_height)],
+                        fill=x_axis_color,
+                        width=x_axis_width
+                    )
+                # X Tick marks
+                if x_axis_tick_length > 0 and x_axis_color:
+                    curr = curr_time
+                    while curr <= end_time:
+                        rel_x = (curr - start) / duration
+                        x = round(diag_x + rel_x * (diag_width - 1))
+                        # Only draw tick marks within the diagram area
+                        if diag_x <= x <= diag_x + diag_width:
+                            draw.line(
+                                [(x, diag_y + diag_height), (x, diag_y + diag_height - x_axis_tick_length)],
+                                fill=x_axis_color,
+                                width=x_axis_tick_width
+                            )
+                        curr += timedelta(seconds=time_interval)
+                # X Grid
+                if x_axis_grid and x_axis_grid_color:
+                    curr = curr_time
+                    while curr <= end_time:
+                        rel_x = (curr - start) / duration
+                        x = round(diag_x + rel_x * (diag_width - 1))
+
+                        # Only draw grid lines within the diagram area
+                        if diag_x <= x <= diag_x + diag_width:
+                            if x_axis_grid_style == "lines":
+                                # Solid line
+                                draw.line(
+                                    [(x, diag_y), (x, diag_y + diag_height)],
+                                    fill=x_axis_grid_color,
+                                    width=1
+                                )
+                            elif x_axis_grid_style == "dashed":
+                                # Dashed line
+                                y_pos = diag_y
+                                dash_length = 5
+                                gap_length = 3
+                                while y_pos < diag_y + diag_height:
+                                    end_y = min(y_pos + dash_length, diag_y + diag_height)
+                                    draw.line(
+                                        [(x, y_pos), (x, end_y)],
+                                        fill=x_axis_grid_color,
+                                        width=1
+                                    )
+                                    y_pos += dash_length + gap_length
+                            elif x_axis_grid_style == "dotted":
+                                # Dotted line
+                                for y in range(int(diag_y), int(diag_y + diag_height), 5):
+                                    draw.point((x, y), fill=x_axis_grid_color)
+                        curr += timedelta(seconds=time_interval)
+
+            # Draw X Axis time labels
+            if x_legend and x_legend_height != 0:
+
+                while curr_time <= end_time:
+                    rel_x = (curr_time - start) / duration
+                    x = round(diag_x + rel_x * (diag_width - 1))
+
+                    if diag_x <= x <= diag_x + diag_width:
+                        # # Draw X Grid
+                        # if x_axis_grid and x_axis_grid_color:
+                        #     if x_axis_grid_style == "lines":
+                        #         # Solid line
+                        #         draw.line(
+                        #             [(x, diag_y), (x, diag_y + diag_height)],
+                        #             fill=x_axis_grid_color,
+                        #             width=1
+                        #         )
+                        #     elif x_axis_grid_style == "dashed":
+                        #         # Dashed line
+                        #         y_pos = diag_y
+                        #         dash_length = 5
+                        #         gap_length = 3
+                        #         while y_pos < diag_y + diag_height:
+                        #             end_y = min(y_pos + dash_length, diag_y + diag_height)
+                        #             draw.line(
+                        #                 [(x, y_pos), (x, end_y)],
+                        #                 fill=x_axis_grid_color,
+                        #                 width=1
+                        #             )
+                        #             y_pos += dash_length + gap_length
+                        #     elif x_axis_grid_style == "dotted":
+                        #         # Dotted line
+                        #         for y in range(int(diag_y), int(diag_y + diag_height), 4):
+                        #             draw.point((x, y), fill=x_axis_grid_color)
+
+
+                        if time_position == 'bottom':
+                            if x_axis_width > 0 and x_axis_color:
+                                draw.line(
+                                    [(x, diag_y + diag_height), (x, diag_y + diag_height - x_axis_tick_width)],
+                                    fill=x_axis_color,
+                                    width=x_axis_width
+                                )
+                            text = curr_time.strftime(time_format)
+                            draw.text(
+                                (x, diag_y + diag_height + x_axis_tick_width + 2),
+                                text,
+                                fill=time_color,
+                                font=time_font,
+                                anchor="mt"
+                            )
+                        else:  # time_position == "top"
+                            # Draw tick mark at top
+                            if x_axis_width > 0 and x_axis_color:
+                                draw.line(
+                                    [(x, diag_y), (x, diag_y + x_axis_tick_width)],
+                                    fill=x_axis_color,
+                                    width=x_axis_width
+                                )
+                            # Draw time label above
+                            text = curr_time.strftime(time_format)
+                            draw.text(
+                                (x, y_start),
+                                text,
+                                fill=time_color,
+                                font=time_font,
+                                anchor="mt"
+                            )
+                    curr_time += timedelta(seconds=time_interval)
             # Draw data
             for plot_data, plot_config in zip(raw_data, element["data"]):
                 # Convert data points to screen coordinates
@@ -1538,63 +1927,96 @@ class ImageGen:
 
                 # Draw line
                 if len(points) > 1:
-                    draw.line(
-                        points,
-                        fill=self.get_index_color(plot_config.get("color", "black")),
-                        width=plot_config.get("width", 1),
-                        joint=plot_config.get("joint")
-                    )
+                    # Get line style
+                    line_color = self.get_index_color(plot_config.get("color", "black"))
+                    line_width = plot_config.get("width", 1)
+                    smooth = plot_config.get("smooth", False)
+                    steps = plot_config.get("smooth_steps", 10)
 
-            # Draw legend
-            if ylegend:
-                if ylegend_pos == "left":
-                    draw.text(
-                        (x_start, y_start),
-                        str(max_v),
-                        fill=ylegend_color,
-                        font=ylegend_font,
-                        anchor="lt"
-                    )
-                    draw.text(
-                        (x_start, y_end),
-                        str(min_v),
-                        fill=ylegend_color,
-                        font=ylegend_font,
-                        anchor="ls"
-                    )
-                elif ylegend_pos == "right":
-                    draw.text(
-                        (x_end, y_start),
-                        str(max_v),
-                        fill=ylegend_color,
-                        font=ylegend_font,
-                        anchor="rt"
-                    )
-                    draw.text(
-                        (x_end, y_end),
-                        str(min_v),
-                        fill=ylegend_color,
-                        font=ylegend_font,
-                        anchor="rs"
-                    )
+                    if smooth and len(points) > 2:
+                        # Create a smoothed line using quadratic Bézier curves
+                        smooth_coords = []
 
-            # Draw axis
-            if yaxis:
-                draw.rectangle(
-                    (diag_x, diag_y, diag_x + yaxis_width - 1, diag_y + diag_height - 1),
-                    fill=yaxis_color
-                )
+                        def catmull_rom(p0, p1, p2, p3, t):
+                            t2 = t * t
+                            t3 = t2 * t
 
-                if yaxis_tick_width > 0:
-                    curr = min_v
-                    while curr <= max_v:
-                        curr_y = round(diag_y + (1 - ((curr - min_v) / spread)) * (diag_height - 1))
-                        draw.rectangle(
-                            (diag_x + yaxis_width, curr_y, diag_x + yaxis_width + yaxis_tick_width - 1, curr_y),
-                            fill=yaxis_color
+                            return (
+                                int(0.5 * (
+                                        (-t3 + 2*t2 - t) * p0[0] +
+                                        (3*t3 - 5*t2 + 2) * p1[0] +
+                                        (-3*t3 + 4*t2 + t) * p2[0] +
+                                        (t3 - t2) * p3[0]
+                                )),
+                                int(0.5 * (
+                                        (-t3 + 2*t2 - t) * p0[1] +
+                                        (3*t3 - 5*t2 + 2) * p1[1] +
+                                        (-3*t3 + 4*t2 + t) * p2[1] +
+                                        (t3 - t2) * p3[1]
+                                ))
+                            )
+
+                        smooth_coords.append(points[0])
+                        # Handle first segment specially (duplicate first point)
+                        if len(points) > 3:
+                            p0 = points[0]
+                            p1 = points[0]
+                            p2 = points[1]
+                            p3 = points[2]
+
+                            for i in range(1, steps):
+                                t = i / steps
+                                point = catmull_rom(p0, p1, p2, p3, t)
+                                smooth_coords.append(point)
+
+                        # Handle middle segments
+                        for i in range(len(points) - 3):
+                            p0 = points[i]
+                            p1 = points[i + 1]
+                            p2 = points[i + 2]
+                            p3 = points[i + 3]
+
+                            for j in range(steps):
+                                t = j / steps
+                                point = catmull_rom(p0, p1, p2, p3, t)
+                                smooth_coords.append(point)
+
+                        # Handle last segment specially (duplicate last point)
+                        if len(points) > 3:
+                            p0 = points[-3]
+                            p1 = points[-2]
+                            p2 = points[-1]
+                            p3 = points[-1]
+
+                            for i in range(1, steps):
+                                t = i / steps
+                                point = catmull_rom(p0, p1, p2, p3, t)
+                                smooth_coords.append(point)
+
+                        # Add last point
+                        smooth_coords.append(points[-1])
+
+                        draw.line(
+                            smooth_coords,
+                            fill=line_color,
+                            width=line_width,
+                            joint="curve"
                         )
-                        curr += yaxis_tick_every
 
+                    else:
+                        draw.line(
+                            points,
+                            fill=line_color,
+                            width=line_width
+                        )
+                    if plot_config.get("show_points", False):
+                        point_size = plot_config.get("point_size", 3)
+                        point_color = self.get_index_color(plot_config.get("point_color", "black"))
+                        for x, y in points:
+                            draw.ellipse(
+                                [(x - point_size, y - point_size), (x + point_size, y + point_size)],
+                                fill=point_color
+                            )
             return y_end
 
         except Exception as e:
@@ -1853,5 +2275,3 @@ class ImageGen:
                 draw.text((x + 2, 2), label_text, fill=label_color, font=font)
 
         return pos_y
-
-
