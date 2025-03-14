@@ -96,6 +96,96 @@ All elements that support colors (text, shapes, icons, etc.) accept the followin
 
 Using `"accent"` is recommended for portable scripts that should work with both red and yellow tags.
 
+# Font support
+
+Custom fonts are supported for text elements. The integration provides several ways to specify fonts:
+
+### Specifying fonts
+
+```yaml
+# Using the default font (ppb.ttf)
+- type: text
+  value: Default font
+  font: ppb.ttf # Optional, you can also omit this line
+  x: 10
+  y: 10
+  
+# Using just the filename (searched in all font directories)
+- type: text
+  value: "Custom Font"
+  font: "CustomFont.ttf"
+  x: 10
+  y: 50
+
+# Using the absolute path (direct access)
+- type: text
+  value: "Custom Font with Path"
+  font: "/media/GothamBold-Rnd.ttf"
+  x: 10
+  y: 90
+```
+
+### Font locations
+
+The integration searches for fonts in these locations in order:
+
+1. **Custom font directories** (configured in the integration options)
+2. **Integration directory** - contains default fonts (`ppb.ttf`, `rbm.ttf`)
+3. **Web directory** - (`/config/www/fonts/`)
+4. **Media directory** - (`/media/fonts/`)
+
+> **Note:** The `/config/www/fonts/` and `/media/fonts/` directories do not exist by default. You'll need to create them if you want to use them.
+
+#### Setting Up Font Directories
+
+To create the standard font directories:
+
+```bash
+# Create the www/fonts directory
+mkdir -p /config/www/fonts
+
+# Create the media/fonts directory
+mkdir -p /media/fonts
+```
+
+You can access these directories:
+- Through the Home Assistant File Editor or the VSCode Addon by navigating to `/config/www/fonts/`
+- Via SFTP/SSH if you have direct access to your Home Assistant server
+- Through Samba shares if configured
+
+### Default fonts
+
+The integration provides two default fonts:
+- `ppb.ttf`
+- `rbm.ttf`
+
+These are always available and will be used as fallbacks if specified fonts cannot be found.
+
+### Configuring custom font directories
+
+You can add custom font directories in the integrations configuration:
+
+1. Go to **Settings** → **Devices & Services**
+2. Find the OpenEPaperLink integration and click **Configure**
+3. Enter custom font directories, separated by semicolons (must be absolute paths)
+   ```
+   /config/custom/fonts;/usr/share/fonts;/home/homeassistant/fonts
+   ```
+4. Click **Submit**
+
+### Font not found
+
+If a font can't be found, the integration:
+1. Logs a warning message
+2. Falls back to the default `ppb.ttf` font
+
+Check the Home Assistant logs for messages like:
+```
+Font 'myfont.ttf' not found in any of the standard locations.
+Place fonts in /config/www/fonts/ or /media/fonts/ or provide absolute path.
+Falling back to default font.
+```
+
 ## Types
 
 ### debug_grid
@@ -722,22 +812,24 @@ Displays a progress bar with optional percentage text.
   progress: 42
   direction: right
   show_percentage: true
+  font: "ppb.ttf"
 ```
 
-| Parameter         | Description          | Required | Default | Notes                                       |
-|-------------------|----------------------|----------|---------|---------------------------------------------|
-| `x_start`         | Left position        | Yes      | -       | Pixels or percentage                        |
-| `y_start`         | Top position         | Yes      | -       | Pixels or percentage                        |
-| `x_end`           | Right position       | Yes      | -       | Pixels or percentage                        |
-| `y_end`           | Bottom position      | Yes      | -       | Pixels or percentage                        |
-| `progress`        | Progress value       | Yes      | -       | 0-100 (clamped)                             |
-| `direction`       | Fill direction       | No       | `right` | `right`, `left`, `up`, `down`               |
-| `background`      | Background color     | No       | `white` | `white`, `black`, `accent`, `red`, `yellow` |
-| `fill`            | Progress bar color   | No       | `red`   | `white`, `black`, `accent`, `red`, `yellow` |
-| `outline`         | Border color         | No       | `black` | `white`, `black`, `accent`, `red`, `yellow` |
-| `width`           | Border thickness     | No       | `1`     | Pixels                                      |
-| `show_percentage` | Show percentage text | No       | `false` | `true`, `false`                             |
-| `visible`         | Show/hide element    | No       | `true`  | `true`, `false`                             |
+| Parameter         | Description               | Required | Default   | Notes                                       |
+|-------------------|---------------------------|----------|-----------|---------------------------------------------|
+| `x_start`         | Left position             | Yes      | -         | Pixels or percentage                        |
+| `y_start`         | Top position              | Yes      | -         | Pixels or percentage                        |
+| `x_end`           | Right position            | Yes      | -         | Pixels or percentage                        |
+| `y_end`           | Bottom position           | Yes      | -         | Pixels or percentage                        |
+| `progress`        | Progress value            | Yes      | -         | 0-100 (clamped)                             |
+| `direction`       | Fill direction            | No       | `right`   | `right`, `left`, `up`, `down`               |
+| `background`      | Background color          | No       | `white`   | `white`, `black`, `accent`, `red`, `yellow` |
+| `fill`            | Progress bar color        | No       | `red`     | `white`, `black`, `accent`, `red`, `yellow` |
+| `outline`         | Border color              | No       | `black`   | `white`, `black`, `accent`, `red`, `yellow` |
+| `width`           | Border thickness          | No       | `1`       | Pixels                                      |
+| `show_percentage` | Show percentage text      | No       | `false`   | `true`, `false`                             |
+| `font`            | Percentage text font      | No       | `ppb.ttf` | Font name                                   |
+| `visible`         | Show/hide element         | No       | `true`    | `true`, `false`                             |
 
 ## Template Examples
 

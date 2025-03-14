@@ -16,7 +16,8 @@
                 "data": {
                     "blacklisted_tags": "Blacklisted Tags",
                     "button_debounce": "Button Debounce Time (seconds)",
-                    "nfc_debounce": "NFC Debounce Time (seconds)"
+                    "nfc_debounce": "NFC Debounce Time (seconds)",
+                    "custom_font_dirs": "Custom Font Directories"
                 }
             }
         }
