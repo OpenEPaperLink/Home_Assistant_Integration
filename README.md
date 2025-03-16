@@ -60,6 +60,16 @@ These legacy services were removed in the 1.0 release. Please migrate to using d
 - Support for tag blacklisting to ignore unwanted devices
 - Hardware capability detection for buttons, NFC, and GPIO features
 
+### 🔋 Battery Optimization
+
+To maximize tag battery life when using this integration:
+
+- **[Shorten latency during config](https://github.com/OpenEPaperLink/OpenEPaperLink/wiki/Tag-protocol-timing#shorten-latency-during-config) setting**: This setting can be set to `no` either directly on the AP's web interface or through the integration's AP device in Home Assistant.
+
+  If set to `yes`, tags will only sleep for 40 seconds between check-ins instead of using the configured longer sleep periods, reducing battery life.
+
+  This occurs because Home Assistant maintains a constant WebSocket connection to the AP, which the AP interprets as being in configuration mode.
+
 ## Installation
 
 ### Option 1: HACS Installation (Recommended)
