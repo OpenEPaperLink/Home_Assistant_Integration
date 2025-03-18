@@ -45,11 +45,11 @@ drawcustom:
         select:
           options:
             - label: "No dithering"
-              value: 0
+              value: "0"
             - label: "Floyd-Steinberg (best for photos)"
-              value: 1
+              value: "1"
             - label: "Ordered (best for halftone colors)"
-              value: 2
+              value: "2"
     ttl:
       name: Time to live
       description: >
