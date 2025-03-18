@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Final, Dict
 
 import json
-
+import requests
 import aiohttp
 import async_timeout
 import websockets
@@ -14,6 +14,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 import logging
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ class Hub:
         self._ap_data: dict[str, any] = {}
         self.ap_config: dict[str, any] = {}
         self._known_tags: set[str] = set()
+        self._last_record_count = None
 
         self._unsub_callbacks: list[CALLBACK_TYPE] = []
         self.online = False
@@ -314,6 +316,10 @@ class Hub:
             "low_battery_count": sys_data.get("lowbattcount", current_low_batt),
             "timeout_count": sys_data.get("timeoutcount", current_timeout),
         }
+
+        if "recordcount" in sys_data:
+            self._track_record_count_changes(sys_data.get("recordcount", 0))
+
         async_dispatcher_send(self.hass, SIGNAL_AP_UPDATE)
 
     @callback
@@ -493,6 +499,124 @@ class Hub:
                 if tag_mac in self._data:
                     # Notify of update
                     async_dispatcher_send(self.hass, f"{SIGNAL_TAG_IMAGE_UPDATE}_{tag_mac}", True)
+
+    async def _fetch_all_tags_from_ap(self) -> set[str]:
+        """Fetch complete list of tags from AP."""
+        all_tags = set()
+        position = 0
+
+        while True:
+            url = f"http://{self.host}/get_db"
+            if position > 0:
+                url += f"?pos={position}"
+
+            try:
+                response = await self.hass.async_add_executor_job(
+                    lambda: requests.get(url, timeout=10)
+                )
+
+                if response.status_code != 200:
+                    _LOGGER.error("Failed to fetch all tags from AP: %s", response.text)
+                    break
+
+                data = response.json()
+
+                # Add tags to set
+                for tag in data.get("tags", []):
+                    all_tags.add(tag["mac"])
+
+                # Check for pagination
+                if "continu" in data and data["continu"] > 0:
+                    position = data["continu"]
+                else:
+                    break
+
+            except Exception as err:
+                _LOGGER.error("Failed to fetch all tags from AP: %s", str(err))
+                break
+
+        return all_tags
+
+    def _track_record_count_changes(self, new_record_count: int) -> None:
+        """Track changes in record count to detect tag deletions."""
+        if self._last_record_count is not None and new_record_count < self._last_record_count:
+            # Record count has decreased, indicating a possible tag deletion
+            _LOGGER.info(f"AP record count decreased from {self._last_record_count} to {new_record_count}. Checking for deleted tags...")
+
+            # Cancel existing cleanup task if any
+            if self._cleanup_task and not self._cleanup_task.done():
+                self._cleanup_task.cancel()
+
+            # Schedule cleanup task to verify and clean up any deleted tags
+            self._cleanup_task = self.hass.async_create_task(
+                self._verify_and_cleanup_tags(),
+                f"{DOMAIN}_tag_verification"
+            )
+
+        # Update the last known record count
+        self._last_record_count = new_record_count
+
+    async def _verify_and_cleanup_tags(self) -> None:
+        """Verify which tags exist on the AP and clean up deleted tags."""
+        try:
+            # Get current tags from AP
+            ap_tags = await self._fetch_all_tags_from_ap()
+
+            # Find locally known tags that are missing from the AP
+            deleted_tags = set(self._known_tags) - ap_tags
+
+            if deleted_tags:
+                _LOGGER.info(f"Detected {len(deleted_tags)} deleted tags from AP: {deleted_tags}")
+
+                # Remove each deleted tag
+                for tag_mac in deleted_tags:
+                    await self._remove_tag(tag_mac)
+
+        except Exception as err:
+            _LOGGER.error(f"Error while verifying AP tags: {err}")
+
+    async def _remove_tag(self, tag_mac: str) -> None:
+        """Remove a tag from HA."""
+        _LOGGER.info(f"Removing tag {tag_mac} as it no longer exists on the AP")
+
+        # Remove from known tags and data
+        if tag_mac in self._known_tags:
+            self._known_tags.remove(tag_mac)
+            self._data.pop(tag_mac, None)
+
+            # Notify that this tag has been removed
+            async_dispatcher_send(self.hass, f"{SIGNAL_TAG_UPDATE}_{tag_mac}")
+
+            # Remove related devices and entities
+            device_registry = dr.async_get(self.hass)
+            entity_registry = er.async_get(self.hass)
+
+            # Find and remove entities for this tag
+            entities_to_remove = []
+            devices_to_remove = set()
+
+            for entity in entity_registry.entities.values():
+                if entity.config_entry_id == self.entry.entry_id:
+                    device = device_registry.async_get(entity.device_id) if entity.device_id else None
+                    if device:
+                        for identifier in device.identifiers:
+                            if identifier[0] == DOMAIN and identifier[1] == tag_mac:
+                                entities_to_remove.append(entity.entity_id)
+                                devices_to_remove.add(device.id)
+                                break
+
+            # Remove entities
+            for entity_id in entities_to_remove:
+                entity_registry.async_remove(entity_id)
+                _LOGGER.debug(f"Removed entity {entity_id} for deleted tag {tag_mac}")
+
+            # Remove devices
+            for device_id in devices_to_remove:
+                device_registry.async_remove_device(device_id)
+                _LOGGER.debug(f"Removed device {device_id} for deleted tag {tag_mac}")
+
+            # Update storage
+            await self._store.async_save({"tags": self._data})
 
     async def async_reload_blacklist(self):
         """Reload blacklist from config entry."""
