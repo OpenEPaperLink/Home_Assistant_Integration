@@ -33,6 +33,12 @@ SWITCH_ENTITIES = [
         "name": "Nightly Reboot",
         "icon": "mdi:restart",
         "description": "Enable/disable automatic nightly reboot of the AP"
+    },
+    {
+        "key": "showtimestamp",
+        "name": "Show Timestamp",
+        "icon": "mdi:clock",
+        "description": "Enable/disable showing timestamps on ESLs"
     }
 ]
 

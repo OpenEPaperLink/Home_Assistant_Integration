@@ -32,7 +32,10 @@
       },
       "nightlyreboot": {
         "name": "Reinício Noturno"
-      }
+      },
+        "showtimestamp": {
+            "name": "Mostrar carimbo de tempo"
+        }
     },
     "text": {
       "alias": {

@@ -32,6 +32,9 @@
             },
             "nightlyreboot": {
                 "name": "Nächtlicher Neustart"
+            },
+            "showtimestamp": {
+                "name": "Zeitstempel anzeigen"
             }
         },
         "text": {

@@ -32,6 +32,9 @@
             },
             "nightlyreboot": {
                 "name": "Nightly Reboot"
+            },
+            "showtimestamp": {
+                "name": "Show Timestamp"
             }
         },
         "text": {
