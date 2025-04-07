@@ -55,6 +55,8 @@ class Hub:
         self.ap_config: dict[str, any] = {}
         self._known_tags: set[str] = set()
         self._last_record_count = None
+        self.ap_env = None
+        self.ap_model = "ESP32"
 
         self._unsub_callbacks: list[CALLBACK_TYPE] = []
         self.online = False
@@ -100,6 +102,12 @@ class Hub:
                     EVENT_HOMEASSISTANT_STOP,
                     self._handle_shutdown
                 )
+
+            # Fetch AP env
+            try:
+                await self.async_update_ap_info()
+            except Exception as err:
+                _LOGGER.warning("Could not load initial AP info: %s", str(err))
 
             # Load all tags from AP
             try:
@@ -885,3 +893,42 @@ class Hub:
             return 0
 
         return time_diff
+
+    async def async_update_ap_info(self) -> None:
+        """Fetch and update AP information."""
+        try:
+            async with async_timeout.timeout(10):
+                async with self._session.get(f"http://{self.host}/sysinfo") as response:
+                    if response.status != 200:
+                        _LOGGER.error("Failed to fetch AP sys info: HTTP %s", response.status)
+                        return
+
+                    data = await response.json()
+                    self.ap_env = data.get("env")
+                    self.ap_model = self._format_ap_model(self.ap_env)
+
+        except Exception as err:
+            _LOGGER.error(f"Error updating AP info: {err}")
+
+    @staticmethod
+    def _format_ap_model(ap_env: str) -> str:
+        """Format the AP model string from the build env."""
+        if not ap_env:
+            return "ESP32"
+
+        model_mapping = {
+            "ESP32_S3_C6_NANO_AP": "Nano AP",
+            "OpenEPaperLink_Mini_AP_v4": "Mini AP v4",
+            "OpenEPaperLink_ESP32-PoE-ISO_AP": "PoE ISO AP",
+            "ESP32_S3_16_8_LILYGO_AP": "LilyGo T-Panel S3",
+            "OpenEPaperLink_AP_and_Flasher": "AP and Flasher",
+            "OpenEPaperLink_PoE_AP": "PoE AP",
+            "BLE_ONLY_AP": "BLE only AP",
+            "OpenEPaperLink_Nano_TLSR": "Nano TLSR AP",
+            "ESP32_S3_16_8_YELLOW_AP": "Yellow AP",
+        }
+
+        if ap_env in model_mapping:
+            return model_mapping[ap_env]
+
+        return ap_env

@@ -64,7 +64,7 @@ class APConfigText(TextEntity):
         return {
             "identifiers": {(DOMAIN, "ap")},
             "name": "OpenEPaperLink AP",
-            "model": "esp32",
+            "model": self._hub.ap_model,
             "manufacturer": "OpenEPaperLink",
         }
 

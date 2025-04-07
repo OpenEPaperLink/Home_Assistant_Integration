@@ -298,7 +298,7 @@ class RefreshTagTypesButton(ButtonEntity):
         return {
             "identifiers": {(DOMAIN, "ap")},
             "name": "OpenEPaperLink AP",
-            "model": "esp32",
+            # "model": self._hub.ap_model,
             "manufacturer": "OpenEPaperLink",
         }
 
