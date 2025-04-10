@@ -50,6 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         """Add buttons for a newly discovered tag.
 
         Creates and registers button entities for a specific tag:
+
         - Clear pending updates button
         - Force refresh button
         - Reboot tag button
