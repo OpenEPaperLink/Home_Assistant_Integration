@@ -295,7 +295,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "AP is offline. Please check your network connection and AP status."
             )
 
-        device_ids = service.data.get("device_id")
+        device_ids = service.data.get("device_id", [])
         if isinstance(device_ids, str):
             device_ids = [device_ids]
 
