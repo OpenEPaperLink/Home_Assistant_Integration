@@ -561,15 +561,16 @@ Downloads and displays an image from a URL.
   rotate: 0
 ```
 
-| Parameter | Description       | Required | Default | Notes                                                       |
-|-----------|-------------------|----------|---------|-------------------------------------------------------------|
-| `url`     | Image URL or path | Yes      | -       | HTTP/HTTPS URL, Data URI, local path or camera/image entity |
-| `x`       | X position        | Yes      | -       | Pixels                                                      |
-| `y`       | Y position        | Yes      | -       | Pixels                                                      |
-| `xsize`   | Target width      | Yes      | -       | Pixels                                                      |
-| `ysize`   | Target height     | Yes      | -       | Pixels                                                      |
-| `rotate`  | Rotation angle    | No       | `0`     | Degrees                                                     |
-| `visible` | Show/hide element | No       | `true`  | `true`, `false`                                             |
+| Parameter       | Description       | Required | Default   | Notes                                                       |
+|-----------------|-------------------|----------|-----------|-------------------------------------------------------------|
+| `url`           | Image URL or path | Yes      | -         | HTTP/HTTPS URL, Data URI, local path or camera/image entity |
+| `x`             | X position        | Yes      | -         | Pixels                                                      |
+| `y`             | Y position        | Yes      | -         | Pixels                                                      |
+| `xsize`         | Target width      | Yes      | -         | Pixels                                                      |
+| `ysize`         | Target height     | Yes      | -         | Pixels                                                      |
+| `resize_method` | Resizing method   | No       | `stretch` | `stretch`, `crop`, `cover`, `contain`                       |
+| `rotate`        | Rotation angle    | No       | `0`       | Degrees                                                     |
+| `visible`       | Show/hide element | No       | `true`    | `true`, `false`                                             |
 
 Notes:
 - Local images must be in `/config/media/`
