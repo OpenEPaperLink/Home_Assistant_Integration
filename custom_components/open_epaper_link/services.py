@@ -23,8 +23,10 @@ _LOGGER: Final = logging.getLogger(__name__)
 DITHER_DISABLED = 0
 DITHER_FLOYD_STEINBERG = 1
 DITHER_ORDERED = 2
-
 DITHER_DEFAULT = DITHER_ORDERED
+
+MAX_RETRIES = 3
+INITIAL_BACKOFF = 1  # seconds
 
 
 def rgb_to_rgb332(rgb):
@@ -365,6 +367,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         multipart/form-data POST request. Configures display parameters
         such as dithering, TTL, and optional preloading.
 
+        Will retry upload on timeout, with increasing backoff times
+
         Args:
             hub: Hub instance with connection details
             entity_id: Entity ID of the target tag
@@ -407,25 +411,39 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         mp_encoder = MultipartEncoder(fields=fields)
 
-        try:
-            async with async_timeout.timeout(30):  # 30 second timeout for upload
-                response = await hass.async_add_executor_job(
-                    lambda: requests.post(
-                        url,
-                        headers={'Content-Type': mp_encoder.content_type},
-                        data=mp_encoder
+        """
+        Try up to MAX_RETRIES times to upload the image, retrying on TimeoutError.
+        """
+        backoff_delay = INITIAL_BACKOFF
+
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                async with async_timeout.timeout(30):  # 30 second timeout for upload
+                    response = await hass.async_add_executor_job(
+                        lambda: requests.post(
+                            url,
+                            headers={'Content-Type': mp_encoder.content_type},
+                            data=mp_encoder
+                        )
                     )
-                )
 
-            if response.status_code != 200:
-                raise HomeAssistantError(
-                    f"Image upload failed for {entity_id} with status code: {response.status_code}"
-                )
+                if response.status_code != 200:
+                    raise HomeAssistantError(
+                        f"Image upload failed for {entity_id} with status code: {response.status_code}"
+                    )
 
-        except asyncio.TimeoutError:
-            raise HomeAssistantError(f"Image upload timed out for {entity_id}")
-        except Exception as err:
-            raise HomeAssistantError(f"Failed to upload image for {entity_id}: {str(err)}")
+            except asyncio.TimeoutError:
+                if attempt < MAX_RETRIES:
+                    _LOGGER.warning(
+                        "Timeout uploading %s (attempt %d/%d), retrying in %ds…",
+                        entity_id, attempt, MAX_RETRIES, backoff_delay
+                    )
+                    await asyncio.sleep(backoff_delay)
+                    backoff_delay *= 2  # exponential back-off
+                    continue
+                raise HomeAssistantError(f"Image upload timed out for {entity_id}")
+            except Exception as err:
+                raise HomeAssistantError(f"Failed to upload image for {entity_id}: {str(err)}")
 
     async def setled_service(service: ServiceCall) -> None:
         """Handle LED pattern service calls.
