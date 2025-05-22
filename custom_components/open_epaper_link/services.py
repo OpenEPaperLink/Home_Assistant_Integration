@@ -70,9 +70,9 @@ def int_to_hex_string(number: int) -> str:
 
 
 async def get_device_ids_from_label_id(hass: HomeAssistant, label_id: str) -> str:
-    """Get the device_if for a label_id.
+    """Get the device_id for a label_id.
 
-    Resolve a Label_ID to one ore more device_ids.
+    Resolve a Label_ID to one or more device_ids.
 
     Args:
         hass: Home Assistant instance
