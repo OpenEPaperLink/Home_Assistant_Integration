@@ -326,7 +326,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             label_ids = [label_ids]
 
         for label_id in label_ids:
-            device_ids = device_ids + await get_device_ids_from_label_id(hass, label_id)
+            device_ids.extend(await get_device_ids_from_label_id(hass, label_id))
 
         generator = ImageGen(hass)
         errors = []
