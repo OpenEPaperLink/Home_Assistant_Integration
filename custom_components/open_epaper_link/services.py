@@ -69,7 +69,7 @@ def int_to_hex_string(number: int) -> str:
     return '0' + hex_string if len(hex_string) == 1 else hex_string
 
 
-async def get_device_ids_from_label_id(hass: HomeAssistant, label_id: str) -> str:
+async def get_device_ids_from_label_id(hass: HomeAssistant, label_id: str) -> list[str]:
     """Get the device_id for a label_id.
 
     Resolve a Label_ID to one or more device_ids.
