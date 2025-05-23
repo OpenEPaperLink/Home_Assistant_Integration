@@ -2027,6 +2027,9 @@ class ImageGen:
             if source_img.size != target_size:
                 if resize_method in ['crop', 'cover', 'contain']:
                     source_img = resizeimage.resize(resize_method, source_img, target_size)
+                elif resize_method != 'stretch':
+                    _LOGGER.warning(f"Warning: resize_method is set to unsupported method '{resize_method}', this will result in simple stretch resizing")
+
                 if source_img.size != target_size:
                     source_img = source_img.resize(target_size)
 
