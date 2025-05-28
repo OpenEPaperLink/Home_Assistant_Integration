@@ -992,7 +992,7 @@ class Hub:
                 "tags": self._data
             })
 
-    async def _handle_ap_config_message(self) -> None:
+    async def _handle_ap_config_message(self,dict) -> None:
         """Handle AP configuration updates.
 
         Fetches the current AP configuration via HTTP and updates the
@@ -1001,6 +1001,9 @@ class Hub:
 
         The method uses a hash comparison to only trigger entity updates
         when the configuration actually changes.
+
+        Args:
+            message: The configuration message from the AP
         """
         try:
             if self._shutdown.is_set():
