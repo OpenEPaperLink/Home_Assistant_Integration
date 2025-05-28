@@ -6,3 +6,4 @@ qrcode[pil]==7.4.2
 requests_toolbelt==1.0.0
 websockets
 websocket-client==1.7.0
+python-resize-image==1.1.20
