@@ -69,6 +69,27 @@ def int_to_hex_string(number: int) -> str:
     return '0' + hex_string if len(hex_string) == 1 else hex_string
 
 
+async def get_device_ids_from_label_id(hass: HomeAssistant, label_id: str) -> list[str]:
+    """Get the device_id for a label_id.
+
+    Resolve a Label_ID to one or more device_ids.
+
+    Args:
+        hass: Home Assistant instance
+        label_id: Home Assistant label id
+
+    Returns:
+        list: Device IDs
+    """
+    device_registry = dr.async_get(hass)
+    devices = dr.async_entries_for_label(device_registry, label_id)
+
+    device_ids = []
+    for device in devices:
+        device_ids.append(device.id)
+
+    return device_ids
+
 async def get_entity_id_from_device_id(hass: HomeAssistant, device_id: str) -> str:
     """Get the primary entity ID for an OpenEPaperLink device.
 
@@ -295,9 +316,17 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "AP is offline. Please check your network connection and AP status."
             )
 
-        device_ids = service.data.get("device_id")
+        label_ids = service.data.get("label_id", [])
+        device_ids = service.data.get("device_id", [])
+
         if isinstance(device_ids, str):
             device_ids = [device_ids]
+
+        if isinstance(label_ids, str):
+            label_ids = [label_ids]
+
+        for label_id in label_ids:
+            device_ids.extend(await get_device_ids_from_label_id(hass, label_id))
 
         generator = ImageGen(hass)
         errors = []
