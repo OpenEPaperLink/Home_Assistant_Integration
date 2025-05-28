@@ -747,6 +747,7 @@ class Hub:
         """
         result = {}
         position = 0
+        retries_left = 10
 
         while True:
             url = f"http://{self.host}/get_db"
@@ -760,7 +761,11 @@ class Hub:
 
                 if response.status_code != 200:
                     _LOGGER.error("Failed to fetch all tags from AP: %s", response.text)
-                    break
+                    retries_left -= 1
+                    if retries_left <= 0:
+                        raise Exception(f"Failed to fetch tags after multiple retries: {response.text}")
+                    await asyncio.sleep(1)
+                    continue
 
                 data = response.json()
 
@@ -777,7 +782,11 @@ class Hub:
 
             except Exception as err:
                 _LOGGER.error("Failed to fetch all tags from AP: %s", str(err))
-                break
+                retries_left -= 1
+                if retries_left <= 0:
+                    raise
+                await asyncio.sleep(1)
+                continue
 
         return result
 
