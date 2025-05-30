@@ -1,0 +1,32 @@
+{
+  "domain": "open_epaper_link",
+  "name": "OpenEPaperLink",
+  "codeowners": [
+    "@jonasniesner"
+  ],
+  "bluetooth": [
+      { "local_name": "ATC_*" },
+      { "local_name": "ATC_*"}
+    ],
+  "config_flow": true,
+  "dependencies": [
+    "recorder",
+    "bluetooth"
+  ],
+  "documentation": "https://github.com/jonasniesner/open_epaper_link_homeassistant",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/jonasniesner/open_epaper_link_homeassistant/issues",
+  "requirements": [
+    "qrcode[pil]==7.4.2",
+    "requests_toolbelt==1.0.0",
+    "websocket-client==1.7.0",
+    "websockets==14.2",
+    "python-resize-image==1.1.20",
+    "bleak-retry-connector>=1.17.1",
+    "bleak>=0.17.0",
+    "pycryptodome>=3.9.0",
+    "bluetooth-sensor-state-data>=1.5.0"
+  ],
+  "version": "1.0.0"
+}
