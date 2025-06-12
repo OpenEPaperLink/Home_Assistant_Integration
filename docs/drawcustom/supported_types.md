@@ -190,6 +190,7 @@ Falling back to default font.
 ## Types
 
 ### debug_grid
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_debug_grid -->
 The `debug_grid` draw type overlays a grid on the image canvas to help with layout debugging.
 
 ```yaml
@@ -209,6 +210,7 @@ The `debug_grid` draw type overlays a grid on the image canvas to help with layo
 | `font`            | Font for labels                            | No       | `ppb.ttf`          | -                   |
 
 ### text
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_text -->
 Draws text.
 
 ```yaml
@@ -289,6 +291,7 @@ Notes:
 - The `accent` color automatically adapts to the display type (red or yellow)
 
 ### Multiline Text
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_multiline -->
 Splits text into multiple lines based on a delimiter.
 
 ```yaml
@@ -327,6 +330,7 @@ Multiline elements support inline color markup when `parse_colors` is enabled. T
 Please take a look at Text element documentation above.
 
 ### Line
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_line -->
 Draws a straight line.
 
 ```yaml
@@ -354,6 +358,7 @@ Draws a straight line.
 | `visible`      | Show/hide element                    | No       | `True`          | `True`, `False`                             |
 
 ### Rectangle
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_rectangle -->
 Draws a rectangle with optional rounded corners.
 
 ```yaml
@@ -381,6 +386,7 @@ Draws a rectangle with optional rounded corners.
 | `visible` | Show/hide element      | No       | `true`  | `true`, `false`                                                                          |
 
 ### Rectangle Pattern
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_rectangle_pattern -->
 Draws repeated rectangles in a grid pattern.
 
 ```yaml
@@ -416,6 +422,7 @@ Draws repeated rectangles in a grid pattern.
 | `visible`  | Show/hide element            | No       | `true`  | `true`, `false`                                      |
 
 ### Polygon
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_polygon -->
 
 Draws a filled or outlined polygon based on the provided points.
 
@@ -435,6 +442,7 @@ Draws a filled or outlined polygon based on the provided points.
 
 
 ### Circle
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_circle -->
 Draws a circle around a center point.
 
 ```yaml
@@ -455,6 +463,7 @@ Draws a circle around a center point.
 | `visible` | Show/hide element | No       | `true`  | `true`, `false`                                      |
 
 ### Ellipse
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_ellipse -->
 Draws an ellipse inside the bounding box.
 
 ```yaml
@@ -477,6 +486,7 @@ Draws an ellipse inside the bounding box.
 | `visible` | Show/hide element | No       | `true`  | `true`, `false`                                     |
 
 ### Arc/ Pie Slice
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_arc -->
 Draws an arc (outline-only) or a pie slice (filled) based on the specified center, radius, and angles.
 ```yaml
 - type: arc
@@ -506,6 +516,7 @@ Draws an arc (outline-only) or a pie slice (filled) based on the specified cente
 
 
 ### Icon
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_icon -->
 Draws Material Design Icons.
 
 ```yaml
@@ -532,6 +543,7 @@ Draws Material Design Icons.
 Note: Icon name can be prefixed with `mdi:` (e.g., `mdi:account-cowboy-hat`)
 
 ### Icon Sequence
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_icon_sequence -->
 Draws multiple Material Design Icons in a sequence with specified direction and spacing.
 
 ```yaml
@@ -562,6 +574,7 @@ Draws multiple Material Design Icons in a sequence with specified direction and 
 
 
 ### Download Image
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_downloaded_image -->
 Downloads and displays an image from a URL.
 
 ```yaml
@@ -592,6 +605,7 @@ Notes:
 - Camera entities (e.g. `camera.p1s_camera`) must have a `entity_picture` attribute
 
 ### QR Code
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_qrcode -->
 Generates and displays a QR code.
 
 ```yaml
@@ -617,6 +631,7 @@ Generates and displays a QR code.
 | `visible` | Show/hide element    | No       | `true`  | `true`, `false`                             |
 
 ### Plot
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_plot -->
 Renders historical data from Home Assistant entities as a line plot.
 
 ```yaml
@@ -812,6 +827,7 @@ xaxis:
 ```
 
 ### Progress Bar
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_progress_bar -->
 Displays a progress bar with optional percentage text.
 
 ```yaml
@@ -846,6 +862,7 @@ Displays a progress bar with optional percentage text.
 | `visible`         | Show/hide element         | No       | `true`    | `true`, `false`                             |
 
 ### Diagram
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_diagram -->
 Displays a simple diagram with optional bar graph.
 
 ```yaml
