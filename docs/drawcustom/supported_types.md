@@ -19,6 +19,7 @@ With `drawcustom`, you can create an image in Home Assistant and send the render
 - [QR Code](#qr-code)
 - [Plot](#plot)
 - [Progress Bar](#progress-bar)
+- [Diagram](#diagram)
 - [Template Examples](#template-examples)
 
 ## Basic Usage
@@ -189,6 +190,7 @@ Falling back to default font.
 ## Types
 
 ### debug_grid
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_debug_grid -->
 The `debug_grid` draw type overlays a grid on the image canvas to help with layout debugging.
 
 ```yaml
@@ -208,6 +210,7 @@ The `debug_grid` draw type overlays a grid on the image canvas to help with layo
 | `font`            | Font for labels                            | No       | `ppb.ttf`          | -                   |
 
 ### text
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_text -->
 Draws text.
 
 ```yaml
@@ -288,6 +291,7 @@ Notes:
 - The `accent` color automatically adapts to the display type (red or yellow)
 
 ### Multiline Text
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_multiline -->
 Splits text into multiple lines based on a delimiter.
 
 ```yaml
@@ -311,8 +315,14 @@ Splits text into multiple lines based on a delimiter.
 | `size`      | Font size                      | No       | `20`                      | Pixels                                      |
 | `font`      | Font file name                 | No       | `ppb.ttf`                 | Available fonts: `ppb.ttf`, `rbm.ttf`       |
 | `color`     | Text color                     | No       | `black`                   | `white`, `black`, `accent`, `red`, `yellow` |
-| `spacing`   | Additional line spacing        | No       | `0`                       | Pixels                                      |
-| `visible`   | Show/hide element              | No       | `true`                    | `true`, `false`                             |
+| `spacing`   | Additional line spacing        | No       | `0`      | Pixels                                      |
+| `anchor`    | Text anchor point              | No       | `lm`     | [Pillow text anchors](https://pillow.readthedocs.io/en/stable/handbook/text-anchors.html) |
+| `align`     | Line alignment                 | No       | `left`   | `left`, `center`, `right`                   |
+| `stroke_width` | Outline width                | No       | `0`      | Pixels                                      |
+| `stroke_fill`  | Outline color                | No       | `white`  | `white`, `black`, `accent`, `red`, `yellow` |
+| `parse_colors` | Enable color markup          | No       | `false`  | Enables `[color]text[/color]` syntax        |
+| `y_padding` | Vertical offset when start_y not specified | No | `10` | Pixels                                      |
+| `visible`   | Show/hide element              | No       | `true`   | `true`, `false`                             |
 ### Inline Color Markup
 
 Multiline elements support inline color markup when `parse_colors` is enabled. This allows different parts of the text to be rendered in different colors without needing to create multiple text elements.
@@ -320,6 +330,7 @@ Multiline elements support inline color markup when `parse_colors` is enabled. T
 Please take a look at Text element documentation above.
 
 ### Line
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_line -->
 Draws a straight line.
 
 ```yaml
@@ -347,6 +358,7 @@ Draws a straight line.
 | `visible`      | Show/hide element                    | No       | `True`          | `True`, `False`                             |
 
 ### Rectangle
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_rectangle -->
 Draws a rectangle with optional rounded corners.
 
 ```yaml
@@ -374,6 +386,7 @@ Draws a rectangle with optional rounded corners.
 | `visible` | Show/hide element      | No       | `true`  | `true`, `false`                                                                          |
 
 ### Rectangle Pattern
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_rectangle_pattern -->
 Draws repeated rectangles in a grid pattern.
 
 ```yaml
@@ -404,9 +417,12 @@ Draws repeated rectangles in a grid pattern.
 | `fill`     | Fill color                   | No       | `null`  | `white`, `black`, `accent`, `red`, `yellow`,  `null` |
 | `outline`  | Border color                 | No       | `black` | `white`, `black`, `accent`, `red`, `yellow`          |
 | `width`    | Border thickness             | No       | `1`     | Pixels                                               |
+| `radius`   | Corner radius             | No       | `0`     | Pixels
+| `corners`  | Which corners to round    | No       | `all`   | `all` or comma-separated list of: `top_left`, `top_right`, `bottom_left`, `bottom_right`
 | `visible`  | Show/hide element            | No       | `true`  | `true`, `false`                                      |
 
 ### Polygon
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_polygon -->
 
 Draws a filled or outlined polygon based on the provided points.
 
@@ -426,6 +442,7 @@ Draws a filled or outlined polygon based on the provided points.
 
 
 ### Circle
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_circle -->
 Draws a circle around a center point.
 
 ```yaml
@@ -446,6 +463,7 @@ Draws a circle around a center point.
 | `visible` | Show/hide element | No       | `true`  | `true`, `false`                                      |
 
 ### Ellipse
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_ellipse -->
 Draws an ellipse inside the bounding box.
 
 ```yaml
@@ -468,6 +486,7 @@ Draws an ellipse inside the bounding box.
 | `visible` | Show/hide element | No       | `true`  | `true`, `false`                                     |
 
 ### Arc/ Pie Slice
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_arc -->
 Draws an arc (outline-only) or a pie slice (filled) based on the specified center, radius, and angles.
 ```yaml
 - type: arc
@@ -491,12 +510,13 @@ Draws an arc (outline-only) or a pie slice (filled) based on the specified cente
 | `radius`      | Radius of the arc or pie slice       | Yes      | -       | Pixels                      |
 | `start_angle` | Starting angle of the arc            | Yes      | -       | 0 degrees = right           |
 | `end_angle`   | Ending angle af the arc              | Yes      | -       | Clockwise direction         |
-| `fill`        | Foll color for the pie slices        | No       | `none`  | Use to make a pie slice     |
+| `fill`        | Fill color for the pie slices        | No       | `none`  | Use to make a pie slice     |
 | `outline`     | Outline color for arcs or pie slices | No       | `black` |                             |
 | `width`       | Width of the outline                 | No       | `1`     | Ignored if fill is provided |
 
 
 ### Icon
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_icon -->
 Draws Material Design Icons.
 
 ```yaml
@@ -516,11 +536,14 @@ Draws Material Design Icons.
 | `size`    | Icon size         | Yes      | -       | Pixels                                                               |
 | `fill`    | Icon color        | No       | `black` | `white`, `black`, `accent`, `red`, `yellow`                          |
 | `anchor`  | Icon anchor point | No       | `la`    | See text anchors                                                     |
+| `stroke_width` | Outline width | No | `0` | Pixels
+| `stroke_fill`  | Outline color | No | `white` | `white`, `black`, `accent`, `red`, `yellow`
 | `visible` | Show/hide element | No       | `true`  | `true`, `false`                                                      |
 
 Note: Icon name can be prefixed with `mdi:` (e.g., `mdi:account-cowboy-hat`)
 
 ### Icon Sequence
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_icon_sequence -->
 Draws multiple Material Design Icons in a sequence with specified direction and spacing.
 
 ```yaml
@@ -545,10 +568,13 @@ Draws multiple Material Design Icons in a sequence with specified direction and 
 | `spacing`      | Space between icons   | No       | size/4  | Pixels                                                               |
 | `fill`         | Icon color            | No       | `black` | `white`, `black`, `accent`, `red`, `yellow`                          |
 | `anchor`       | Icon anchor point     | No       | `la`    | See text anchors                                                     |
+| `stroke_width` | Outline width | No | `0` | Pixels
+| `stroke_fill` | Outline color | No | `white` | `white`, `black`, `accent`, `red`, `yellow`
 | `visible`      | Show/hide element     | No       | `true`  | `true`, `false`                                                      |
 
 
 ### Download Image
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_downloaded_image -->
 Downloads and displays an image from a URL.
 
 ```yaml
@@ -579,6 +605,7 @@ Notes:
 - Camera entities (e.g. `camera.p1s_camera`) must have a `entity_picture` attribute
 
 ### QR Code
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_qrcode -->
 Generates and displays a QR code.
 
 ```yaml
@@ -604,6 +631,7 @@ Generates and displays a QR code.
 | `visible` | Show/hide element    | No       | `true`  | `true`, `false`                             |
 
 ### Plot
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_plot -->
 Renders historical data from Home Assistant entities as a line plot.
 
 ```yaml
@@ -799,6 +827,7 @@ xaxis:
 ```
 
 ### Progress Bar
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_progress_bar -->
 Displays a progress bar with optional percentage text.
 
 ```yaml
@@ -829,8 +858,45 @@ Displays a progress bar with optional percentage text.
 | `outline`         | Border color              | No       | `black`   | `white`, `black`, `accent`, `red`, `yellow` |
 | `width`           | Border thickness          | No       | `1`       | Pixels                                      |
 | `show_percentage` | Show percentage text      | No       | `false`   | `true`, `false`                             |
-| `font`            | Percentage text font      | No       | `ppb.ttf` | Font name                                   |
+| `font_name`       | Percentage text font      | No       | `ppb.ttf` | Font name                                   |
 | `visible`         | Show/hide element         | No       | `true`    | `true`, `false`                             |
+
+### Diagram
+<!-- See custom_components/open_epaper_link/imagegen.py:_draw_diagram -->
+Displays a simple diagram with optional bar graph.
+
+```yaml
+- type: diagram
+  x: 10
+  height: 120
+  width: 200
+  margin: 20
+  bars:
+    values: "A,5;B,3;C,9"
+    color: red
+    legend_color: black
+    legend_size: 10
+    font: ppb.ttf
+```
+
+| Parameter | Description           | Required | Default | Notes                                       |
+|-----------|-----------------------|----------|---------|---------------------------------------------|
+| `x`       | Left position         | Yes      | -       | Pixels or percentage                        |
+| `height`  | Diagram height        | Yes      | -       | Pixels or percentage                        |
+| `width`   | Diagram width         | No       | image width | Pixels or percentage                     |
+| `margin`  | Axis margin size      | No       | `20`    | Pixels                                     |
+| `bars`    | Bar graph options     | No       | -       | See below                                   |
+| `visible` | Show/hide element     | No       | `true`  | `true`, `false`                             |
+
+#### Bar Options
+| Option        | Description                  | Required | Default | Notes                           |
+|---------------|------------------------------|----------|---------|---------------------------------|
+| `values`      | Bar labels and values        | Yes      | -       | Format `label,value;...`         |
+| `color`       | Bar color                    | Yes      | -       | Any supported color              |
+| `margin`      | Space between bars           | No       | `10`    | Pixels                           |
+| `legend_color`| Text color for bar labels    | No       | `black` | Any supported color              |
+| `legend_size` | Font size for bar labels     | No       | `10`    | Pixels                           |
+| `font`        | Font for bar labels          | No       | `ppb.ttf`| Font name                        |
 
 ## Template Examples
 
