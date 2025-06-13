@@ -39,6 +39,9 @@ RED = (255, 0, 0, 255)
 HALF_RED = (255, 127, 127, 255)
 YELLOW = (255, 255, 0, 255)
 HALF_YELLOW = (255, 255, 127, 255)
+BLUE = (0, 0, 255, 255)
+GREEN = (0, 255, 0, 255)
+ORANGE = (255, 128, 0, 255)
 
 
 class ElementType(str, Enum):
@@ -733,6 +736,12 @@ class ImageGen:
             return YELLOW
         elif color_str in ("half_yellow", "hy"):
             return HALF_YELLOW
+        if color_str in ("blue", "bl"):
+            return BLUE
+        if color_str in ("green", "gr"):
+            return GREEN
+        if color_str in ("orange", "or"):
+            return ORANGE
         else:
             return WHITE
 
