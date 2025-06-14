@@ -21,7 +21,7 @@ from .const import DOMAIN
 
 _LOGGER: Final = logging.getLogger(__name__)
 
-TRIGGER_TYPES = {"GPIO", "NFC", "BUTTON1", "BUTTON2"}
+TRIGGER_TYPES = {"GPIO", "NFC", "BUTTON1", "BUTTON2", "BUTTON3"}
 
 TRIGGER_SCHEMA = DEVICE_TRIGGER_BASE_SCHEMA.extend(
     {
