@@ -21,7 +21,7 @@ from .const import DOMAIN
 
 _LOGGER: Final = logging.getLogger(__name__)
 
-TRIGGER_TYPES = {"GPIO", "NFC", "BUTTON1", "BUTTON2"}
+TRIGGER_TYPES = {"GPIO", "NFC", "BUTTON1", "BUTTON2", "BUTTON3"}
 
 TRIGGER_SCHEMA = DEVICE_TRIGGER_BASE_SCHEMA.extend(
     {
@@ -37,7 +37,7 @@ async def async_get_triggers(hass, device_id):
     This function is called by Home Assistant when setting up
     automations to let users choose which triggers to use.
 
-    All supported trigger types (BUTTON1, BUTTON2, NFC, GPIO) are
+    All supported trigger types (BUTTON1, BUTTON2, BUTTON3, NFC, GPIO) are
     presented for each device, regardless of hardware capability.
 
     TODO Tag specific triggers will be implemented later.
