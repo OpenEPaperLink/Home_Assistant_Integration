@@ -75,6 +75,14 @@ async def async_get_triggers(hass, device_id):
         CONF_DOMAIN: DOMAIN,
         CONF_DEVICE_ID: device_id,
         # Required fields of TRIGGER_SCHEMA
+        CONF_TYPE: "BUTTON3",
+    })
+    triggers.append({
+        # Required fields of TRIGGER_BASE_SCHEMA
+        CONF_PLATFORM: "device",
+        CONF_DOMAIN: DOMAIN,
+        CONF_DEVICE_ID: device_id,
+        # Required fields of TRIGGER_SCHEMA
         CONF_TYPE: "NFC",
     })
     triggers.append({
