@@ -699,7 +699,7 @@ class Hub:
             current_time = datetime.now()
 
             # Apply debouncing based on event type
-            if reason_string in ["BUTTON1", "BUTTON2"]:
+            if reason_string in ["BUTTON1", "BUTTON2", "BUTTON3"]:
                 # Button debouncing
                 debounce_key = f"{tag_mac}_{reason_string}"
                 last_event = self._last_button_press.get(debounce_key)
@@ -1050,6 +1050,7 @@ class Hub:
         - 3: "NFC" (NFC scan)
         - 4: "BUTTON1" (first button pressed)
         - 5: "BUTTON2" (second button pressed)
+        - 6: "BUTTON3" (third button pressed)
         - 252: "FIRSTBOOT" (first boot)
         - 253: "NETWORK_SCAN" (network scan)
         - 254: "WDT_RESET" (watchdog reset)
@@ -1067,6 +1068,7 @@ class Hub:
             3: "NFC",
             4: "BUTTON1",
             5: "BUTTON2",
+            6: "BUTTON3",
             252: "FIRSTBOOT",
             253: "NETWORK_SCAN",
             254: "WDT_RESET"
