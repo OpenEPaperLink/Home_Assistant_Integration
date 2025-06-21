@@ -1,0 +1,25 @@
+body {
+  font-family: Arial, sans-serif;
+}
+#container {
+  display: flex;
+  gap: 20px;
+}
+#canvas {
+  border: 1px solid #ccc;
+}
+#controls {
+  width: 350px;
+}
+#controls label {
+  display: block;
+  margin-top: 5px;
+}
+.element {
+  border: 1px solid #ccc;
+  padding: 5px;
+  margin-top: 5px;
+}
+.element textarea {
+  width: 100%;
+}

@@ -214,6 +214,19 @@ New format (`drawcustom` payload):
 
 The device selection, background color, rotation, and other options are now configured through dropdown menus in the service UI.
 
+## Drawcustom Web Editor
+
+A simple web-based editor is included for building `drawcustom` payloads visually.
+
+### Running the Editor
+
+1. Open `tools/editor/index.html` directly in a modern web browser.
+2. Select a screen size preset (296x128, 154x154 or 384x168) or choose **Custom** and enter the desired width and height.
+3. Use the controls to add elements on the canvas and adjust service options such as background color, rotation, dithering, TTL and the dry-run flag.
+4. Import or export YAML using the buttons below the canvas.
+
+No build step is required; all dependencies are bundled with the repository.
+
 ## Contributing
 - Feature requests and bug reports are welcome! Please open an issue on GitHub
 - Pull requests are encouraged
