@@ -47,13 +47,19 @@ def resolve_color(name):
 
 DEFAULT_FONT = "DejaVuSans.ttf"
 
+def _load_font(name, size):
+    try:
+        return ImageFont.truetype(name, size)
+    except OSError:
+        return ImageFont.load_default()
+
 def draw_element(draw, el, img):
     t = el.get("type")
     if t == "text":
-        font = ImageFont.truetype(el.get("font", DEFAULT_FONT), el.get("size", 12))
+        font = _load_font(el.get("font", DEFAULT_FONT), el.get("size", 12))
         draw.text((el.get("x", 0), el.get("y", 0)), str(el.get("value", "")), fill=resolve_color(el.get("color")), font=font)
     elif t == "multiline":
-        font = ImageFont.truetype(el.get("font", DEFAULT_FONT), el.get("size", 12))
+        font = _load_font(el.get("font", DEFAULT_FONT), el.get("size", 12))
         y = el.get("start_y", el.get("y", 0))
         for idx, line in enumerate(str(el.get("value", "")).split(el.get("delimiter", "|"))):
             draw.text((el.get("x", 0), y + idx * el.get("offset_y", 20)), line, fill=resolve_color(el.get("color")), font=font)

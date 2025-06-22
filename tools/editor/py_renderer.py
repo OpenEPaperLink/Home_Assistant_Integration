@@ -6,6 +6,14 @@ from PIL import Image, ImageDraw, ImageFont
 DEFAULT_FONT = "DejaVuSans.ttf"
 
 
+def _load_font(name: str, size: int) -> ImageFont.FreeTypeFont:
+    """Load a truetype font, falling back to PIL's default."""
+    try:
+        return ImageFont.truetype(name, size)
+    except OSError:
+        return ImageFont.load_default()
+
+
 def render_image(yaml_text: str) -> str:
     data = yaml.safe_load(yaml_text)
     width = data.get("width", 296)
@@ -16,7 +24,7 @@ def render_image(yaml_text: str) -> str:
     for el in data.get("payload", []):
         t = el.get("type")
         if t == "text":
-            font = ImageFont.truetype(el.get("font", DEFAULT_FONT), el.get("size", 12))
+            font = _load_font(el.get("font", DEFAULT_FONT), el.get("size", 12))
             draw.text((el.get("x", 0), el.get("y", 0)), el.get("value", ""), fill=el.get("color", "black"), font=font)
         elif t == "line":
             draw.line([(el.get("x_start", 0), el.get("y_start", 0)), (el.get("x_end", 0), el.get("y_end", 0))], fill=el.get("color", "black"), width=el.get("width", 1))
