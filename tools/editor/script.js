@@ -186,9 +186,16 @@ function resolveColor(name) {
 async function drawPython() {
   await initPyodide();
   try {
-    let data = jsyaml.load(document.getElementById('yaml').value || '{}');
-    data.width = canvas.width;
-    data.height = canvas.height;
+    const data = {
+      payload: elements,
+      background: document.getElementById('background').value,
+      rotate: parseInt(document.getElementById('rotate').value) || 0,
+      dither: parseInt(document.getElementById('dither').value) || 0,
+      ttl: parseInt(document.getElementById('ttl').value) || 0,
+      'dry-run': document.getElementById('dry-run').checked,
+      width: canvas.width,
+      height: canvas.height,
+    };
     const renderImage = self.pyodide.globals.get('render_image');
     const dataUrl = renderImage(jsyaml.dump(data));
     const img = new Image();
