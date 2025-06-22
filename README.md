@@ -223,9 +223,19 @@ A simple web-based editor is included for building `drawcustom` payloads visuall
 1. Open `tools/editor/index.html` directly in a modern web browser.
 2. Select a screen size preset (296x128, 154x154 or 384x168) or choose **Custom** and enter the desired width and height.
 3. Click the element buttons to add drawing items. Adjust service options such as background color, rotation, dithering (previewed on the canvas), TTL and the dry-run flag.
-4. Import or export YAML using the buttons below the canvas.
+4. Use the **Zoom** selector to preview the canvas at 1x to 4x size.
+5. Import or export YAML using the buttons below the canvas.
 
 No build step is required; all dependencies are bundled with the repository.
+
+### Hosting on GitHub Pages
+
+If the repository is stored on GitHub, you can enable GitHub Pages and view the editor online:
+
+1. In the repository settings, enable **GitHub Pages** with the source set to the main branch.
+2. Visit `https://<your-user>.github.io/<repo-name>/tools/editor/` to open the editor.
+
+The editor is completely static so no additional build steps are required.
 
 ## Contributing
 - Feature requests and bug reports are welcome! Please open an issue on GitHub

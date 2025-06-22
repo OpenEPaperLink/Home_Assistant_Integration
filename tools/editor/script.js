@@ -1,6 +1,35 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let elements = [];
+let zoom = 1;
+
+function resolveColor(name) {
+  if (!name) return '#000';
+  const map = {
+    black: '#000000',
+    b: '#000000',
+    white: '#ffffff',
+    w: '#ffffff',
+    red: '#ff0000',
+    r: '#ff0000',
+    yellow: '#ffff00',
+    y: '#ffff00',
+    accent: '#ff0000',
+    a: '#ff0000',
+    half_black: '#808080',
+    gray: '#808080',
+    grey: '#808080',
+    hb: '#808080',
+    g: '#808080',
+    half_red: '#ff8080',
+    hr: '#ff8080',
+    half_yellow: '#ffff80',
+    hy: '#ffff80',
+    half_accent: '#ff8080',
+    ha: '#ff8080',
+  };
+  return map[name.toLowerCase()] || name;
+}
 
 const elementTypes = [
   'text',
@@ -89,20 +118,25 @@ function updateScreenSize() {
   }
   canvas.width = w;
   canvas.height = h;
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
+  updateZoom();
   draw();
+}
+
+function updateZoom() {
+  zoom = parseInt(document.getElementById('zoom').value) || 1;
+  canvas.style.width = canvas.width * zoom + 'px';
+  canvas.style.height = canvas.height * zoom + 'px';
 }
 
 function drawElement(el) {
   switch (el.type) {
     case 'text':
-      ctx.fillStyle = el.color || '#000';
+      ctx.fillStyle = resolveColor(el.color);
       ctx.font = `${el.size || 12}px ${el.font || 'sans-serif'}`;
       ctx.fillText(el.value || 'Text', el.x || 0, el.y || 10);
       break;
     case 'multiline':
-      ctx.fillStyle = el.color || '#000';
+      ctx.fillStyle = resolveColor(el.color);
       ctx.font = `${el.size || 12}px ${el.font || 'sans-serif'}`;
       const lines = (el.value || '').split(el.delimiter || '|');
       let y = el.start_y || el.y || 10;
@@ -111,7 +145,7 @@ function drawElement(el) {
       });
       break;
     case 'line':
-      ctx.strokeStyle = el.color || '#000';
+      ctx.strokeStyle = resolveColor(el.color);
       ctx.lineWidth = el.width || 1;
       ctx.beginPath();
       ctx.moveTo(el.x_start || 0, el.y_start || 0);
@@ -119,10 +153,10 @@ function drawElement(el) {
       ctx.stroke();
       break;
     case 'rectangle':
-      ctx.strokeStyle = el.outline || '#000';
+      ctx.strokeStyle = resolveColor(el.outline);
       ctx.lineWidth = el.width || 1;
       if (el.fill) {
-        ctx.fillStyle = el.fill;
+        ctx.fillStyle = resolveColor(el.fill);
         ctx.fillRect(
           el.x_start || 0,
           el.y_start || 0,
@@ -140,7 +174,7 @@ function drawElement(el) {
     case 'rectangle_pattern':
       for (let xi = 0; xi < (el.x_repeat || 1); xi++) {
         for (let yi = 0; yi < (el.y_repeat || 1); yi++) {
-          ctx.strokeStyle = el.outline || '#000';
+          ctx.strokeStyle = resolveColor(el.outline);
           ctx.lineWidth = el.width || 1;
           ctx.strokeRect(
             (el.x_start || 0) + xi * (el.x_size || 10) + (el.x_offset || 0),
@@ -153,7 +187,7 @@ function drawElement(el) {
       break;
     case 'polygon':
       if (!el.points || !el.points.length) return;
-      ctx.strokeStyle = el.outline || '#000';
+      ctx.strokeStyle = resolveColor(el.outline);
       ctx.lineWidth = el.width || 1;
       ctx.beginPath();
       ctx.moveTo(el.points[0][0], el.points[0][1]);
@@ -162,24 +196,24 @@ function drawElement(el) {
       }
       if (el.closed) ctx.closePath();
       if (el.fill) {
-        ctx.fillStyle = el.fill;
+        ctx.fillStyle = resolveColor(el.fill);
         ctx.fill();
       }
       ctx.stroke();
       break;
     case 'circle':
-      ctx.strokeStyle = el.outline || '#000';
+      ctx.strokeStyle = resolveColor(el.outline);
       ctx.lineWidth = el.width || 1;
       ctx.beginPath();
       ctx.arc(el.x || 0, el.y || 0, el.radius || 10, 0, Math.PI * 2);
       if (el.fill) {
-        ctx.fillStyle = el.fill;
+        ctx.fillStyle = resolveColor(el.fill);
         ctx.fill();
       }
       ctx.stroke();
       break;
     case 'ellipse':
-      ctx.strokeStyle = el.outline || '#000';
+      ctx.strokeStyle = resolveColor(el.outline);
       ctx.lineWidth = el.width || 1;
       ctx.beginPath();
       ctx.ellipse(
@@ -192,13 +226,13 @@ function drawElement(el) {
         Math.PI * 2
       );
       if (el.fill) {
-        ctx.fillStyle = el.fill;
+        ctx.fillStyle = resolveColor(el.fill);
         ctx.fill();
       }
       ctx.stroke();
       break;
     case 'arc':
-      ctx.strokeStyle = el.color || '#000';
+      ctx.strokeStyle = resolveColor(el.color);
       ctx.lineWidth = el.width || 1;
       ctx.beginPath();
       ctx.arc(
@@ -211,12 +245,12 @@ function drawElement(el) {
       ctx.stroke();
       break;
     case 'icon':
-      ctx.fillStyle = el.color || '#000';
+      ctx.fillStyle = resolveColor(el.color);
       ctx.font = `${el.size || 24}px sans-serif`;
       ctx.fillText(el.value || '?', el.x || 0, el.y || 10);
       break;
     case 'icon_sequence':
-      ctx.fillStyle = el.color || '#000';
+      ctx.fillStyle = resolveColor(el.color);
       ctx.font = `${el.size || 24}px sans-serif`;
       let dx = 0;
       (el.icons || []).forEach((ic) => {
@@ -225,7 +259,7 @@ function drawElement(el) {
       });
       break;
     case 'qrcode':
-      ctx.fillStyle = '#000';
+      ctx.fillStyle = resolveColor('black');
       ctx.fillRect(el.x || 0, el.y || 0, el.size || 50, el.size || 50);
       break;
     case 'plot':
@@ -249,12 +283,12 @@ function drawElement(el) {
       img.src = el.url;
       break;
     case 'progress_bar':
-      ctx.strokeStyle = el.outline || '#000';
+      ctx.strokeStyle = resolveColor(el.outline);
       ctx.lineWidth = 1;
       const w = (el.x_end || 0) - (el.x_start || 0);
       const h = (el.y_end || 0) - (el.y_start || 0);
       ctx.strokeRect(el.x_start || 0, el.y_start || 0, w, h);
-      ctx.fillStyle = el.fill || '#000';
+      ctx.fillStyle = resolveColor(el.fill || 'black');
       const prog = Math.max(0, Math.min(1, (el.progress || 0) / 100));
       ctx.fillRect(el.x_start || 0, el.y_start || 0, w * prog, h);
       break;
@@ -293,29 +327,45 @@ function applyDither() {
   const w = canvas.width;
   const h = canvas.height;
   if (mode === 1) {
-    // Floyd-Steinberg
-    const gray = new Float32Array(w * h);
-    for (let i = 0; i < data.length; i += 4) {
-      gray[i / 4] = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-    }
+    const errR = new Float32Array(w * h);
+    const errG = new Float32Array(w * h);
+    const errB = new Float32Array(w * h);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const i = y * w + x;
-        const old = gray[i];
-        const newVal = old < 128 ? 0 : 255;
-        const err = old - newVal;
-        gray[i] = newVal;
-        if (x + 1 < w) gray[i + 1] += (err * 7) / 16;
+        const idx = y * w + x;
+        let r = data[idx * 4] + errR[idx];
+        let g = data[idx * 4 + 1] + errG[idx];
+        let b = data[idx * 4 + 2] + errB[idx];
+        const nr = r < 128 ? 0 : 255;
+        const ng = g < 128 ? 0 : 255;
+        const nb = b < 128 ? 0 : 255;
+        data[idx * 4] = nr;
+        data[idx * 4 + 1] = ng;
+        data[idx * 4 + 2] = nb;
+        const dr = r - nr;
+        const dg = g - ng;
+        const db = b - nb;
+        if (x + 1 < w) {
+          errR[idx + 1] += (dr * 7) / 16;
+          errG[idx + 1] += (dg * 7) / 16;
+          errB[idx + 1] += (db * 7) / 16;
+        }
         if (y + 1 < h) {
-          if (x > 0) gray[i + w - 1] += (err * 3) / 16;
-          gray[i + w] += (err * 5) / 16;
-          if (x + 1 < w) gray[i + w + 1] += err / 16;
+          if (x > 0) {
+            errR[idx + w - 1] += (dr * 3) / 16;
+            errG[idx + w - 1] += (dg * 3) / 16;
+            errB[idx + w - 1] += (db * 3) / 16;
+          }
+          errR[idx + w] += (dr * 5) / 16;
+          errG[idx + w] += (dg * 5) / 16;
+          errB[idx + w] += (db * 5) / 16;
+          if (x + 1 < w) {
+            errR[idx + w + 1] += dr / 16;
+            errG[idx + w + 1] += dg / 16;
+            errB[idx + w + 1] += db / 16;
+          }
         }
       }
-    }
-    for (let i = 0; i < gray.length; i++) {
-      const v = gray[i] < 128 ? 0 : 255;
-      data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = v;
     }
   } else if (mode === 2) {
     const bayer = [
@@ -327,10 +377,10 @@ function applyDither() {
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const i = (y * w + x) * 4;
-        const v = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
         const threshold = (bayer[y % 4][x % 4] + 0.5) * 16;
-        const val = v < threshold ? 0 : 255;
-        data[i] = data[i + 1] = data[i + 2] = val;
+        data[i] = data[i] < threshold ? 0 : 255;
+        data[i + 1] = data[i + 1] < threshold ? 0 : 255;
+        data[i + 2] = data[i + 2] < threshold ? 0 : 255;
       }
     }
   }
@@ -346,7 +396,7 @@ function renderElementList() {
     const ta = document.createElement('textarea');
     ta.rows = 6;
     ta.value = jsyaml.dump(el);
-    ta.onchange = () => {
+    ta.oninput = () => {
       try {
         elements[i] = jsyaml.load(ta.value);
         draw();
@@ -387,6 +437,10 @@ document.getElementById('screen-height').onchange = () => {
   document.getElementById('screen-size').value = 'custom';
   updateScreenSize();
 };
+document.getElementById('zoom').onchange = () => {
+  updateZoom();
+  draw();
+};
 
 document.getElementById('background').onchange = draw;
 
@@ -421,5 +475,26 @@ document.getElementById('import-yaml').onclick = () => {
     alert('Parse error: ' + e.message);
   }
 };
+
+document.getElementById('yaml').oninput = () => {
+  try {
+    const data = jsyaml.load(document.getElementById('yaml').value);
+    if (data.payload) elements = data.payload;
+    if (data.background)
+      document.getElementById('background').value = data.background;
+    if (data.rotate !== undefined)
+      document.getElementById('rotate').value = data.rotate;
+    if (data.dither !== undefined)
+      document.getElementById('dither').value = data.dither;
+    if (data.ttl !== undefined) document.getElementById('ttl').value = data.ttl;
+    if (data['dry-run'] !== undefined)
+      document.getElementById('dry-run').checked = data['dry-run'];
+    renderElementList();
+    draw();
+  } catch (e) {
+    // ignore parse errors while typing
+  }
+};
 createElementButtons();
 updateScreenSize();
+updateZoom();

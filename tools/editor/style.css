@@ -9,6 +9,7 @@ body {
 #canvas {
   border: 1px solid #ccc;
   flex: none;
+  image-rendering: pixelated;
 }
 #controls {
   width: 350px;
