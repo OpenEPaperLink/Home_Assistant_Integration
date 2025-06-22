@@ -10,6 +10,11 @@
   <div id="container">
     <canvas id="canvas" width="296" height="128"></canvas>
     <div id="controls">
+      <h2>Renderer</h2>
+      <select id="renderer">
+        <option value="js">JavaScript</option>
+        <option value="py">Python (Pyodide)</option>
+      </select>
       <h2>Screen Size</h2>
       <select id="screen-size">
         <option value="296x128">296x128</option>
@@ -44,6 +49,7 @@
     </div>
   </div>
   <script src="js-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.1/full/pyodide.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

@@ -2,6 +2,17 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let elements = [];
 let zoom = 1;
+let backend = 'js';
+
+let pyodideReady = false;
+async function initPyodide() {
+  if (pyodideReady) return;
+  self.pyodide = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.1/full/' });
+  await self.pyodide.loadPackage(['Pillow', 'PyYAML']);
+  const resp = await fetch('py_renderer.py');
+  await self.pyodide.runPython(await resp.text());
+  pyodideReady = true;
+}
 
 const anchorMap = {
   lt: ['left', 'top'],
@@ -50,6 +61,19 @@ function resolveColor(name) {
     ha: '#ff8080',
   };
   return map[name.toLowerCase()] || name;
+}
+
+async function drawPython() {
+  await initPyodide();
+  const yamlText = document.getElementById('yaml').value;
+  const code = `render_image("""${yamlText.replace(/"""/g, '\"\"\"')}""")`;
+  const dataUrl = await self.pyodide.runPythonAsync(code);
+  const img = new Image();
+  img.onload = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+  };
+  img.src = dataUrl;
 }
 
 const elementTypes = [
@@ -335,7 +359,7 @@ function drawElement(el) {
   }
 }
 
-function draw() {
+function drawJS() {
   ctx.save();
   ctx.fillStyle = document.getElementById('background').value;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -412,6 +436,14 @@ function applyDither() {
   ctx.putImageData(imageData, 0, 0);
 }
 
+function draw() {
+  if (backend === 'py') {
+    drawPython();
+  } else {
+    drawJS();
+  }
+}
+
 function renderElementList() {
   const container = document.getElementById('elements');
   container.innerHTML = '';
@@ -468,6 +500,11 @@ document.getElementById('screen-height').onchange = () => {
 };
 document.getElementById('zoom').onchange = () => {
   updateZoom();
+  draw();
+};
+
+document.getElementById('renderer').onchange = () => {
+  backend = document.getElementById('renderer').value;
   draw();
 };
 
@@ -533,3 +570,4 @@ document.getElementById('yaml').addEventListener('input', () => {
 createElementButtons();
 updateScreenSize();
 updateZoom();
+draw();
