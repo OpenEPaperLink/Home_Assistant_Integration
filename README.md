@@ -220,7 +220,7 @@ A simple web-based editor is included for building `drawcustom` payloads visuall
 
 ### Running the Editor
 
-1. Open `tools/editor/index.html` directly in a modern web browser.
+1. Open `tools/editor/index.html` directly in a browser, or run `python app.py` and visit `http://localhost:5001/`.
 2. Select a screen size preset (296x128, 154x154 or 384x168) or choose **Custom** and enter the desired width and height.
 3. Click the element buttons to add drawing items. Configure colors, fonts, anchor points and other options. Service settings like background, rotation, dithering (previewed on the canvas), TTL and dry-run are also available.
 4. Use the **Zoom** selector to preview the canvas at 1x to 4x size.
