@@ -3,6 +3,12 @@ const ctx = canvas.getContext('2d');
 let elements = [];
 let zoom = 1;
 let backend = 'js';
+let screenWidth = canvas.width;
+let screenHeight = canvas.height;
+let selectedIndex = null;
+let dragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
 
 function log(msg) {
   const out = document.getElementById('debug-output');
@@ -231,10 +237,11 @@ function resolveColor(name) {
 async function drawPython() {
   await initPyodide();
   try {
+    const rot = parseInt(document.getElementById('rotate').value) || 0;
     const data = {
       payload: elements,
       background: document.getElementById('background').value,
-      rotate: parseInt(document.getElementById('rotate').value) || 0,
+      rotate: rot % 180 === 0 ? rot : 0,
       dither: parseInt(document.getElementById('dither').value) || 0,
       ttl: parseInt(document.getElementById('ttl').value) || 0,
       'dry-run': document.getElementById('dry-run').checked,
@@ -325,8 +332,8 @@ function updateScreenSize() {
   const sel = document.getElementById('screen-size').value;
   const widthInput = document.getElementById('screen-width');
   const heightInput = document.getElementById('screen-height');
-  let w = canvas.width;
-  let h = canvas.height;
+  let w = screenWidth;
+  let h = screenHeight;
   if (sel === 'custom') {
     widthInput.disabled = false;
     heightInput.disabled = false;
@@ -339,8 +346,20 @@ function updateScreenSize() {
     widthInput.disabled = true;
     heightInput.disabled = true;
   }
-  canvas.width = w;
-  canvas.height = h;
+  screenWidth = w;
+  screenHeight = h;
+  applyRotation();
+}
+
+function applyRotation() {
+  const rot = parseInt(document.getElementById('rotate').value) || 0;
+  if (rot % 180 === 0) {
+    canvas.width = screenWidth;
+    canvas.height = screenHeight;
+  } else {
+    canvas.width = screenHeight;
+    canvas.height = screenWidth;
+  }
   updateZoom();
   draw();
 }
@@ -629,6 +648,11 @@ function renderElementList() {
   elements.forEach((el, i) => {
     const div = document.createElement('div');
     div.className = 'element';
+    if (i === selectedIndex) div.classList.add('selected');
+    div.onclick = () => {
+      selectedIndex = i;
+      renderElementList();
+    };
     const ta = document.createElement('textarea');
     ta.rows = 6;
     ta.value = jsyaml.dump(el);
@@ -681,6 +705,7 @@ document.getElementById('zoom').onchange = () => {
   updateZoom();
   draw();
 };
+document.getElementById('rotate').onchange = applyRotation;
 
 document.querySelectorAll('input[name="renderer"]').forEach((el) => {
   el.onchange = () => {
@@ -701,8 +726,8 @@ document.getElementById('export-yaml').onclick = () => {
     dither: parseInt(document.getElementById('dither').value) || 0,
     ttl: parseInt(document.getElementById('ttl').value) || 0,
     'dry-run': document.getElementById('dry-run').checked,
-    width: canvas.width,
-    height: canvas.height,
+    width: screenWidth,
+    height: screenHeight,
   };
   document.getElementById('yaml').value = jsyaml.dump(data);
 };
@@ -717,9 +742,11 @@ function parseYamlField() {
     const data = jsyaml.load(document.getElementById('yaml').value);
     if (data.payload) elements = data.payload;
     if (data.background)
-      document.getElementById('background').value = data.background;
-    if (data.rotate !== undefined)
+      document.getElementById('background').value = resolveColor(data.background);
+    if (data.rotate !== undefined) {
       document.getElementById('rotate').value = data.rotate;
+      applyRotation();
+    }
     if (data.dither !== undefined)
       document.getElementById('dither').value = data.dither;
     if (data.ttl !== undefined) document.getElementById('ttl').value = data.ttl;
@@ -741,6 +768,45 @@ function parseYamlField() {
 document.getElementById('yaml').addEventListener('input', () => {
   clearTimeout(yamlTimer);
   yamlTimer = setTimeout(parseYamlField, 400);
+});
+
+canvas.addEventListener('mousedown', (e) => {
+  if (selectedIndex === null) return;
+  dragging = true;
+  dragStartX = e.offsetX;
+  dragStartY = e.offsetY;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!dragging || selectedIndex === null) return;
+  const dx = e.offsetX - dragStartX;
+  const dy = e.offsetY - dragStartY;
+  const el = elements[selectedIndex];
+  if ('x' in el) el.x = (el.x || 0) + dx;
+  if ('y' in el) el.y = (el.y || 0) + dy;
+  if ('x_start' in el) {
+    el.x_start = (el.x_start || 0) + dx;
+    if ('x_end' in el) el.x_end = (el.x_end || 0) + dx;
+  }
+  if ('y_start' in el) {
+    el.y_start = (el.y_start || 0) + dy;
+    if ('y_end' in el) el.y_end = (el.y_end || 0) + dy;
+  }
+  if (Array.isArray(el.points)) {
+    el.points = el.points.map((p) => [p[0] + dx, p[1] + dy]);
+  }
+  dragStartX = e.offsetX;
+  dragStartY = e.offsetY;
+  renderElementList();
+  draw();
+});
+
+canvas.addEventListener('mouseup', () => {
+  dragging = false;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  dragging = false;
 });
 createElementButtons();
 updateScreenSize();

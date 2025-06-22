@@ -46,6 +46,11 @@ body {
   margin-top: 5px;
 }
 
+.element.selected {
+  border-color: #007bff;
+  background: #e7f1ff;
+}
+
 .element textarea {
   width: 100%;
 }
