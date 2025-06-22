@@ -773,14 +773,16 @@ document.getElementById('yaml').addEventListener('input', () => {
 canvas.addEventListener('mousedown', (e) => {
   if (selectedIndex === null) return;
   dragging = true;
-  dragStartX = e.offsetX;
-  dragStartY = e.offsetY;
+  dragStartX = e.offsetX / zoom;
+  dragStartY = e.offsetY / zoom;
 });
 
 canvas.addEventListener('mousemove', (e) => {
   if (!dragging || selectedIndex === null) return;
-  const dx = e.offsetX - dragStartX;
-  const dy = e.offsetY - dragStartY;
+  const x = e.offsetX / zoom;
+  const y = e.offsetY / zoom;
+  const dx = x - dragStartX;
+  const dy = y - dragStartY;
   const el = elements[selectedIndex];
   if ('x' in el) el.x = (el.x || 0) + dx;
   if ('y' in el) el.y = (el.y || 0) + dy;
@@ -795,8 +797,8 @@ canvas.addEventListener('mousemove', (e) => {
   if (Array.isArray(el.points)) {
     el.points = el.points.map((p) => [p[0] + dx, p[1] + dy]);
   }
-  dragStartX = e.offsetX;
-  dragStartY = e.offsetY;
+  dragStartX = x;
+  dragStartY = y;
   renderElementList();
   draw();
 });

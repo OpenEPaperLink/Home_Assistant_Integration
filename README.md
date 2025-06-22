@@ -223,9 +223,12 @@ A simple web-based editor is included for building `drawcustom` payloads visuall
 1. Open `tools/editor/index.html` directly in a browser, or run `python app.py` and visit `http://localhost:5001/`.
 2. Select a screen size preset (296x128, 154x154 or 384x168) or choose **Custom** and enter the desired width and height.
 3. Click the element buttons to add drawing items. Configure colors, fonts, anchor points and other options. Service options such as background color, rotation, dithering, TTL and dry-run stay visible above the element list so they remain accessible while scrolling.
-4. Use the **Zoom** selector to preview the canvas at 1x to 4x size.
+4. Use the **Zoom** selector to preview the canvas at 1x to 4x size. Scaling is
+   pixel-perfect so each canvas pixel becomes a block of 2×2, 3×3 or 4×4
+   pixels when zoomed.
 5. Click an element in the list to select it, then drag it on the canvas to
-   reposition it.
+   reposition it. Dragging accounts for the current zoom level so movement feels
+   natural at any scale.
 6. Choose **JavaScript** or **Python (Pyodide)** rendering using the
    **Renderer** toggle. The Python renderer uses the same drawing
    routines as the integration and automatically loads the bundled
