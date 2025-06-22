@@ -615,7 +615,8 @@ function applyDither() {
 }
 
 function draw() {
-  if (backend === 'py') {
+  const rot = parseInt(document.getElementById('rotate').value) || 0;
+  if (backend === 'py' || rot !== 0) {
     drawPython();
   } else {
     drawJS();
@@ -707,29 +708,7 @@ document.getElementById('export-yaml').onclick = () => {
 };
 
 document.getElementById('import-yaml').onclick = () => {
-  try {
-    const data = jsyaml.load(document.getElementById('yaml').value);
-    if (data.payload) elements = data.payload;
-    if (data.background)
-      document.getElementById('background').value = data.background;
-    if (data.rotate !== undefined)
-      document.getElementById('rotate').value = data.rotate;
-    if (data.dither !== undefined)
-      document.getElementById('dither').value = data.dither;
-    if (data.ttl !== undefined) document.getElementById('ttl').value = data.ttl;
-    if (data['dry-run'] !== undefined)
-      document.getElementById('dry-run').checked = data['dry-run'];
-    if (data.width && data.height) {
-      document.getElementById('screen-size').value = 'custom';
-      document.getElementById('screen-width').value = data.width;
-      document.getElementById('screen-height').value = data.height;
-      updateScreenSize();
-    }
-    renderElementList();
-    draw();
-  } catch (e) {
-    log('Parse error: ' + e.message);
-  }
+  parseYamlField();
 };
 
 let yamlTimer;

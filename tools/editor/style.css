@@ -1,34 +1,51 @@
 body {
   font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0 10px;
 }
-#container {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
+
+#display-area {
+  text-align: center;
+  margin: 10px 0;
 }
+
 #canvas {
   border: 1px solid #ccc;
-  flex: none;
   image-rendering: pixelated;
 }
-#controls {
-  width: 350px;
+
+#service-options {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  padding: 10px;
+  border-bottom: 1px solid #ccc;
+  z-index: 1;
 }
-#controls label {
-  display: block;
-  margin-top: 5px;
+
+#service-options label {
+  display: inline-block;
+  margin: 5px 5px 0 0;
 }
+
 .element-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
   margin-bottom: 5px;
 }
+
+#elements-container {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
 .element {
   border: 1px solid #ccc;
   padding: 5px;
   margin-top: 5px;
 }
+
 .element textarea {
   width: 100%;
 }
