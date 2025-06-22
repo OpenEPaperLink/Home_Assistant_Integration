@@ -2,6 +2,73 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let elements = [];
 
+const elementTypes = [
+  'text',
+  'multiline',
+  'line',
+  'rectangle',
+  'rectangle_pattern',
+  'polygon',
+  'circle',
+  'ellipse',
+  'arc',
+  'icon',
+  'icon_sequence',
+  'qrcode',
+  'plot',
+  'progress_bar',
+  'diagram',
+  'dlimg',
+  'debug_grid',
+];
+
+function defaultElement(type) {
+  switch (type) {
+    case 'text':
+      return { type: 'text', value: 'Text', x: 0, y: 10, size: 12, color: '#000' };
+    case 'multiline':
+      return { type: 'multiline', value: 'Line1|Line2', x: 0, y: 10, size: 12 };
+    case 'line':
+      return { type: 'line', x_start: 0, y_start: 0, x_end: 50, y_end: 50 };
+    case 'rectangle':
+      return { type: 'rectangle', x_start: 0, y_start: 0, x_end: 50, y_end: 30 };
+    case 'rectangle_pattern':
+      return { type: 'rectangle_pattern', x_start: 0, y_start: 0, x_size: 10, y_size: 10 };
+    case 'polygon':
+      return { type: 'polygon', points: [[0, 0], [40, 0], [20, 30]], closed: true };
+    case 'circle':
+      return { type: 'circle', x: 20, y: 20, radius: 10 };
+    case 'ellipse':
+      return { type: 'ellipse', x_start: 0, y_start: 0, x_end: 40, y_end: 20 };
+    case 'arc':
+      return { type: 'arc', x: 20, y: 20, radius: 10, start_angle: 0, end_angle: 180 };
+    case 'icon':
+      return { type: 'icon', value: 'mdi-home', x: 0, y: 24, size: 24 };
+    case 'icon_sequence':
+      return { type: 'icon_sequence', icons: ['A', 'B'], x: 0, y: 24, size: 24 };
+    case 'qrcode':
+      return { type: 'qrcode', data: 'https://example.com', x: 0, y: 0, size: 50 };
+    case 'plot':
+      return { type: 'plot', x: 0, y: 0, width: 100, height: 50 };
+    case 'progress_bar':
+      return { type: 'progress_bar', x_start: 0, y_start: 0, x_end: 100, y_end: 20, progress: 50 };
+    case 'diagram':
+      return { type: 'diagram', x: 0, y: 0, width: 100, height: 50 };
+    case 'dlimg':
+      return { type: 'dlimg', url: '', x: 0, y: 0, xsize: 50, ysize: 50 };
+    case 'debug_grid':
+      return { type: 'debug_grid' };
+    default:
+      return { type };
+  }
+}
+
+function addElement(type) {
+  elements.push(defaultElement(type));
+  renderElementList();
+  draw();
+}
+
 function updateScreenSize() {
   const sel = document.getElementById('screen-size').value;
   const widthInput = document.getElementById('screen-width');
@@ -22,6 +89,8 @@ function updateScreenSize() {
   }
   canvas.width = w;
   canvas.height = h;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
   draw();
 }
 
@@ -213,6 +282,59 @@ function draw() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   elements.forEach((el) => drawElement(el));
   ctx.restore();
+  applyDither();
+}
+
+function applyDither() {
+  const mode = parseInt(document.getElementById('dither').value) || 0;
+  if (mode === 0) return; // no dithering preview
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  const w = canvas.width;
+  const h = canvas.height;
+  if (mode === 1) {
+    // Floyd-Steinberg
+    const gray = new Float32Array(w * h);
+    for (let i = 0; i < data.length; i += 4) {
+      gray[i / 4] = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    }
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        const old = gray[i];
+        const newVal = old < 128 ? 0 : 255;
+        const err = old - newVal;
+        gray[i] = newVal;
+        if (x + 1 < w) gray[i + 1] += (err * 7) / 16;
+        if (y + 1 < h) {
+          if (x > 0) gray[i + w - 1] += (err * 3) / 16;
+          gray[i + w] += (err * 5) / 16;
+          if (x + 1 < w) gray[i + w + 1] += err / 16;
+        }
+      }
+    }
+    for (let i = 0; i < gray.length; i++) {
+      const v = gray[i] < 128 ? 0 : 255;
+      data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = v;
+    }
+  } else if (mode === 2) {
+    const bayer = [
+      [0, 8, 2, 10],
+      [12, 4, 14, 6],
+      [3, 11, 1, 9],
+      [15, 7, 13, 5],
+    ];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const v = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        const threshold = (bayer[y % 4][x % 4] + 0.5) * 16;
+        const val = v < threshold ? 0 : 255;
+        data[i] = data[i + 1] = data[i + 2] = val;
+      }
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
 }
 
 function renderElementList() {
@@ -245,12 +367,16 @@ function renderElementList() {
   });
 }
 
-document.getElementById('add-element').onclick = () => {
-  const type = document.getElementById('element-type').value;
-  elements.push({ type });
-  renderElementList();
-  draw();
-};
+function createElementButtons() {
+  const container = document.getElementById('element-buttons');
+  elementTypes.forEach((t) => {
+    const btn = document.createElement('button');
+    btn.textContent = t;
+    btn.onclick = () => addElement(t);
+    container.appendChild(btn);
+  });
+}
+
 
 document.getElementById('screen-size').onchange = updateScreenSize;
 document.getElementById('screen-width').onchange = () => {
@@ -295,5 +421,5 @@ document.getElementById('import-yaml').onclick = () => {
     alert('Parse error: ' + e.message);
   }
 };
-
+createElementButtons();
 updateScreenSize();

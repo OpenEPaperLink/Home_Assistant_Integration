@@ -3,10 +3,12 @@ body {
 }
 #container {
   display: flex;
+  align-items: flex-start;
   gap: 20px;
 }
 #canvas {
   border: 1px solid #ccc;
+  flex: none;
 }
 #controls {
   width: 350px;
@@ -14,6 +16,12 @@ body {
 #controls label {
   display: block;
   margin-top: 5px;
+}
+.element-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 5px;
 }
 .element {
   border: 1px solid #ccc;
