@@ -222,11 +222,16 @@ A simple web-based editor is included for building `drawcustom` payloads visuall
 
 1. Open `tools/editor/index.html` directly in a modern web browser.
 2. Select a screen size preset (296x128, 154x154 or 384x168) or choose **Custom** and enter the desired width and height.
-3. Click the element buttons to add drawing items. Adjust service options such as background color, rotation, dithering (previewed on the canvas), TTL and the dry-run flag.
+3. Click the element buttons to add drawing items. Configure colors, fonts, anchor points and other options. Service settings like background, rotation, dithering (previewed on the canvas), TTL and dry-run are also available.
 4. Use the **Zoom** selector to preview the canvas at 1x to 4x size.
 5. Import or export YAML using the buttons below the canvas.
+   YAML changes are applied a short time after you stop typing to avoid
+   errors while editing.
 
 No build step is required; all dependencies are bundled with the repository.
+The preview renderer is a lightweight JavaScript version of the integration's
+image generator. For an exact result you can send the YAML to the `drawcustom`
+service with `dry-run: true`.
 
 ### Hosting on GitHub Pages
 

@@ -3,6 +3,27 @@ const ctx = canvas.getContext('2d');
 let elements = [];
 let zoom = 1;
 
+const anchorMap = {
+  lt: ['left', 'top'],
+  lm: ['left', 'middle'],
+  lb: ['left', 'bottom'],
+  la: ['left', 'alphabetic'],
+  mt: ['center', 'top'],
+  mm: ['center', 'middle'],
+  mb: ['center', 'bottom'],
+  ma: ['center', 'alphabetic'],
+  rt: ['right', 'top'],
+  rm: ['right', 'middle'],
+  rb: ['right', 'bottom'],
+  ra: ['right', 'alphabetic'],
+};
+
+function applyAnchor(anchor) {
+  const [align, baseline] = anchorMap[anchor] || anchorMap.lt;
+  ctx.textAlign = align;
+  ctx.textBaseline = baseline;
+}
+
 function resolveColor(name) {
   if (!name) return '#000';
   const map = {
@@ -54,9 +75,9 @@ const elementTypes = [
 function defaultElement(type) {
   switch (type) {
     case 'text':
-      return { type: 'text', value: 'Text', x: 0, y: 10, size: 12, color: '#000' };
+      return { type: 'text', value: 'Text', x: 0, y: 10, size: 12, color: '#000', anchor: 'lt' };
     case 'multiline':
-      return { type: 'multiline', value: 'Line1|Line2', x: 0, y: 10, size: 12 };
+      return { type: 'multiline', value: 'Line1|Line2', x: 0, y: 10, size: 12, anchor: 'lm' };
     case 'line':
       return { type: 'line', x_start: 0, y_start: 0, x_end: 50, y_end: 50 };
     case 'rectangle':
@@ -72,9 +93,9 @@ function defaultElement(type) {
     case 'arc':
       return { type: 'arc', x: 20, y: 20, radius: 10, start_angle: 0, end_angle: 180 };
     case 'icon':
-      return { type: 'icon', value: 'mdi-home', x: 0, y: 24, size: 24 };
+      return { type: 'icon', value: 'mdi-home', x: 0, y: 24, size: 24, anchor: 'la' };
     case 'icon_sequence':
-      return { type: 'icon_sequence', icons: ['A', 'B'], x: 0, y: 24, size: 24 };
+      return { type: 'icon_sequence', icons: ['A', 'B'], x: 0, y: 24, size: 24, anchor: 'la' };
     case 'qrcode':
       return { type: 'qrcode', data: 'https://example.com', x: 0, y: 0, size: 50 };
     case 'plot':
@@ -133,11 +154,13 @@ function drawElement(el) {
     case 'text':
       ctx.fillStyle = resolveColor(el.color);
       ctx.font = `${el.size || 12}px ${el.font || 'sans-serif'}`;
+      applyAnchor(el.anchor || 'lt');
       ctx.fillText(el.value || 'Text', el.x || 0, el.y || 10);
       break;
     case 'multiline':
       ctx.fillStyle = resolveColor(el.color);
       ctx.font = `${el.size || 12}px ${el.font || 'sans-serif'}`;
+      applyAnchor(el.anchor || 'lm');
       const lines = (el.value || '').split(el.delimiter || '|');
       let y = el.start_y || el.y || 10;
       lines.forEach((line, i) => {
@@ -247,11 +270,13 @@ function drawElement(el) {
     case 'icon':
       ctx.fillStyle = resolveColor(el.color);
       ctx.font = `${el.size || 24}px sans-serif`;
+      applyAnchor(el.anchor || 'la');
       ctx.fillText(el.value || '?', el.x || 0, el.y || 10);
       break;
     case 'icon_sequence':
       ctx.fillStyle = resolveColor(el.color);
       ctx.font = `${el.size || 24}px sans-serif`;
+      applyAnchor(el.anchor || 'la');
       let dx = 0;
       (el.icons || []).forEach((ic) => {
         ctx.fillText(ic, (el.x || 0) + dx, el.y || 10);
@@ -396,14 +421,18 @@ function renderElementList() {
     const ta = document.createElement('textarea');
     ta.rows = 6;
     ta.value = jsyaml.dump(el);
-    ta.oninput = () => {
-      try {
-        elements[i] = jsyaml.load(ta.value);
-        draw();
-      } catch (e) {
-        alert('Parse error: ' + e.message);
-      }
-    };
+    let taTimer;
+    ta.addEventListener('input', () => {
+      clearTimeout(taTimer);
+      taTimer = setTimeout(() => {
+        try {
+          elements[i] = jsyaml.load(ta.value);
+          draw();
+        } catch (e) {
+          // ignore parse errors until valid YAML is entered
+        }
+      }, 300);
+    });
     const del = document.createElement('button');
     del.textContent = 'Delete';
     del.onclick = () => {
@@ -476,7 +505,8 @@ document.getElementById('import-yaml').onclick = () => {
   }
 };
 
-document.getElementById('yaml').oninput = () => {
+let yamlTimer;
+function parseYamlField() {
   try {
     const data = jsyaml.load(document.getElementById('yaml').value);
     if (data.payload) elements = data.payload;
@@ -492,9 +522,14 @@ document.getElementById('yaml').oninput = () => {
     renderElementList();
     draw();
   } catch (e) {
-    // ignore parse errors while typing
+    // ignore parse errors until valid YAML
   }
-};
+}
+
+document.getElementById('yaml').addEventListener('input', () => {
+  clearTimeout(yamlTimer);
+  yamlTimer = setTimeout(parseYamlField, 400);
+});
 createElementButtons();
 updateScreenSize();
 updateZoom();
