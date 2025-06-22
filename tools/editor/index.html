@@ -11,10 +11,10 @@
     <canvas id="canvas" width="296" height="128"></canvas>
     <div id="controls">
       <h2>Renderer</h2>
-      <select id="renderer">
-        <option value="js">JavaScript</option>
-        <option value="py">Python (Pyodide)</option>
-      </select>
+      <div id="renderer-toggle" class="renderer-toggle">
+        <label><input type="radio" name="renderer" id="renderer-js" value="js" checked> JavaScript</label>
+        <label><input type="radio" name="renderer" id="renderer-py" value="py"> Python (Pyodide)</label>
+      </div>
       <h2>Screen Size</h2>
       <select id="screen-size">
         <option value="296x128">296x128</option>
@@ -46,6 +46,10 @@
       <br>
       <button id="import-yaml">Import YAML</button>
       <button id="export-yaml">Export YAML</button>
+      <details id="debug-details">
+        <summary>Show Debug Output</summary>
+        <pre id="debug-output"></pre>
+      </details>
     </div>
   </div>
   <script src="js-yaml.min.js"></script>

@@ -32,3 +32,16 @@ body {
 .element textarea {
   width: 100%;
 }
+
+#debug-output {
+  max-height: 150px;
+  overflow: auto;
+  background: #f9f9f9;
+  border: 1px solid #ccc;
+  padding: 5px;
+  font-family: monospace;
+}
+
+.renderer-toggle label {
+  margin-right: 10px;
+}

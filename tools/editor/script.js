@@ -4,6 +4,13 @@ let elements = [];
 let zoom = 1;
 let backend = 'js';
 
+function log(msg) {
+  const out = document.getElementById('debug-output');
+  if (!out) return;
+  out.textContent += msg + '\n';
+  out.scrollTop = out.scrollHeight;
+}
+
 let pyodideReady = false;
 async function initPyodide() {
   if (pyodideReady) return;
@@ -12,6 +19,7 @@ async function initPyodide() {
   const resp = await fetch('py_renderer.py');
   await self.pyodide.runPython(await resp.text());
   pyodideReady = true;
+  log('Pyodide ready');
 }
 
 const anchorMap = {
@@ -65,15 +73,21 @@ function resolveColor(name) {
 
 async function drawPython() {
   await initPyodide();
-  const yamlText = document.getElementById('yaml').value;
-  const code = `render_image("""${yamlText.replace(/"""/g, '\"\"\"')}""")`;
-  const dataUrl = await self.pyodide.runPythonAsync(code);
-  const img = new Image();
-  img.onload = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-  };
-  img.src = dataUrl;
+  try {
+    let data = jsyaml.load(document.getElementById('yaml').value || '{}');
+    data.width = canvas.width;
+    data.height = canvas.height;
+    const renderImage = self.pyodide.globals.get('render_image');
+    const dataUrl = renderImage(jsyaml.dump(data));
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+    };
+    img.src = dataUrl;
+  } catch (e) {
+    log('Pyodide error: ' + e);
+  }
 }
 
 const elementTypes = [
@@ -461,7 +475,7 @@ function renderElementList() {
           elements[i] = jsyaml.load(ta.value);
           draw();
         } catch (e) {
-          // ignore parse errors until valid YAML is entered
+          log('Parse error: ' + e.message);
         }
       }, 300);
     });
@@ -503,10 +517,14 @@ document.getElementById('zoom').onchange = () => {
   draw();
 };
 
-document.getElementById('renderer').onchange = () => {
-  backend = document.getElementById('renderer').value;
-  draw();
-};
+document.querySelectorAll('input[name="renderer"]').forEach((el) => {
+  el.onchange = () => {
+    if (el.checked) {
+      backend = el.value;
+      draw();
+    }
+  };
+});
 
 document.getElementById('background').onchange = draw;
 
@@ -518,6 +536,8 @@ document.getElementById('export-yaml').onclick = () => {
     dither: parseInt(document.getElementById('dither').value) || 0,
     ttl: parseInt(document.getElementById('ttl').value) || 0,
     'dry-run': document.getElementById('dry-run').checked,
+    width: canvas.width,
+    height: canvas.height,
   };
   document.getElementById('yaml').value = jsyaml.dump(data);
 };
@@ -535,10 +555,16 @@ document.getElementById('import-yaml').onclick = () => {
     if (data.ttl !== undefined) document.getElementById('ttl').value = data.ttl;
     if (data['dry-run'] !== undefined)
       document.getElementById('dry-run').checked = data['dry-run'];
+    if (data.width && data.height) {
+      document.getElementById('screen-size').value = 'custom';
+      document.getElementById('screen-width').value = data.width;
+      document.getElementById('screen-height').value = data.height;
+      updateScreenSize();
+    }
     renderElementList();
     draw();
   } catch (e) {
-    alert('Parse error: ' + e.message);
+    log('Parse error: ' + e.message);
   }
 };
 
@@ -556,10 +582,16 @@ function parseYamlField() {
     if (data.ttl !== undefined) document.getElementById('ttl').value = data.ttl;
     if (data['dry-run'] !== undefined)
       document.getElementById('dry-run').checked = data['dry-run'];
+    if (data.width && data.height) {
+      document.getElementById('screen-size').value = 'custom';
+      document.getElementById('screen-width').value = data.width;
+      document.getElementById('screen-height').value = data.height;
+      updateScreenSize();
+    }
     renderElementList();
     draw();
   } catch (e) {
-    // ignore parse errors until valid YAML
+    log('Parse error: ' + e.message);
   }
 }
 
