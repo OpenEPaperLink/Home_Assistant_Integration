@@ -225,16 +225,18 @@ A simple web-based editor is included for building `drawcustom` payloads visuall
 3. Click the element buttons to add drawing items. Configure colors, fonts, anchor points and other options. Service settings like background, rotation, dithering (previewed on the canvas), TTL and dry-run are also available.
 4. Use the **Zoom** selector to preview the canvas at 1x to 4x size.
 5. Choose **JavaScript** or **Python (Pyodide)** rendering using the
-   **Renderer** toggle. The Python option runs a simplified version of
-   the integration's image generator in WebAssembly. Debug messages
-   are available in the optional output panel below the YAML field.
+   **Renderer** toggle. The Python renderer is bundled with the editor
+   and runs a lightweight version of the integration's image generator
+   directly in WebAssembly. Debug messages are available in the
+   optional output panel below the YAML field.
 6. Import or export YAML using the buttons below the canvas.
    YAML changes are applied a short time after you stop typing to avoid
    errors while editing.
 
 No build step is required; all dependencies are bundled with the repository.
 The Python renderer downloads Pyodide and Pillow when first selected, so an
-internet connection is required. The default JavaScript renderer is a
+internet connection is required, but the renderer code itself is embedded in the
+editor. The default JavaScript renderer is a
 lightweight approximation of the integration's image generator. For an exact
 result you can send the YAML to the `drawcustom` service with `dry-run: true`.
 
