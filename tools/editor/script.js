@@ -736,6 +736,15 @@ document.getElementById('import-yaml').onclick = () => {
   parseYamlField();
 };
 
+document.getElementById('clear-elements').onclick = () => {
+  if (elements.length === 0) return;
+  if (confirm('Clear all elements?')) {
+    elements = [];
+    renderElementList();
+    draw();
+  }
+};
+
 let yamlTimer;
 function parseYamlField() {
   try {
@@ -773,29 +782,32 @@ document.getElementById('yaml').addEventListener('input', () => {
 canvas.addEventListener('mousedown', (e) => {
   if (selectedIndex === null) return;
   dragging = true;
-  dragStartX = e.offsetX / zoom;
-  dragStartY = e.offsetY / zoom;
+  dragStartX = Math.round(e.offsetX / zoom);
+  dragStartY = Math.round(e.offsetY / zoom);
 });
 
 canvas.addEventListener('mousemove', (e) => {
   if (!dragging || selectedIndex === null) return;
-  const x = e.offsetX / zoom;
-  const y = e.offsetY / zoom;
+  const x = Math.round(e.offsetX / zoom);
+  const y = Math.round(e.offsetY / zoom);
   const dx = x - dragStartX;
   const dy = y - dragStartY;
   const el = elements[selectedIndex];
-  if ('x' in el) el.x = (el.x || 0) + dx;
-  if ('y' in el) el.y = (el.y || 0) + dy;
+  if ('x' in el) el.x = Math.round((el.x || 0) + dx);
+  if ('y' in el) el.y = Math.round((el.y || 0) + dy);
   if ('x_start' in el) {
-    el.x_start = (el.x_start || 0) + dx;
-    if ('x_end' in el) el.x_end = (el.x_end || 0) + dx;
+    el.x_start = Math.round((el.x_start || 0) + dx);
+    if ('x_end' in el) el.x_end = Math.round((el.x_end || 0) + dx);
   }
   if ('y_start' in el) {
-    el.y_start = (el.y_start || 0) + dy;
-    if ('y_end' in el) el.y_end = (el.y_end || 0) + dy;
+    el.y_start = Math.round((el.y_start || 0) + dy);
+    if ('y_end' in el) el.y_end = Math.round((el.y_end || 0) + dy);
   }
   if (Array.isArray(el.points)) {
-    el.points = el.points.map((p) => [p[0] + dx, p[1] + dy]);
+    el.points = el.points.map((p) => [
+      Math.round(p[0] + dx),
+      Math.round(p[1] + dy),
+    ]);
   }
   dragStartX = x;
   dragStartY = y;

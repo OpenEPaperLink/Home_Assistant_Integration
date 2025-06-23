@@ -235,9 +235,9 @@ A simple web-based editor is included for building `drawcustom` payloads visuall
    fonts (`ppb.ttf`, `rbm.ttf`, and Material Design Icons) when
    initialized. Debug messages are available in the optional output
    panel below the YAML field.
-7. Import or export YAML using the buttons below the canvas.
-   YAML changes are applied a short time after you stop typing to avoid
-   errors while editing.
+7. Use the buttons below the canvas to import or export YAML, or
+   clear all elements. YAML changes are applied a short time after you
+   stop typing to avoid errors while editing.
 
 Rotation values of 90 or 270 degrees swap the preview width and height so the
 displayed canvas matches the rotated orientation.
