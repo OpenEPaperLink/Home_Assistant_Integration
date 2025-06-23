@@ -736,6 +736,15 @@ document.getElementById('import-yaml').onclick = () => {
   parseYamlField();
 };
 
+document.getElementById('clear-elements').onclick = () => {
+  if (elements.length === 0) return;
+  if (confirm('Clear all elements?')) {
+    elements = [];
+    renderElementList();
+    draw();
+  }
+};
+
 let yamlTimer;
 function parseYamlField() {
   try {
