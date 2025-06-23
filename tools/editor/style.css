@@ -4,6 +4,12 @@ body {
   padding: 0 10px;
 }
 
+#top-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
 #display-area {
   text-align: center;
   margin: 10px 0;
@@ -16,16 +22,18 @@ body {
 
 #service-options {
   position: sticky;
-  top: 0;
+  top: 10px;
   background: #fff;
   padding: 10px;
-  border-bottom: 1px solid #ccc;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  max-width: 250px;
   z-index: 1;
 }
 
 #service-options label {
-  display: inline-block;
-  margin: 5px 5px 0 0;
+  display: block;
+  margin: 3px 0;
 }
 
 .element-buttons {

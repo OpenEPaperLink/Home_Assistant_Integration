@@ -7,15 +7,16 @@
 </head>
 <body>
   <h1>Drawcustom Editor</h1>
-  <div id="display-area">
-    <canvas id="canvas" width="296" height="128"></canvas>
-  </div>
-  <div id="service-options">
-    <h2>Renderer</h2>
-    <div id="renderer-toggle" class="renderer-toggle">
-      <label><input type="radio" name="renderer" id="renderer-js" value="js" checked> JavaScript</label>
-      <label><input type="radio" name="renderer" id="renderer-py" value="py"> Python (Pyodide)</label>
+  <div id="top-container">
+    <div id="display-area">
+      <canvas id="canvas" width="296" height="128"></canvas>
     </div>
+    <div id="service-options">
+      <h2>Renderer</h2>
+      <div id="renderer-toggle" class="renderer-toggle">
+        <label><input type="radio" name="renderer" id="renderer-js" value="js" checked> JavaScript</label>
+        <label><input type="radio" name="renderer" id="renderer-py" value="py"> Python (Pyodide)</label>
+      </div>
     <h2>Screen Size</h2>
     <select id="screen-size">
       <option value="296x128">296x128</option>
@@ -38,7 +39,8 @@
     <label>Rotate <input type="number" id="rotate" value="0" min="0" max="270" step="90"></label>
     <label>Dither <input type="number" id="dither" value="2" min="0" max="2"></label>
     <label>TTL <input type="number" id="ttl" value="60" min="0"></label>
-    <label>Dry-run <input type="checkbox" id="dry-run"></label>
+      <label>Dry-run <input type="checkbox" id="dry-run"></label>
+    </div>
   </div>
   <h2>Add Element</h2>
   <div id="element-buttons" class="element-buttons"></div>
