@@ -6,6 +6,7 @@ let backend = 'js';
 let screenWidth = canvas.width;
 let screenHeight = canvas.height;
 let selectedIndex = null;
+let elementRefs = [];
 let dragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
@@ -642,17 +643,32 @@ function draw() {
   }
 }
 
+function selectElement(i) {
+  selectedIndex = i;
+  elementRefs.forEach((ref, idx) => {
+    if (!ref) return;
+    if (idx === i) ref.div.classList.add('selected');
+    else ref.div.classList.remove('selected');
+  });
+}
+
+function updateElementTextarea(i) {
+  const ref = elementRefs[i];
+  if (ref) {
+    ref.ta.value = jsyaml.dump(elements[i]);
+  }
+}
+
 function renderElementList() {
   const container = document.getElementById('elements');
+  const scroll = container.scrollTop;
   container.innerHTML = '';
+  elementRefs = [];
   elements.forEach((el, i) => {
     const div = document.createElement('div');
     div.className = 'element';
     if (i === selectedIndex) div.classList.add('selected');
-    div.onclick = () => {
-      selectedIndex = i;
-      renderElementList();
-    };
+    div.onclick = () => selectElement(i);
     const ta = document.createElement('textarea');
     ta.rows = 6;
     ta.value = jsyaml.dump(el);
@@ -678,7 +694,9 @@ function renderElementList() {
     div.appendChild(ta);
     div.appendChild(del);
     container.appendChild(div);
+    elementRefs[i] = { div, ta };
   });
+  container.scrollTop = scroll;
 }
 
 function createElementButtons() {
@@ -811,7 +829,7 @@ canvas.addEventListener('mousemove', (e) => {
   }
   dragStartX = x;
   dragStartY = y;
-  renderElementList();
+  updateElementTextarea(selectedIndex);
   draw();
 });
 
@@ -825,4 +843,5 @@ canvas.addEventListener('mouseleave', () => {
 createElementButtons();
 updateScreenSize();
 updateZoom();
+renderElementList();
 draw();
