@@ -4,52 +4,66 @@ body {
   padding: 0 10px;
 }
 
-.main-container {
-  display: flex;
-  gap: 20px;
-}
-
-#config-panel {
-  width: 40%;
-  max-width: 400px;
-}
-
-#preview-panel {
-  flex: 1;
+#display-area {
   text-align: center;
+  margin: 10px 0;
 }
 
-#preview-image {
-  max-width: 100%;
+#canvas {
   border: 1px solid #ccc;
+  image-rendering: pixelated;
 }
 
-#yaml-output {
-  width: 100%;
-  height: 200px;
+#service-options {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  padding: 10px;
+  border-bottom: 1px solid #ccc;
+  z-index: 1;
 }
 
-.accordion-item {
-  border: 1px solid #ccc;
+#service-options label {
+  display: inline-block;
+  margin: 5px 5px 0 0;
+}
+
+.element-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
   margin-bottom: 5px;
 }
 
-.accordion-header {
-  background: #eee;
+#elements-container {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.element {
+  border: 1px solid #ccc;
   padding: 5px;
-  cursor: pointer;
+  margin-top: 5px;
 }
 
-.accordion-content {
-  display: none;
+.element.selected {
+  border-color: #007bff;
+  background: #e7f1ff;
+}
+
+.element textarea {
+  width: 100%;
+}
+
+#debug-output {
+  max-height: 150px;
+  overflow: auto;
+  background: #f9f9f9;
+  border: 1px solid #ccc;
   padding: 5px;
+  font-family: monospace;
 }
 
-.accordion-item.open .accordion-content {
-  display: block;
-}
-
-label {
-  display: block;
-  margin: 5px 0;
+.renderer-toggle label {
+  margin-right: 10px;
 }

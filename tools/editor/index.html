@@ -2,27 +2,60 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Eetlijst Image Configurator</title>
+  <title>Drawcustom Editor</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Eetlijst Image Configurator</h1>
-  <div class="main-container">
-    <div id="config-panel">
-      <h2>Configuration</h2>
-      <div id="accordion-container"></div>
-      <h3>Generated YAML (for reference)</h3>
-      <textarea id="yaml-output" readonly></textarea>
-    </div>
-    <div id="preview-panel">
-      <h2>Preview</h2>
-      <button id="generate-btn">Generate Image</button>
-      <div id="preview-image-container">
-        <img id="preview-image" src="" alt="Image Preview" />
-      </div>
-    </div>
+  <h1>Drawcustom Editor</h1>
+  <div id="display-area">
+    <canvas id="canvas" width="296" height="128"></canvas>
   </div>
+  <div id="service-options">
+    <h2>Renderer</h2>
+    <div id="renderer-toggle" class="renderer-toggle">
+      <label><input type="radio" name="renderer" id="renderer-js" value="js" checked> JavaScript</label>
+      <label><input type="radio" name="renderer" id="renderer-py" value="py"> Python (Pyodide)</label>
+    </div>
+    <h2>Screen Size</h2>
+    <select id="screen-size">
+      <option value="296x128">296x128</option>
+      <option value="154x154">154x154</option>
+      <option value="384x168">384x168</option>
+      <option value="custom">Custom</option>
+    </select>
+    <label>Width <input type="number" id="screen-width" value="296" min="1"></label>
+    <label>Height <input type="number" id="screen-height" value="128" min="1"></label>
+    <label>Zoom
+      <select id="zoom">
+        <option value="1">1x</option>
+        <option value="2">2x</option>
+        <option value="3">3x</option>
+        <option value="4">4x</option>
+      </select>
+    </label>
+    <h2>Service Options</h2>
+    <label>Background <input type="color" id="background" value="#ffffff"></label>
+    <label>Rotate <input type="number" id="rotate" value="0" min="0" max="270" step="90"></label>
+    <label>Dither <input type="number" id="dither" value="2" min="0" max="2"></label>
+    <label>TTL <input type="number" id="ttl" value="60" min="0"></label>
+    <label>Dry-run <input type="checkbox" id="dry-run"></label>
+  </div>
+  <h2>Add Element</h2>
+  <div id="element-buttons" class="element-buttons"></div>
+  <div id="elements-container">
+    <div id="elements"></div>
+  </div>
+  <h2>YAML</h2>
+  <textarea id="yaml" rows="10" cols="40"></textarea>
+  <br>
+  <button id="import-yaml">Import YAML</button>
+  <button id="export-yaml">Export YAML</button>
+  <details id="debug-details">
+    <summary>Show Debug Output</summary>
+    <pre id="debug-output"></pre>
+  </details>
   <script src="js-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.1/full/pyodide.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
