@@ -1,4 +1,9 @@
 {
+  "bluetooth": [
+    {
+      "manufacturer_id": 4919
+    }
+  ],
   "domain": "open_epaper_link",
   "name": "OpenEPaperLink",
   "codeowners": [
@@ -8,17 +13,17 @@
   "dependencies": [
     "recorder"
   ],
-  "documentation": "https://github.com/jonasniesner/open_epaper_link_homeassistant",
+  "documentation": "https://github.com/OpenEPaperLink/Home_Assistant_Integration",
   "integration_type": "hub",
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/jonasniesner/open_epaper_link_homeassistant/issues",
+  "issue_tracker": "https://github.com/OpenEPaperLink/Home_Assistant_Integration/issues",
   "requirements": [
     "qrcode[pil]==7.4.2",
     "requests_toolbelt==1.0.0",
     "websocket-client==1.7.0",
     "websockets>=14.2",
-    "python-resize-image==1.1.20"
+    "python-resize-image==1.1.20",
+    "bleak>=1.0.1"
   ],
-  "single_config_entry": true,
   "version": "1.0.0"
 }

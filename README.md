@@ -14,8 +14,18 @@ Home Assistant Integration for the [OpenEPaperLink](https://github.com/jjwbruijn
 ## Requirements
 
 ### Hardware
+
+**AP-Based Setup:**
 - OpenEPaperLink Access Point (ESP32-based)
-- Compatible Electronic Shelf Labels
+- Compatible Electronic Shelf Labels connected to AP
+
+**BLE-Based Setup:**
+- BLE-compatible Electronic Shelf Labels with ATC BLE firmware
+- Home Assistant with Bluetooth adapter or proxy (e.g., ESPHome)
+- No separate AP required - direct device communication
+
+**Mixed Setup:**
+- Both AP and BLE devices can coexist in the same Home Assistant instance
 
 ## Features
 
@@ -107,8 +117,19 @@ After setup, you can configure additional options through the integration's opti
 - **Button Debounce Time**: Adjust sensitivity of button triggers (0.0-5.0 seconds)
 - **NFC Debounce Time**: Adjust sensitivity of NFC triggers (0.0-5.0 seconds)
 
-#### Tag Discovery
-Tags are automatically discovered when they check in with your AP. New tags will appear as devices with their MAC address as the identifier or alias if available. You can rename these in the device settings.
+#### Device Discovery
+
+**AP Device Configuration:**
+- Manual setup required via Settings → Integrations → Add Integration
+- Enter your AP's IP address when prompted
+- ⚠️ **Single Hub Limitation**: Only one AP hub allowed per Home Assistant instance
+- All tags connected to the AP are automatically discovered
+
+**BLE Device Discovery:**
+- Automatic discovery via Bluetooth scanning
+- Devices appear when in range and advertising
+- Each BLE device creates a separate integration entry
+- No limit on number of BLE devices
 
 ## Usage Examples
 

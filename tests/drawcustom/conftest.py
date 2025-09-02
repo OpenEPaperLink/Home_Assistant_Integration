@@ -1,10 +1,8 @@
 """Shared fixtures for drawcustom tests."""
 import os
-import sys
 import pytest
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
-from PIL import Image, ImageFont, ImageDraw
-from io import BytesIO
+from unittest.mock import AsyncMock, MagicMock, patch
+from PIL import ImageFont
 
 from PIL import ImageChops
 

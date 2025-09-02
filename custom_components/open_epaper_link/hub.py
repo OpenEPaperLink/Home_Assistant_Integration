@@ -10,7 +10,6 @@ import websockets
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, CALLBACK_TYPE, callback
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
@@ -808,14 +807,14 @@ class Hub:
         try:
             _LOGGER.info("Loading existing tags from AP...")
 
-            # Track how many tags we've processed
+            # Track the number of processed tags
             new_tags_count = 0
             updated_tags_count = 0
 
             # Get all tag data from AP
             all_tags = await self._fetch_all_tags_from_ap()
 
-            # Process each tag using our common helper function
+            # Process each tag using the common helper function
             for tag_mac, tag_data in all_tags.items():
                 # Process tag with the initial load flag set
                 is_new = await self._process_tag_data(tag_mac, tag_data, is_initial_load=True)

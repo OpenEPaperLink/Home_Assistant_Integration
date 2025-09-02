@@ -4,8 +4,32 @@ from .const import DOMAIN
 import requests
 import logging
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 _LOGGER = logging.getLogger(__name__)
+
+def is_bluetooth_available(hass: HomeAssistant) -> bool:
+    """Check if Bluetooth integration is available with working scanners.
+    
+    Args:
+        hass: Home Assistant instance
+        
+    Returns:
+        bool: True if Bluetooth integration is loaded with available scanners, False otherwise
+    """
+    try:
+        # First check if bluetooth integration is loaded
+        if "bluetooth" not in hass.config.components:
+            return False
+        
+        # Then check if connectable Bluetooth scanners are available
+        from homeassistant.components import bluetooth
+        scanner_count = bluetooth.async_scanner_count(hass, connectable=True)
+        return scanner_count > 0
+        
+    except (ImportError, AttributeError, Exception) as err:
+        _LOGGER.debug("Bluetooth availability check failed: %s", err)
+        return False
 
 def get_image_folder(hass: HomeAssistant) -> str:
     """Return the folder where images are stored.
@@ -61,8 +85,7 @@ async def send_tag_cmd(hass: HomeAssistant, entity_id: str, cmd: str) -> bool:
         HomeAssistantError: If the AP is offline or entity_id is invalid
     """
     # Get the hub from the entity_id's domain
-    entry_id = list(hass.data[DOMAIN].keys())[0]  # Get the first (and should be only) entry
-    hub = hass.data[DOMAIN][entry_id]
+    hub = get_hub_from_hass(hass)
 
     if not hub.online:
         _LOGGER.error("Cannot send command: AP is offline")
@@ -105,8 +128,7 @@ async def reboot_ap(hass: HomeAssistant) -> bool:
         HomeAssistantError: If the AP is offline or cannot be reached
     """
     # Get the hub instance
-    entry_id = list(hass.data[DOMAIN].keys())[0]  # Get the first (and should be only) entry
-    hub = hass.data[DOMAIN][entry_id]
+    hub = get_hub_from_hass(hass)
 
     if not hub.online:
         _LOGGER.error("Cannot reboot AP: AP is offline")
@@ -177,3 +199,40 @@ async def set_ap_config_item(hub, key: str, value: str | int) -> bool:
     except Exception as e:
         _LOGGER.error("Failed to set AP config %s: %s", key, str(e))
         return False
+
+
+def get_hub_from_hass(hass: HomeAssistant):
+    """Get the AP Hub instance from Home Assistant data.
+    
+    Searches through all integration entries to find the AP Hub object,
+    filtering out BLE entries which are dictionaries.
+    
+    Args:
+        hass: Home Assistant instance
+    
+    Returns:
+        Hub: The OpenEPaperLink AP Hub instance
+        
+    Raises:
+        HomeAssistantError: If no AP hub is configured
+    """
+    if DOMAIN not in hass.data or not hass.data[DOMAIN]:
+        raise HomeAssistantError("OpenEPaperLink integration not configured")
+    
+    for entry_data in hass.data[DOMAIN].values():
+        if not is_ble_entry(entry_data):
+            return entry_data  # This is the Hub object
+    
+    raise HomeAssistantError("No AP hub configured. Only BLE devices found.")
+
+
+def is_ble_entry(entry_data) -> bool:
+    """Check if entry data represents a BLE device.
+    
+    Args:
+        entry_data: Entry data from hass.data[DOMAIN][entry_id]
+        
+    Returns:
+        bool: True if the entry represents a BLE device
+    """
+    return isinstance(entry_data, dict) and entry_data.get("type") == "ble"

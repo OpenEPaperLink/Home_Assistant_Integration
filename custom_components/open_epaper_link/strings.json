@@ -6,6 +6,9 @@
           "host": "[%key:common::config_flow::data::host%]"
         }
       }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one OpenEPaperLink hub can be configured. Multiple BLE devices are supported, but only one AP hub is allowed."
     }
   }
 }

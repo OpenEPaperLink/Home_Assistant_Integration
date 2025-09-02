@@ -7,9 +7,7 @@ from unittest.mock import patch
 
 from PIL import Image
 
-from homeassistant.exceptions import HomeAssistantError
 from conftest import BASE_IMG_PATH, images_equal
-from conftest import save_image
 
 COMMON_IMG_PATH = os.path.join(BASE_IMG_PATH, 'common')
 

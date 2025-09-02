@@ -9,14 +9,13 @@ from homeassistant.components.camera import Camera
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import requests
 
 from .tag_types import TagType
 from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
 from .image_decompressor import to_image
-from .tag_types import get_hw_string, get_tag_types_manager
+from .tag_types import get_tag_types_manager
 from .util import get_image_path
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -286,7 +285,7 @@ class EPDCamera(Camera):
     ) -> bytes | None:
         """Return image response."""
         try:
-            # First check if we have an image on disk
+            # First check if an image exists on disk
             if os.path.exists(self._image_path):
                 if not self._last_image:
                     self._last_image = await self.hass.async_add_executor_job(

@@ -1,11 +1,21 @@
 {
     "config": {
         "step": {
+          "bluetooth_confirm": {
+            "title": "Set up BLE Tag",
+            "description": "Set up **{name}**?\n\n**Details:**\n- Address: {address}\n- Signal: {rssi} dBm\n- Battery: {battery}"
+          },
             "user": {
                 "data": {
                     "host": "Host or IP"
                 }
             }
+        },
+        "error": {
+            "interrogation_failed": "Failed to connect to device and retrieve display information. Error: {error}. Retry or check device connectivity."
+        },
+        "abort": {
+            "single_instance_allowed": "Only one OpenEPaperLink hub can be configured. Multiple BLE devices are supported, but only one AP hub is allowed."
         }
     },
     "options": {
@@ -20,6 +30,9 @@
                     "custom_font_dirs": "Custom Font Directories"
                 }
             }
+        },
+        "abort": {
+            "no_options_ble": "No configurable options are available for BLE devices. BLE devices are managed automatically and do not require additional configuration."
         }
     },
     "entity": {
@@ -189,6 +202,11 @@
                 "name": "Content"
             }
         },
+        "light": {
+            "led": {
+                "name": "LED"
+            }
+        },
         "button": {
             "clear_pending": {
                 "name": "Clear Pending Updates"
@@ -210,6 +228,12 @@
             },
             "refresh_tag_types": {
                 "name": "Refresh Tag Types"
+            },
+            "set_clock_mode": {
+                "name": "Enable Clock Mode"
+            },
+            "disable_clock_mode": {
+                "name": "Disable Clock Mode"
             }
         }
     }

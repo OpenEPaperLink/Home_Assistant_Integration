@@ -16,7 +16,8 @@ from homeassistant.helpers import device_registry as dr
 from .const import DOMAIN
 from .imagegen import ImageGen
 from .tag_types import get_tag_types_manager
-from .util import send_tag_cmd, reboot_ap
+from .util import send_tag_cmd, reboot_ap, is_ble_entry, get_hub_from_hass
+from .ble_utils import upload_image as ble_upload_image, DeviceMetadata
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -123,7 +124,14 @@ async def get_entity_id_from_device_id(hass: HomeAssistant, device_id: str) -> s
     if domain_mac[0] != DOMAIN:
         raise HomeAssistantError(f"Device {device_id} is not an OpenEPaperLink device")
 
-    return f"{DOMAIN}.{domain_mac[1].lower()}"
+    # Handle BLE device identifiers (format: "ble_MAC") vs Hub tags (format: "MAC")
+    identifier = domain_mac[1]
+    if identifier.startswith("ble_"):
+        mac_address = identifier[4:]  # Remove "ble_" prefix
+    else:
+        mac_address = identifier
+    
+    return f"{DOMAIN}.{mac_address.lower()}"
 
 
 class UploadQueueHandler:
@@ -183,109 +191,120 @@ class UploadQueueHandler:
             asyncio.create_task(self._process_queue())
 
     async def _process_queue(self):
-        """Process queued upload tasks.
+        """Process queued upload tasks with true parallelism.
 
         Long-running task that processes the upload queue, respecting:
 
         - Maximum concurrent upload limit
         - Cooldown period between uploads
 
+        Creates background tasks for parallel execution instead of blocking.
         Handles errors in individual uploads without stopping queue processing.
         This method runs until the queue is empty, then terminates.
         """
         self._processing = True
         _LOGGER.debug("Upload queue processor started. %s", self)
+        
+        running_tasks = set()
 
         try:
-            while not self._queue.empty():
+            while not self._queue.empty() or running_tasks:
+                # Clean up completed tasks
+                if running_tasks:
+                    done_tasks = {task for task in running_tasks if task.done()}
+                    for task in done_tasks:
+                        running_tasks.remove(task)
+                        # Get the result to handle any exceptions
+                        try:
+                            await task
+                        except Exception as err:
+                            _LOGGER.error("Background upload task failed: %s", str(err))
+
+                # Check if new uploads can be started
                 async with self._lock:
-                    # Check if the upload limit has been reached
-                    if self._active_uploads >= self._max_concurrent:
-                        _LOGGER.debug("Hit concurrent upload limit (%d). Waiting...", self._max_concurrent)
-                        await asyncio.sleep(0.1)
-                        continue
+                    if (not self._queue.empty() and 
+                        self._active_uploads < self._max_concurrent):
+                        
+                        # Check cooldown period
+                        if self._last_upload:
+                            elapsed = (datetime.now() - self._last_upload).total_seconds()
+                            if elapsed < self._cooldown:
+                                _LOGGER.debug("In cooldown period (%.1f seconds remaining)",
+                                              self._cooldown - elapsed)
+                                await asyncio.sleep(self._cooldown - elapsed)
 
-                    # Check cooldown period
-                    if self._last_upload:
-                        elapsed = (datetime.now() - self._last_upload).total_seconds()
-                        if elapsed < self._cooldown:
-                            _LOGGER.debug("In cooldown period (%.1f seconds remaining)",
-                                          self._cooldown - elapsed)
-                            await asyncio.sleep(self._cooldown - elapsed)
+                        # Get next task from queue
+                        upload_func, args, kwargs = await self._queue.get()
+                        entity_id = next((arg for arg in args if isinstance(arg, str) and "." in arg), "unknown")
 
-                    # Get next task from queue
-                    upload_func, args, kwargs = await self._queue.get()
-
-                    entity_id = next((arg for arg in args if isinstance(arg, str) and "." in arg), "unknown")
-
-                    try:
-                        # Increment active uploads counter
-                        self._active_uploads += 1
-                        _LOGGER.debug("Starting upload for %s. %s", entity_id, self)
-
-                        # Perform upload
-                        _LOGGER.debug("Starting queued upload task")
-                        start_time = datetime.now()
-                        await upload_func(*args, **kwargs)
-                        duration = (datetime.now() - start_time).total_seconds()
-
+                        # Create and start background task
+                        task = asyncio.create_task(self._execute_upload(upload_func, args, kwargs, entity_id))
+                        running_tasks.add(task)
+                        
                         # Update last upload timestamp
                         self._last_upload = datetime.now()
-                        _LOGGER.debug("Upload completed for %s in %.1f seconds", entity_id, duration)
+                        
+                    else:
+                        # Wait a bit before checking again
+                        await asyncio.sleep(0.1)
 
-                    except Exception as err:
-                        _LOGGER.error("Error processing queued upload for %s: %s", entity_id, str(err))
-                    finally:
-                        # Decrement active upload counter
-                        self._active_uploads -= 1
-                        # Mark task as done
-                        self._queue.task_done()
-                        _LOGGER.debug("Upload task for %s finished. %s", entity_id, self)
         finally:
+            # Wait for all running tasks to complete
+            if running_tasks:
+                await asyncio.gather(*running_tasks, return_exceptions=True)
             self._processing = False
 
+    async def _execute_upload(self, upload_func, args, kwargs, entity_id):
+        """Execute a single upload task in the background."""
+        try:
+            # Increment active uploads counter
+            async with self._lock:
+                self._active_uploads += 1
+            _LOGGER.debug("Starting upload for %s. %s", entity_id, self)
 
-async def async_setup_services(hass: HomeAssistant) -> None:
+            # Perform upload
+            _LOGGER.debug("Starting queued upload task")
+            start_time = datetime.now()
+            await upload_func(*args, **kwargs)
+            duration = (datetime.now() - start_time).total_seconds()
+
+            _LOGGER.debug("Upload completed for %s in %.1f seconds", entity_id, duration)
+
+        except Exception as err:
+            _LOGGER.error("Error processing queued upload for %s: %s", entity_id, str(err))
+        finally:
+            # Decrement active upload counter
+            async with self._lock:
+                self._active_uploads -= 1
+            # Mark task as done
+            self._queue.task_done()
+            _LOGGER.debug("Upload task for %s finished. %s", entity_id, self)
+
+
+async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -> None:
     """Set up the OpenEPaperLink services.
 
-    Registers all service handlers for the integration:
+    Registers service handlers for the integration based on device type:
 
-    - drawcustom: Draw custom content on tags
-    - setled: Configure LED patterns
-    - clear_pending, force_refresh, reboot_tag: Tag management
-    - scan_channels: Tag network scanning
-    - reboot_ap: AP management
-    - refresh_tag_types: System management
+    - service_type="all": All services (AP and BLE compatible)
+    - service_type="ble": Only BLE-compatible services (drawcustom)
+    - service_type="ap": All services (backwards compatibility)
+
+    Services by category:
+    - BLE compatible: drawcustom
+    - AP only: setled, clear_pending, force_refresh, reboot_tag, scan_channels, reboot_ap, refresh_tag_types
 
     Also registers handlers for deprecated services that show errors.
 
     Args:
         hass: Home Assistant instance
+        service_type: Type of services to register ("all", "ble", "ap")
     """
 
-    upload_queue = UploadQueueHandler(max_concurrent=1, cooldown=1.0)
+    # Separate queues for different device types
+    ble_upload_queue = UploadQueueHandler(max_concurrent=3, cooldown=0.1)
+    hub_upload_queue = UploadQueueHandler(max_concurrent=1, cooldown=1.0)
 
-    async def get_hub():
-        """Get the hub instance from Home Assistant data.
-
-        Retrieves the OpenEPaperLink Hub instance from the Home Assistant
-        data registry. The Hub is the central communication point that
-        manages the connection to the AP.
-
-        Since there can only be one OpenEPaperLink integration instance,
-        this function takes the first (and should be only) entry from
-        the hass.data[DOMAIN] dictionary.
-
-        Returns:
-            Hub: The OpenEPaperLink Hub instance
-
-        Raises:
-            HomeAssistantError: If the integration is not configured yet
-                               or no Hub instance is available
-        """
-        if DOMAIN not in hass.data or not hass.data[DOMAIN]:
-            raise HomeAssistantError("Integration not configured")
-        return next(iter(hass.data[DOMAIN].values()))
 
     async def drawcustom_service(service: ServiceCall) -> None:
         """Handle drawcustom service calls.
@@ -312,11 +331,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         Raises:
             HomeAssistantError: If AP is offline or image generation fails
         """
-        hub = await get_hub()
-        if not hub.online:
-            raise HomeAssistantError(
-                "AP is offline. Please check your network connection and AP status."
-            )
+        # Check if any Hub (AP-based) devices require Hub connectivity
+        # BLE devices don't need the Hub to be online
+        hub = None
 
         label_ids = service.data.get("label_id", [])
         device_ids = service.data.get("device_id", [])
@@ -341,13 +358,41 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 entity_id = await get_entity_id_from_device_id(hass, device_id)
                 _LOGGER.debug("Processing device_id: %s (entity_id: %s)", device_id, entity_id)
 
+                # Determine if this is a BLE device by checking device registry
+                device_registry = dr.async_get(hass)
+                device = device_registry.async_get(device_id)
+                is_ble_device = False
+                if device and device.identifiers:
+                    domain_mac = next(iter(device.identifiers))
+                    is_ble_device = domain_mac[1].startswith("ble_")
+
+                # For Hub devices, ensure Hub is online
+                if not is_ble_device:
+                    if hub is None:
+                        hub = get_hub_from_hass(hass)
+                    if not hub.online:
+                        raise HomeAssistantError(
+                            "AP is offline. Please check your network connection and AP status."
+                        )
+
                 try:
-                    # Generate image
-                    image_data = await generator.generate_custom_image(
-                        entity_id=entity_id,
-                        service_data=service.data,
-                        error_collector=device_errors
-                    )
+                    # Generate image (BLE vs Hub path will be handled in ImageGen)
+                    if is_ble_device:
+                        # For BLE devices, tag info must be provided since they don't use Hub
+                        tag_info = await generator.get_ble_tag_info(hass, entity_id)
+                        image_data = await generator.generate_custom_image(
+                            entity_id=entity_id,
+                            service_data=service.data,
+                            error_collector=device_errors,
+                            tag_info=tag_info
+                        )
+                    else:
+                        # Hub devices use existing path
+                        image_data = await generator.generate_custom_image(
+                            entity_id=entity_id,
+                            service_data=service.data,
+                            error_collector=device_errors
+                        )
 
                     if device_errors:
                         errors.extend([f"Device {entity_id}: {err}" for err in device_errors])
@@ -361,17 +406,36 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         _LOGGER.info("Dry run completed for %s", entity_id)
                         continue
 
-                    # Queue the upload
-                    await upload_queue.add_to_queue(
-                        upload_image,
-                        hub,
-                        entity_id,
-                        image_data,
-                        service.data.get("dither", DITHER_DEFAULT),
-                        service.data.get("ttl", 60),
-                        service.data.get("preload_type", 0),
-                        service.data.get("preload_lut", 0)
-                    )
+                    # Choose upload method based on device type
+                    if is_ble_device:
+                        # Check Bluetooth availability before queuing BLE upload
+                        from .util import is_bluetooth_available
+                        if not is_bluetooth_available(hass):
+                            raise HomeAssistantError(
+                                f"Cannot upload to BLE device {entity_id}: "
+                                "Bluetooth integration is disabled or no scanners available. "
+                                "Please enable Bluetooth integration in Home Assistant."
+                            )
+                            
+                        # Queue BLE upload (only if Bluetooth is available)
+                        await ble_upload_queue.add_to_queue(
+                            upload_ble_image,
+                            hass,
+                            entity_id,
+                            image_data
+                        )
+                    else:
+                        # Queue Hub/AP upload
+                        await hub_upload_queue.add_to_queue(
+                            upload_image,
+                            hub,
+                            entity_id,
+                            image_data,
+                            service.data.get("dither", DITHER_DEFAULT),
+                            service.data.get("ttl", 60),
+                            service.data.get("preload_type", 0),
+                            service.data.get("preload_lut", 0)
+                        )
 
                 except Exception as err:
                     error_msg = f"Error processing device {entity_id}: {str(err)}"
@@ -470,6 +534,59 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             except Exception as err:
                 raise HomeAssistantError(f"Failed to upload image for {entity_id}: {str(err)}")
 
+    async def upload_ble_image(hass: HomeAssistant, entity_id: str, img: bytes) -> None:
+        """Upload image to BLE tag.
+
+        Sends an image to a BLE tag using direct Bluetooth communication.
+        This bypasses the AP and provides faster upload times.
+
+        Args:
+            hass: Home Assistant instance
+            entity_id: Entity ID of the target tag
+            img: JPEG image data as bytes
+
+        Raises:
+            HomeAssistantError: If BLE upload fails
+        """
+
+        mac = entity_id.split(".")[1].upper()
+        _LOGGER.debug("Preparing BLE upload for %s (MAC: %s)", entity_id, mac)
+
+        try:
+            # Get device metadata from Home Assistant data
+            domain_data = hass.data.get(DOMAIN, {})
+            device_metadata = None
+            
+            # Find the config entry for this BLE device
+            for entry_id, entry_data in domain_data.items():
+                if (is_ble_entry(entry_data) and
+                    entry_data.get("mac_address", "").upper() == mac):
+                    device_metadata = entry_data.get("device_metadata", {})
+                    break
+            
+            if not device_metadata:
+                raise HomeAssistantError(f"No metadata found for BLE device {entity_id}")
+            
+            # Create DeviceMetadata object
+            metadata = DeviceMetadata(
+                hw_type=device_metadata.get("hw_type", 0),
+                fw_version=device_metadata.get("fw_version", 0),
+                width=device_metadata.get("width", 0),
+                height=device_metadata.get("height", 0),
+                color_support=device_metadata.get("color_support", "mono"),
+                rotatebuffer=device_metadata.get("rotatebuffer", 0)
+            )
+            
+
+            # Upload via BLE
+            success = await ble_upload_image(hass, mac, img, metadata)
+            if not success:
+                raise HomeAssistantError(f"BLE image upload failed for {entity_id}")
+                
+        except Exception as err:
+            _LOGGER.error("BLE upload error for %s: %s", entity_id, err)
+            raise HomeAssistantError(f"Failed to upload image via BLE to {entity_id}: {str(err)}") from err
+
     async def setled_service(service: ServiceCall) -> None:
         """Handle LED pattern service calls.
 
@@ -489,7 +606,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         Raises:
             HomeAssistantError: If AP is offline or request fails
         """
-        hub = await get_hub()
+        hub = get_hub_from_hass(hass)
         if not hub.online:
             raise HomeAssistantError("AP is offline")
 
@@ -636,16 +753,18 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "notification_id": "tag_types_refresh_notification",
             },
         )
-
-    # Register current services
+    # Register services available for all device types
     hass.services.async_register(DOMAIN, "drawcustom", drawcustom_service)
-    hass.services.async_register(DOMAIN, "setled", setled_service)
-    hass.services.async_register(DOMAIN, "clear_pending", clear_pending_service)
-    hass.services.async_register(DOMAIN, "force_refresh", force_refresh_service)
-    hass.services.async_register(DOMAIN, "reboot_tag", reboot_tag_service)
-    hass.services.async_register(DOMAIN, "scan_channels", scan_channels_service)
-    hass.services.async_register(DOMAIN, "reboot_ap", reboot_ap_service)
-    hass.services.async_register(DOMAIN, "refresh_tag_types", refresh_tag_types_service)
+
+    # Register AP-only services based on service_type
+    if service_type in ["all", "ap"]:
+        hass.services.async_register(DOMAIN, "setled", setled_service)
+        hass.services.async_register(DOMAIN, "clear_pending", clear_pending_service)
+        hass.services.async_register(DOMAIN, "force_refresh", force_refresh_service)
+        hass.services.async_register(DOMAIN, "reboot_tag", reboot_tag_service)
+        hass.services.async_register(DOMAIN, "scan_channels", scan_channels_service)
+        hass.services.async_register(DOMAIN, "reboot_ap", reboot_ap_service)
+        hass.services.async_register(DOMAIN, "refresh_tag_types", refresh_tag_types_service)
 
     # Register handlers for deprecated services that just show error
     async def deprecated_service_handler(service: ServiceCall, old_service: str) -> None:
@@ -668,13 +787,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "See the documentation for more details."
         )
 
-    # Register deprecated services with error message
-    for old_service in ["dlimg", "lines5", "lines4"]:
-        hass.services.async_register(
-            DOMAIN,
-            old_service,
-            lambda call, name=old_service: deprecated_service_handler(call, name)
-        )
+    # Register deprecated services with error message (only if all services are being registered)
+    if service_type in ["all", "ap"]:
+        for old_service in ["dlimg", "lines5", "lines4"]:
+            hass.services.async_register(
+                DOMAIN,
+                old_service,
+                lambda call, name=old_service: deprecated_service_handler(call, name)
+            )
 
 
 async def async_unload_services(hass: HomeAssistant) -> None:
@@ -684,12 +804,23 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     is unloaded. This prevents service calls to a non-existent
     integration.
 
+    Only removes services that were actually registered to prevent errors.
+
     Args:
         hass: Home Assistant instance
     """
-    services = [
-        "dlimg", "lines5", "lines4", "drawcustom", "setled", "clear_pending",
-        "force_refresh", "reboot_tag", "scan_channels", "reboot_ap", "refresh_tag_types"
-    ]
-    for service in services:
-        hass.services.async_remove(DOMAIN, service)
+    # Always try to remove drawcustom service (registered for all device types)
+    if hass.services.has_service(DOMAIN, "drawcustom"):
+        hass.services.async_remove(DOMAIN, "drawcustom")
+
+    # Remove AP-only services if they exist
+    ap_services = ["setled", "clear_pending", "force_refresh", "reboot_tag", "scan_channels", "reboot_ap", "refresh_tag_types"]
+    for service in ap_services:
+        if hass.services.has_service(DOMAIN, service):
+            hass.services.async_remove(DOMAIN, service)
+
+    # Remove deprecated services if they exist
+    deprecated_services = ["dlimg", "lines5", "lines4"]
+    for service in deprecated_services:
+        if hass.services.has_service(DOMAIN, service):
+            hass.services.async_remove(DOMAIN, service)

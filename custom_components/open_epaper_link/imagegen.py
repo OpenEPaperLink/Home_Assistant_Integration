@@ -20,7 +20,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.network import get_url
 from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
 from .tag_types import TagType, get_tag_types_manager
-from .util import get_image_path
+from .util import get_image_path, get_hub_from_hass
 from PIL import Image, ImageDraw, ImageFont
 from resizeimage import resizeimage
 from homeassistant.exceptions import HomeAssistantError
@@ -470,7 +470,7 @@ class FontManager:
                     continue
 
                 return ImageFont.truetype(font_path, size)
-            except (OSError, IOError) as err:
+            except (OSError, IOError):
                 continue
 
         # Font was not found in any standard location
@@ -486,7 +486,7 @@ class FontManager:
             try:
                 default_path = os.path.join(os.path.dirname(__file__), default_font)
                 return ImageFont.truetype(default_path, size)
-            except (OSError, IOError) as err:
+            except (OSError, IOError):
                 continue
 
         _LOGGER.error(
@@ -581,11 +581,15 @@ class ImageGen:
         self._not_setup = True
         self._last_interaction_file = os.path.join(os.path.dirname(__file__), "lastapinteraction.txt")
 
-        # Load font manager
+        # Load font manager - find a Hub entry with .entry attribute, or None for BLE-only setups
         self._entry = None
         if DOMAIN in hass.data and hass.data[DOMAIN]:
-            entry_id = list(hass.data[DOMAIN].keys())[0]
-            self._entry = hass.data[DOMAIN][entry_id].entry
+            for entry_id, entry_data in hass.data[DOMAIN].items():
+                # Look for Hub entries (which have .entry attribute) vs BLE entries (which are dicts)
+                if hasattr(entry_data, 'entry'):
+                    self._entry = entry_data.entry
+                    break
+            # If no Hub found, self._entry stays None (BLE-only setup)
 
         self._font_manager = FontManager(self.hass, self._entry)
 
@@ -629,10 +633,7 @@ class ImageGen:
 
         try:
             # Get hub instance
-            if DOMAIN not in self.hass.data or not self.hass.data[DOMAIN]:
-                raise HomeAssistantError("OpenEPaperLink integration not properly configured")
-
-            hub = next(iter(self.hass.data[DOMAIN].values()))
+            hub = get_hub_from_hass(self.hass)
             if not hub.online:
                 raise HomeAssistantError("OpenEPaperLink AP is offline")
 
@@ -655,7 +656,7 @@ class ImageGen:
                     f"Tag {tag_mac} is currently blacklisted. Remove it from the blacklist in integration options to use it."
                 )
 
-            # Get tag data - should exist since we checked hub.tags
+            # Get tag data - should exist since hub.tags was checked
             tag_data = hub.get_tag_data(tag_mac)
             if not tag_data:
                 raise HomeAssistantError(
@@ -695,6 +696,107 @@ class ImageGen:
             if not isinstance(e, HomeAssistantError):
                 raise HomeAssistantError(
                     f"Unexpected error getting tag type for {entity_id}: {str(e)}"
+                ) from e
+            raise
+
+    async def get_ble_tag_info(self, hass: HomeAssistant, entity_id: str) -> Optional[tuple[TagType, str]]:
+        """Get tag type information for a BLE entity.
+        
+        Retrieves tag type information and accent color for BLE devices from
+        stored device metadata instead of Hub data.
+        
+        Args:
+            hass: Home Assistant instance
+            entity_id: The BLE entity ID to get tag information for
+            
+        Returns:
+            tuple: (TagType object, accent color string)
+            None: If tag information could not be retrieved
+            
+        Raises:
+            HomeAssistantError: If BLE device metadata is not found
+        """
+        try:
+            # Get MAC from entity ID
+            try:
+                tag_mac = entity_id.split(".")[1].upper()
+            except IndexError:
+                raise HomeAssistantError(f"Invalid entity ID format: {entity_id}")
+                
+            # Get device metadata from config entry data
+            domain_data = hass.data.get(DOMAIN, {})
+            device_metadata = None
+            
+            # Find the config entry for this BLE device
+            for entry_id, entry_data in domain_data.items():
+                if (isinstance(entry_data, dict) and 
+                    entry_data.get("type") == "ble" and
+                    entry_data.get("mac_address", "").upper() == tag_mac):
+                    device_metadata = entry_data.get("device_metadata", {})
+                    break
+            
+            if not device_metadata:
+                raise HomeAssistantError(f"No metadata found for BLE device {entity_id}")
+            
+            # Create TagType object from stored metadata
+            hw_type = device_metadata.get("hw_type", 0)
+            width = device_metadata.get("width", 184)
+            height = device_metadata.get("height", 384)
+            color_support = device_metadata.get("color_support", "mono")
+            
+            _LOGGER.debug("BLE device metadata for %s: width=%d, height=%d", entity_id, width, height)
+            
+            # Map color support to color table
+            if color_support == "bwry":
+                color_table = {
+                    'white': [255, 255, 255],
+                    'black': [0, 0, 0],
+                    'red': [255, 0, 0],
+                    'yellow': [255, 255, 0],
+                    'accent': 'red'  # Default to red for BWR displays
+                }
+                accent_color = "red"
+            elif color_support == "red":
+                color_table = {
+                    'white': [255, 255, 255],
+                    'black': [0, 0, 0],
+                    'red': [255, 0, 0],
+                    'accent': 'red'
+                }
+                accent_color = "red"
+            else:  # mono
+                color_table = {
+                    'white': [255, 255, 255],
+                    'black': [0, 0, 0],
+                    'accent': 'black'  # No accent color for mono
+                }
+                accent_color = "black"
+            
+            # Create a minimal TagType-like object with required fields
+            # Width/height are already effective canvas dimensions from config
+            tag_data = {
+                'name': device_metadata.get('model_name', f'BLE Type {hw_type}'),
+                'width': width,
+                'height': height,
+                'rotatebuffer': 0,
+                'bpp': 2 if color_support != "mono" else 1,
+                'colortable': color_table,
+                'shortlut': 2,
+                'options': [],
+                'contentids': [],
+                'template': {},
+                'usetemplate': None,
+                'zlib_compression': None,
+            }
+            
+            tag_type = TagType(hw_type, tag_data)
+            return tag_type, accent_color
+            
+        except Exception as e:
+            # Convert any unknown exceptions to HomeAssistantError with context
+            if not isinstance(e, HomeAssistantError):
+                raise HomeAssistantError(
+                    f"Unexpected error getting BLE tag type for {entity_id}: {str(e)}"
                 ) from e
             raise
 
@@ -776,7 +878,8 @@ class ImageGen:
             self,
             entity_id: str,
             service_data: Dict[str, Any],
-            error_collector: list = None
+            error_collector: list = None,
+            tag_info: Optional[tuple[TagType, str]] = None
     ) -> bytes:
         """Generate a custom image based on service data.
 
@@ -787,6 +890,7 @@ class ImageGen:
             entity_id: The entity ID to generate the image for
             service_data: Service data containing image parameters and payload
             error_collector: Optional list to collect error messages
+            tag_info: Optional pre-computed tag info for BLE devices (TagType, accent_color)
 
         Returns:
             bytes: JPEG image data
@@ -797,13 +901,19 @@ class ImageGen:
 
         error_collector = error_collector if error_collector is not None else []
 
-        tag_type, accent_color = await self.get_tag_info(entity_id)
+        # Use provided tag_info for BLE devices, or get from Hub for traditional devices
+        if tag_info is not None:
+            tag_type, accent_color = tag_info
+        else:
+            tag_type, accent_color = await self.get_tag_info(entity_id)
         if not tag_type:
             raise HomeAssistantError("Failed to get tag type information")
 
         # Get canvas dimensions from tag type
         canvas_width = tag_type.width
         canvas_height = tag_type.height
+        
+        _LOGGER.debug("Canvas dimensions for %s: %dx%d", entity_id, canvas_width, canvas_height)
 
         # Get rotation and create base image
         rotate = service_data.get("rotate", 0)
@@ -1291,7 +1401,7 @@ class ImageGen:
             dash_end = current_pos + dash_length
 
             if dash_end >= line_length:
-                # We have a partial dash that ends exactly or beyond the line_end
+                # A partial dash exists that ends exactly or beyond the line_end
                 dash_end = line_length
                 segment_len = dash_end - current_pos
 
@@ -1305,7 +1415,7 @@ class ImageGen:
                     fill=fill,
                     width=width
                 )
-                # We're done, because we've reached the end of the line
+                # Process is done because the end of the line has been reached
                 break
             else:
                 # Normal full dash
@@ -1326,7 +1436,7 @@ class ImageGen:
             # 3) Skip the space segment
             space_end = current_pos + space_length
             if space_end >= line_length:
-                # The space would exceed the line's end, so we're done
+                # The space would exceed the line's end, so processing is complete
                 break
             else:
                 # Jump over the space
@@ -2290,7 +2400,7 @@ class ImageGen:
                 # Draw labels for each grid line
                 if y_axis_tick_every > 0:
                     curr = min_v
-                    # Track if we've drawn the max value
+                    # Track if the max value has been drawn
                     max_value_drawn = False
 
                     while curr <= max_v:
@@ -2333,7 +2443,7 @@ class ImageGen:
 
                         curr += y_axis_tick_every
 
-                    # If we haven't drawn the max value and it's not equal to min_v, draw it now
+                    # If the max value hasn't been drawn and it's not equal to min_v, draw it now
                     if not max_value_drawn and abs(max_v - min_v) > 0.0001:
                         # Calculate y position for max value
                         max_y = round(diag_y + (1 - ((max_v - min_v) / spread)) * (diag_height - 1))

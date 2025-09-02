@@ -130,7 +130,7 @@ def decode_g5(data: bytes, width: int, height: int) -> bytes:
                 count = ((cmd & 0x7f) + 1) * 8  # Count in bits
                 val = 0xFF if (cmd & 0x40) else 0x00
 
-                # Calculate how many bytes we can write
+                # Calculate how many bytes can be written
                 bytes_remaining = (width - x + 7) // 8
                 bytes_to_write = min(count // 8, bytes_remaining)
 

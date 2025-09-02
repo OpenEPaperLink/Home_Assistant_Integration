@@ -1,17 +1,16 @@
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-import requests
-import json
 import logging
 
-from .tag_types import get_hw_dimensions, get_tag_types_manager
-from .util import send_tag_cmd, reboot_ap
+from .tag_types import get_tag_types_manager
+from .util import send_tag_cmd, reboot_ap, is_ble_entry
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -19,17 +18,18 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up button entities from a config entry.
 
-    Creates button entities for all tags and the AP based on the
-    integration's configuration. For each tag, creates:
+    Creates button entities based on device type:
+    
+    For BLE devices:
+    - Set clock mode button
+    - Disable clock mode button
 
+    For AP devices and tags:
     - Clear pending updates button
     - Force refresh button
     - Reboot tag button
     - Scan channels button
     - Deep sleep button
-
-    For the AP, creates:
-
     - Reboot AP button
     - Refresh tag types button
 
@@ -41,7 +41,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         entry: Configuration entry
         async_add_entities: Callback to register new entities
     """
-    hub = hass.data[DOMAIN][entry.entry_id]
+    entry_data = hass.data[DOMAIN][entry.entry_id]
+    
+    # Check if this is a BLE device
+    is_ble_device = is_ble_entry(entry_data)
+    
+    if is_ble_device:
+        # BLE device setup - create clock mode buttons
+        mac_address = entry_data["mac_address"]
+        name = entry_data["name"]
+        device_metadata = entry_data.get("device_metadata", {})
+        
+        ble_buttons = [
+            SetClockModeButton(mac_address, name, device_metadata, entry.entry_id),
+            DisableClockModeButton(mac_address, name, device_metadata, entry.entry_id),
+        ]
+        async_add_entities(ble_buttons)
+        return
+    
+    # AP device setup (original logic)
+    hub = entry_data
 
     # Track added tags to prevent duplicates
     added_tags = set()
@@ -591,3 +610,99 @@ class RefreshTagTypesButton(ButtonEntity):
                 "notification_id": "tag_types_refresh_notification",
             },
         )
+
+
+class SetClockModeButton(ButtonEntity):
+    """Button to set clock mode on BLE device.
+
+    Creates a button entity that sends the clock mode command to a BLE device,
+    setting it to display the current time.
+    """
+    def __init__(self, mac_address: str, name: str, device_metadata: dict, entry_id: str) -> None:
+        """Initialize the button entity.
+
+        Args:
+            mac_address: MAC address of the BLE device
+            name: Human-readable name for the device
+            device_metadata: Device metadata dictionary
+            entry_id: Configuration entry ID
+        """
+        self._mac_address = mac_address
+        self._name = name
+        self._device_metadata = device_metadata
+        self._entry_id = entry_id
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "set_clock_mode"
+        self._attr_unique_id = f"ble_{mac_address}_set_clock_mode"
+        self._attr_icon = "mdi:clock"
+
+    @property
+    def device_info(self):
+        """Return device info for the BLE device."""
+        model_string = self._device_metadata.get('model_name', 'Unknown')
+        height = self._device_metadata.get('height', 0)
+        width = self._device_metadata.get('width', 0)
+        
+        return {
+            "identifiers": {(DOMAIN, f"ble_{self._mac_address}")},
+            "name": self._name,
+            "manufacturer": "OpenEPaperLink",
+            "model": model_string,
+            "sw_version": f"0x{self._device_metadata.get('fw_version', 0):04x}",
+            "hw_version": f"{width}x{height}" if width and height else None,
+        }
+
+    async def async_press(self) -> None:
+        """Handle the button press."""
+        from .ble_utils import set_clock_mode
+        success = await set_clock_mode(self.hass, self._mac_address)
+        if not success:
+            raise HomeAssistantError(f"Failed to set clock mode on {self._mac_address}")
+
+
+class DisableClockModeButton(ButtonEntity):
+    """Button to disable clock mode on BLE device.
+
+    Creates a button entity that sends the disable clock mode command to a BLE device,
+    returning it to normal operation.
+    """
+    def __init__(self, mac_address: str, name: str, device_metadata: dict, entry_id: str) -> None:
+        """Initialize the button entity.
+
+        Args:
+            mac_address: MAC address of the BLE device
+            name: Human-readable name for the device
+            device_metadata: Device metadata dictionary
+            entry_id: Configuration entry ID
+        """
+        self._mac_address = mac_address
+        self._name = name
+        self._device_metadata = device_metadata
+        self._entry_id = entry_id
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "disable_clock_mode"
+        self._attr_unique_id = f"ble_{mac_address}_disable_clock_mode"
+        self._attr_icon = "mdi:clock-remove"
+
+    @property
+    def device_info(self):
+        """Return device info for the BLE device."""
+        model_string = self._device_metadata.get('model_name', 'Unknown')
+        height = self._device_metadata.get('height', 0)
+        width = self._device_metadata.get('width', 0)
+        
+        return {
+            "identifiers": {(DOMAIN, f"ble_{self._mac_address}")},
+            "name": self._name,
+            "manufacturer": "OpenEPaperLink",
+            "model": model_string,
+            "sw_version": f"0x{self._device_metadata.get('fw_version', 0):04x}",
+            "hw_version": f"{width}x{height}" if width and height else None,
+        }
+
+    async def async_press(self) -> None:
+        """Handle the button press."""
+        from .ble_utils import disable_clock_mode
+        success = await disable_clock_mode(self.hass, self._mac_address)
+        if not success:
+            raise HomeAssistantError(f"Failed to disable clock mode on {self._mac_address}")
