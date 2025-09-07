@@ -376,38 +376,32 @@ def _convert_image_to_bytes(image: Image.Image, multi_color: bool = False, compr
     Returns:
         tuple: (data_type, pixel_array)
     """
-    pixel_array = np.array(image)
+    pixel_array = np.array(image.convert("RGB"))
     height, width, _ = pixel_array.shape
-    byte_data = []
-    byte_data_red = []
-    current_byte = 0
-    current_byte_red = 0
-    bit_position = 7
-    
-    for y in range(height):
-        for x in range(width):
-            r, g, b = pixel_array[y, x]
-            luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
-            if luminance > 128:
-                current_byte |= (1 << bit_position)
-            elif r > 170:
-                current_byte_red |= (1 << bit_position)
-            bit_position -= 1
-            if bit_position < 0:
-                byte_data.append(~current_byte & 0xFF)
-                byte_data_red.append(current_byte_red)
-                current_byte = 0
-                current_byte_red = 0
-                bit_position = 7
-    
-    if bit_position != 7:
-        byte_data.append(~current_byte & 0xFF)
-        byte_data_red.append(current_byte_red)
-    
+
+    # Get RGB channels as float arrays
+    r, g, b = (
+        pixel_array[:, :, 0].astype(np.float32),
+        pixel_array[:, :, 1].astype(np.float32),
+        pixel_array[:, :, 2].astype(np.float32),
+    )
+
+    # Calculate luminance for the whole image
+    luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+    #BW Channel
+    white_pixels = luminance > 128
+    bw_channel_bits = ~white_pixels
+
+    byte_data = np.packbits(bw_channel_bits).tobytes()
+
+    # Red channel (if multi-color)
     bpp_array = bytearray(byte_data)
     if multi_color:
-        bpp_array += bytearray(byte_data_red)
-    
+        red_pixels = (pixel_array[:, :, 0] > 170) & ~white_pixels
+        byte_data_red = np.packbits(red_pixels).tobytes()
+        bpp_array += byte_data_red
+
     if compressed:
         buffer = bytearray(6)
         buffer[0] = 6
