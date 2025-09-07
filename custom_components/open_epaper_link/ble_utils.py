@@ -105,7 +105,7 @@ class BLEConnection:
                 
             return self
             
-        except Exception as e:
+        except (BleakError, asyncio.TimeoutError) as e:
             if self.client and self.client.is_connected:
                 if self._notification_active:
                     try:
@@ -463,7 +463,7 @@ class BLEImageUploader:
             return True
             
         return False  # Not an upload response
-    
+
     async def upload_image(self, image_data: bytes, metadata: DeviceMetadata) -> bool:
         """Upload image using block-based protocol with existing notification system."""
         try:
@@ -586,20 +586,16 @@ class BLEImageUploader:
         _LOGGER.debug("Sending packet %d/%d", self._packet_index + 1, len(self._packets))
         await self.connection._write_raw(bytes.fromhex("0065") + self._packets[self._packet_index])
 
-
-async def upload_image(hass: HomeAssistant, mac_address: str, image_data: bytes, metadata: DeviceMetadata) -> bool:
+@ble_device_operation
+async def upload_image(conn: BLEConnection, image_data: bytes, metadata: DeviceMetadata) -> bool:
     """Upload image to specified BLE device using block-based protocol."""
-        
-    lock = _device_locks.setdefault(mac_address, asyncio.Lock())
-    async with lock:
-        try:
-            async with BLEConnection(hass, mac_address) as conn:
-                uploader = BLEImageUploader(conn, mac_address)
-                return await uploader.upload_image(image_data, metadata)
-                
-        except BLEError as e:
-            _LOGGER.error("Failed to upload image to %s: %s", mac_address, e)
-            return False
+    try:
+        uploader = BLEImageUploader(conn, conn.mac_address)
+        return await uploader.upload_image(image_data, metadata)
+    except BLEError as e:
+        _LOGGER.error("Image upload failed for %s: %s", conn.mac_address, e)
+        return False
+
 
 
 def parse_ble_advertisement(manufacturer_data: bytes) -> dict:
