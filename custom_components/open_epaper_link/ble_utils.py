@@ -237,12 +237,7 @@ async def set_clock_mode(conn: BLEConnection) -> bool:
     Uses BLE protocol command 000B with 4-byte Unix timestamp payload.
     Sends local time (not UTC) to match the device's expected timezone.
     """
-    utc_timestamp = int(time.time())
-    # Get actual current timezone offset (includes DST)
-    local_now = datetime.now()
-    utc_now = datetime.now(timezone.utc).replace(tzinfo=None)
-    timezone_offset_seconds = int((local_now - utc_now).total_seconds())
-    timestamp = utc_timestamp + timezone_offset_seconds
+    timestamp = int(datetime.now().replace(tzinfo=timezone.utc).timestamp())
 
     payload = struct.pack('<I', timestamp)  # 4-byte little-endian
     command = CMD_SET_CLOCK_MODE + payload
@@ -259,7 +254,7 @@ async def disable_clock_mode(conn: BLEConnection) -> bool:
     return True
 
 @ble_device_operation
-async def ping_device(hass: HomeAssistant, mac_address: str) -> bool:
+async def ping_device(conn: BLEConnection) -> bool:
     """Test device connectivity."""
     # If connection and initialization succeed, device is reachable
     return True
