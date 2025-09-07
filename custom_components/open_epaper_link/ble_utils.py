@@ -337,26 +337,6 @@ async def interrogate_ble_device(conn: BLEConnection) -> DisplayInfo | None:
 
 
 # Helper functions for image upload protocol
-
-def _crc32(input_data: bytes) -> int:
-    """Calculate CRC32 checksum for image data."""
-    table = []
-    polynomial = 0xEDB88320
-    for i in range(256):
-        crc = i
-        for _ in range(8):
-            if crc & 1:
-                crc = (crc >> 1) ^ polynomial
-            else:
-                crc >>= 1
-        table.append(crc)
-    crc = 0xFFFFFFFF
-    for byte in input_data:
-        table_index = (crc ^ byte) & 0xFF
-        crc = (crc >> 8) ^ table[table_index]
-    return (crc ^ 0xFFFFFFFF) & 0xFFFFFFFF
-
-
 def _create_data_info(checksum: int, data_ver: int, data_size: int, 
                       data_type: int, data_type_argument: int, next_check_in: int) -> bytes:
     """Create data info packet for image upload."""
@@ -523,7 +503,7 @@ class BLEImageUploader:
             
             try:
                 # Send data info to initiate upload
-                data_info = _create_data_info(255, _crc32(self._img_array), self._img_array_len, data_type, 0, 0)
+                data_info = _create_data_info(255, zlib.crc32(self._img_array) & 0xfffffff, self._img_array_len, data_type, 0, 0)
                 await self.connection._write_raw(bytes.fromhex("0064") + data_info)
                 
                 # Wait for upload completion (timeout after 30 seconds)
