@@ -9,41 +9,27 @@ import logging
 import struct
 import zlib
 import io
+from functools import wraps
 from typing import Dict
 from dataclasses import dataclass
 import time
 from datetime import datetime, timezone
 from bleak import BleakClient
 from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
+from habluetooth.scanner import BleakError
+
 from homeassistant.components import bluetooth
 from PIL import Image
 import numpy as np
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from .const import SERVICE_UUID, MANUFACTURER_ID, CMD_INIT, CMD_GET_DISPLAY_INFO, CMD_LED_ON, CMD_LED_OFF, CMD_LED_OFF_FINAL, CMD_SET_CLOCK_MODE, CMD_DISABLE_CLOCK_MODE
 
 _LOGGER = logging.getLogger(__name__)
 
-# OEPL BLE protocol constants
-SERVICE_UUID = "00001337-0000-1000-8000-00805f9b34fb"  # OEPL BLE service UUID
-MANUFACTURER_ID = 4919  # OEPL manufacturer ID for device discovery (0x1337)
-
-# Protocol commands from specification
-CMD_INIT = bytes([0x01, 0x01])  # Required initialization from protocol spec
-CMD_GET_DISPLAY_INFO = bytes([0x00, 0x05])  # Get display information
-
-# LED control commands  
-CMD_LED_ON = bytes.fromhex("000103")
-CMD_LED_OFF = bytes.fromhex("000100")
-CMD_LED_OFF_FINAL = bytes.fromhex("0000")
-
-# Clock mode commands from BLE protocol specification
-CMD_SET_CLOCK_MODE = bytes.fromhex("000B")
-CMD_DISABLE_CLOCK_MODE = bytes.fromhex("000C")
-
 # Per-device connection locks to prevent conflicts
 _device_locks: Dict[str, asyncio.Lock] = {}
-
 
 @dataclass
 class DeviceMetadata:
@@ -197,86 +183,86 @@ class BLEConnection:
         """Handle disconnection."""
         _LOGGER.debug("Device %s disconnected", self.mac_address)
 
+def ble_device_operation(func):
+    """
+    Decorator to handle locking and retries for a BLE device operation.
+    It assumes that the wrapped function has 'mac_address' as its second argument.
+    """
 
-async def turn_led_on(hass: HomeAssistant, mac_address: str) -> bool:
+    @wraps(func)
+    async def wrapper(hass, mac_address, *args, **kwargs):
+
+        lock = _device_locks.setdefault(mac_address, asyncio.Lock())
+
+        async with lock:
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    async with BLEConnection(hass, mac_address) as conn:
+                        return await func(conn, *args, **kwargs)
+                except BleakError as e:
+                    if attempt == max_attempts - 1:
+                        _LOGGER.error(
+                            "BLE operation %s failed after %d attempts: %s",
+                            func.__name__, max_attempts, e
+                        )
+                        raise
+                    backoff_time = 0.25 * (attempt + 1)
+                    _LOGGER.warning(
+                        "BLE operation %s failed on attempt %d: %s. Retrying in %.2f seconds...",
+                        func.__name__, attempt + 1, e, backoff_time
+                    )
+                    await asyncio.sleep(backoff_time)
+            return None
+    return wrapper
+
+@ble_device_operation
+async def turn_led_on(conn: BLEConnection) -> bool:
     """Turn on LED for specified device using OEPL protocol."""
-    lock = _device_locks.setdefault(mac_address, asyncio.Lock())
-    async with lock:
-        try:
-            async with BLEConnection(hass, mac_address) as conn:
-                await conn.write_command(CMD_LED_ON)
-                return True
-        except BLEError as e:
-            _LOGGER.error("Failed to turn on LED for %s: %s", mac_address, e)
-            return False
+    await conn.write_command(CMD_LED_ON)
+    return True
 
-
-async def turn_led_off(hass: HomeAssistant, mac_address: str) -> bool:
+@ble_device_operation
+async def turn_led_off(conn: BLEConnection) -> bool:
     """Turn off LED for specified device using OEPL protocol."""
-    lock = _device_locks.setdefault(mac_address, asyncio.Lock())
-    async with lock:
-        try:
-            async with BLEConnection(hass, mac_address) as conn:
-                await conn.write_command(CMD_LED_OFF)
-                await conn.write_command(CMD_LED_OFF_FINAL)  # Required finalization command?
-                return True
-        except BLEError as e:
-            _LOGGER.error("Failed to turn off LED for %s: %s", mac_address, e)
-            return False
+    await conn.write_command(CMD_LED_OFF)
+    await conn.write_command(CMD_LED_OFF_FINAL)  # Required finalization command?
+    return True
 
 
-async def set_clock_mode(hass: HomeAssistant, mac_address: str) -> bool:
+@ble_device_operation
+async def set_clock_mode(conn: BLEConnection) -> bool:
     """Set device to clock mode with current timestamp.
     
     Uses BLE protocol command 000B with 4-byte Unix timestamp payload.
     Sends local time (not UTC) to match the device's expected timezone.
     """
-    lock = _device_locks.setdefault(mac_address, asyncio.Lock())
-    async with lock:
-        try:
-            async with BLEConnection(hass, mac_address) as conn:
-                utc_timestamp = int(time.time())
-                # Get actual current timezone offset (includes DST)
-                local_now = datetime.now()
-                utc_now = datetime.now(timezone.utc).replace(tzinfo=None)
-                timezone_offset_seconds = int((local_now - utc_now).total_seconds())
-                timestamp = utc_timestamp + timezone_offset_seconds
-                
-                payload = struct.pack('<I', timestamp)  # 4-byte little-endian
-                command = CMD_SET_CLOCK_MODE + payload
-                await conn.write_command(command)
-                return True
-        except BLEError as e:
-            _LOGGER.error("Failed to set clock mode for %s: %s", mac_address, e)
-            return False
+    utc_timestamp = int(time.time())
+    # Get actual current timezone offset (includes DST)
+    local_now = datetime.now()
+    utc_now = datetime.now(timezone.utc).replace(tzinfo=None)
+    timezone_offset_seconds = int((local_now - utc_now).total_seconds())
+    timestamp = utc_timestamp + timezone_offset_seconds
 
+    payload = struct.pack('<I', timestamp)  # 4-byte little-endian
+    command = CMD_SET_CLOCK_MODE + payload
+    await conn.write_command(command)
+    return True
 
-async def disable_clock_mode(hass: HomeAssistant, mac_address: str) -> bool:
+@ble_device_operation
+async def disable_clock_mode(conn: BLEConnection) -> bool:
     """Disable clock mode on device.
     
     Uses BLE protocol command 000C with no payload.
     """
-    lock = _device_locks.setdefault(mac_address, asyncio.Lock())
-    async with lock:
-        try:
-            async with BLEConnection(hass, mac_address) as conn:
-                await conn.write_command(CMD_DISABLE_CLOCK_MODE)
-                return True
-        except BLEError as e:
-            _LOGGER.error("Failed to disable clock mode for %s: %s", mac_address, e)
-            return False
+    await conn.write_command(CMD_DISABLE_CLOCK_MODE)
+    return True
 
-
+@ble_device_operation
 async def ping_device(hass: HomeAssistant, mac_address: str) -> bool:
     """Test device connectivity."""
-    lock = _device_locks.setdefault(mac_address, asyncio.Lock())
-    async with lock:
-        try:
-            async with BLEConnection(hass, mac_address):
-                # If connection and initialization succeed, device is reachable
-                return True
-        except BLEError:
-            return False
+    # If connection and initialization succeed, device is reachable
+    return True
 
 
 @dataclass
@@ -287,8 +273,8 @@ class DisplayInfo:
     color_support: str
     rotatebuffer: int
 
-
-async def interrogate_ble_device(hass: HomeAssistant, mac_address: str) -> DisplayInfo | None:
+@ble_device_operation
+async def interrogate_ble_device(conn: BLEConnection) -> DisplayInfo | None:
     """Connect and interrogate device for display specifications.
     
     Uses the 0005 command to get accurate display information:
@@ -296,69 +282,58 @@ async def interrogate_ble_device(hass: HomeAssistant, mac_address: str) -> Displ
     - Color support capabilities
     - Buffer rotation requirement
     """
-    lock = _device_locks.setdefault(mac_address, asyncio.Lock())
-    async with lock:
-        try:
-            async with BLEConnection(hass, mac_address) as conn:
-                # Request display information using protocol command 0005
-                response = await conn.write_command_with_response(CMD_GET_DISPLAY_INFO)
-                
-                # Verify response format: 00 05 + payload (based on real data analysis)
-                if len(response) < 33:  # Minimum 2 bytes command + 31 bytes payload
-                    raise BLEProtocolError(f"Invalid display info response length: {len(response)}")
-                
-                # Verify command ID (should be 0005)
-                if response[0] != 0x00 or response[1] != 0x05:
-                    raise BLEProtocolError(f"Invalid command ID in response: {response[0]:02x}{response[1]:02x}")
-                
-                # Skip command ID (first 2 bytes) and parse payload
-                payload = response[2:]
-                
-                if len(payload) < 31:
-                    raise BLEProtocolError("Display info payload too short")
-                
-                # Parse display specifications from 0005 response:
-                
-                # Offset 19: Width/Height inversion flag
-                wh_inverted = payload[19] == 1
-                
-                # Offset 22-23: Height (uint16, little-endian)
-                height = struct.unpack("<H", payload[22:24])[0]
-                
-                # Offset 24-25: Width (uint16, little-endian) 
-                width = struct.unpack("<H", payload[24:26])[0]
-                
-                # Keep original dimensions, store rotation flag for later processing
-                # Don't swap here - let the image processing pipeline handle rotation consistently
-                
-                # Offset 30: Color count (1=BW, 2=BWR/BWY, 3=BWRY)
-                colors = payload[30]
-                
-                # Determine color support from actual device response
-                if colors >= 3:
-                    color_support = "bwry"  # Black, white, red, yellow
-                elif colors >= 2:
-                    color_support = "red"   # Black, white, red (or yellow)
-                else:
-                    color_support = "mono"  # Monochrome
-                
-                # Store dimensions exactly as device reports them - keep it simple
-                _LOGGER.debug("Device %s dimensions: %dx%d, colors=%d", 
-                            mac_address, width, height, colors)
-                
-                return DisplayInfo(
-                    width=width if wh_inverted else height,
-                    height=height if wh_inverted else width,
-                    color_support=color_support,
-                    rotatebuffer=wh_inverted
-                )
-                
-        except BLEError as e:
-            _LOGGER.error("Failed to interrogate device %s: %s", mac_address, e)
-            return None
-        except Exception as e:
-            _LOGGER.error("Unexpected error interrogating device %s: %s", mac_address, e)
-            return None
+    # Request display information using protocol command 0005
+    response = await conn.write_command_with_response(CMD_GET_DISPLAY_INFO)
+
+    # Verify response format: 00 05 + payload (based on real data analysis)
+    if len(response) < 33:  # Minimum 2 bytes command + 31 bytes payload
+        raise BLEProtocolError(f"Invalid display info response length: {len(response)}")
+
+    # Verify command ID (should be 0005)
+    if response[0] != 0x00 or response[1] != 0x05:
+        raise BLEProtocolError(f"Invalid command ID in response: {response[0]:02x}{response[1]:02x}")
+
+    # Skip command ID (first 2 bytes) and parse payload
+    payload = response[2:]
+
+    if len(payload) < 31:
+        raise BLEProtocolError("Display info payload too short")
+
+    # Parse display specifications from 0005 response:
+
+    # Offset 19: Width/Height inversion flag
+    wh_inverted = payload[19] == 1
+
+    # Offset 22-23: Height (uint16, little-endian)
+    height = struct.unpack("<H", payload[22:24])[0]
+
+    # Offset 24-25: Width (uint16, little-endian)
+    width = struct.unpack("<H", payload[24:26])[0]
+
+    # Keep original dimensions, store rotation flag for later processing
+    # Don't swap here - let the image processing pipeline handle rotation consistently
+
+    # Offset 30: Color count (1=BW, 2=BWR/BWY, 3=BWRY)
+    colors = payload[30]
+
+    # Determine color support from actual device response
+    if colors >= 3:
+        color_support = "bwry"  # Black, white, red, yellow
+    elif colors >= 2:
+        color_support = "red"   # Black, white, red (or yellow)
+    else:
+        color_support = "mono"  # Monochrome
+
+    # Store dimensions exactly as device reports them - keep it simple
+    _LOGGER.debug("Device %s dimensions: %dx%d, colors=%d",
+                conn.mac_address, width, height, colors)
+
+    return DisplayInfo(
+        width=width if wh_inverted else height,
+        height=height if wh_inverted else width,
+        color_support=color_support,
+        rotatebuffer=wh_inverted
+    )
 
 
 # Helper functions for image upload protocol
@@ -687,17 +662,3 @@ def calculate_battery_percentage(voltage_mv: int) -> int:
     percentage = min(100, max(0, int((voltage - min_voltage) * 100 / (max_voltage - min_voltage))))
     return percentage
 
-
-async def robust_ble_operation(operation_func, *args, **kwargs):
-    """Execute BLE operation with error handling and retries."""
-    for attempt in range(3):
-        try:
-            return await operation_func(*args, **kwargs)
-        except BLEConnectionError as e:
-            if attempt == 2:  # Last attempt
-                raise HomeAssistantError(f"BLE connection failed after 3 attempts: {e}")
-            _LOGGER.warning("BLE connection attempt %d failed, retrying: %s", attempt + 1, e)
-            await asyncio.sleep(0.25 * (attempt + 1))  # Exponential backoff
-        except (BLEProtocolError, BLETimeoutError) as e:
-            # Don't retry protocol/timeout errors
-            raise HomeAssistantError(f"BLE operation failed: {e}")
