@@ -2,9 +2,11 @@ import logging
 import os
 from typing import Final
 
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform, EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from .const import DOMAIN
 from .hub import Hub
 from .services import async_setup_services, async_unload_services
@@ -13,11 +15,38 @@ _LOGGER: Final = logging.getLogger(__name__)
 PLATFORMS = [
     Platform.SENSOR,
     Platform.BUTTON,
-    Platform.CAMERA,
+    Platform.IMAGE,
     Platform.SELECT,
     Platform.SWITCH,
     Platform.TEXT,
 ]
+
+async def async_migrate_camera_entities(hass: HomeAssistant, entry: ConfigEntry) -> list[str]:
+    """Migrate old camera entities to image entities.
+
+          Finds and removes camera entities that match our unique ID pattern,
+          returns list of removed entity IDs for notification.
+
+          Returns:
+              list[str]: List of removed camera entity IDs
+    """
+    entity_registry = er.async_get(hass)
+    removed_entities = []
+
+    # Find camera entities with OEPL domain and content in unique_id
+    camera_entities = []
+    for entity in entity_registry.entities.values():
+        if entity.platform == DOMAIN and entity.domain == "camera" and entity.unique_id.endswith("_content"):
+            camera_entities.append(entity)
+
+    for entity in camera_entities:
+        _LOGGER.info("Removing old camera entity: %s", entity.entity_id)
+        entity_registry.async_remove(entity.entity_id)
+        removed_entities.append(entity.entity_id)
+
+    return removed_entities
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up OpenEPaperLink integration from a config entry.
 
@@ -46,6 +75,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
+
+    removed_entities = await async_migrate_camera_entities(hass, entry)
+    if removed_entities:
+        persistent_notification.async_create(
+            hass,
+            f"OpenEPaperLink: Migrated {len(removed_entities)} camera entities to image entities.\n\n"
+            f"Please update your dashboards and automations to use the new image entities instead of camera entities.\n\n"
+            f"Removed entities: {', '.join(removed_entities)}",
+            title="OpenEPaperLink Migration",
+            notification_id="open_epaper_link_camera_migration"
+        )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
