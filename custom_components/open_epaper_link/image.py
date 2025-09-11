@@ -182,7 +182,6 @@ class ESLImage(ImageEntity):
         Raises:
             Exception: If HTTP request fails
         """
-        _LOGGER.error("Fetching raw image data from AP for %s", self._tag_mac)
         url = f"http://{self._hub.host}/current/{self._tag_mac}.raw"
         try:
             result = await self.hass.async_add_executor_job(lambda: requests.get(url))
@@ -288,9 +287,6 @@ class ESLImage(ImageEntity):
     async def async_added_to_hass(self) -> None:
         """Register callback when entity is added."""
 
-        # # Initial image load
-        # await self._refresh_image()
-
         # Update image on tag updates
         self.async_on_remove(
             async_dispatcher_connect(
@@ -308,9 +304,6 @@ class ESLImage(ImageEntity):
                 self._handle_connection_status
             )
         )
-
-        # Initial image load
-        # self.hass.async_create_task(self._refresh_image())
 
     @callback
     def _handle_tag_update(self, data) -> None:
