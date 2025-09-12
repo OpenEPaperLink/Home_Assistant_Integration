@@ -6,7 +6,6 @@ from unittest.mock import patch
 from PIL import Image
 
 from conftest import BASE_IMG_PATH, images_equal
-from conftest import save_image
 
 QR_CODE_IMG_PATH = os.path.join(BASE_IMG_PATH, 'progress_bar')
 

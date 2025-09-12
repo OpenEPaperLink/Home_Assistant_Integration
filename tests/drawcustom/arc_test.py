@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import patch
 from PIL import Image
 
-from conftest import BASE_IMG_PATH, images_equal, save_image
+from conftest import BASE_IMG_PATH, images_equal
 
 ARC_IMG_PATH = os.path.join(BASE_IMG_PATH, 'arc')
 

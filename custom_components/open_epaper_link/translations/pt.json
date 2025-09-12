@@ -1,11 +1,21 @@
 {
   "config": {
     "step": {
+      "bluetooth_confirm": {
+        "title": "Configurar Etiqueta BLE",
+        "description": "Configurar **{name}**?\n\n**Detalhes:**\n- Endereço: {address}\n- Sinal: {rssi} dBm\n- Bateria: {battery}"
+      },
       "user": {
         "data": {
           "host": "Host ou IP"
         }
       }
+    },
+    "error": {
+      "interrogation_failed": "Falha ao conectar ao dispositivo e recuperar informações do display. Erro: {error}. Tente novamente ou verifique a conectividade do dispositivo."
+    },
+    "abort": {
+      "single_instance_allowed": "Apenas um hub OpenEPaperLink pode ser configurado. Múltiplos dispositivos BLE são suportados, mas apenas um hub AP é permitido."
     }
   },
   "options": {
@@ -20,6 +30,9 @@
           "custom_font_dirs": "Diretórios de Fontes Personalizadas"
         }
       }
+    },
+    "abort": {
+      "no_options_ble": "Não há opções configuráveis disponíveis para dispositivos BLE. Os dispositivos BLE são gerenciados automaticamente e não requerem configuração adicional."
     }
   },
   "entity": {
@@ -189,6 +202,11 @@
         "name": "Conteúdo"
       }
     },
+    "light": {
+      "led": {
+        "name": "LED"
+      }
+    },
     "button": {
       "clear_pending": {
         "name": "Limpar Atualizações Pendentes"
@@ -210,6 +228,12 @@
       },
       "refresh_tag_types": {
         "name": "Atualizar Tipos de Etiqueta"
+      },
+      "set_clock_mode": {
+        "name": "Ativar Modo Relógio"
+      },
+      "disable_clock_mode": {
+        "name": "Desativar Modo Relógio"
       }
     }
   }

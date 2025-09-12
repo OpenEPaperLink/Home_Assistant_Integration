@@ -6,7 +6,7 @@ import aiohttp
 import asyncio
 import json
 import logging
-from typing import Dict, Tuple, Optional, Any, cast
+from typing import Dict, Tuple, Optional, Any
 from datetime import datetime, timedelta
 
 from homeassistant.core import HomeAssistant
@@ -223,7 +223,7 @@ class TagTypesManager:
         except Exception as e:
             _LOGGER.error("Error loading stored tag types: %s", str(e), exc_info=True)
 
-        # If we get here, either no stored data or invalid data
+        # If this point is reached, either no stored data exists or data is invalid
         await self._fetch_tag_types()
 
     async def save_to_storage(self) -> None:
@@ -515,6 +515,16 @@ async def get_tag_types_manager(hass: HomeAssistant) -> TagTypesManager:
         _INSTANCE = TagTypesManager(hass)
         await _INSTANCE.ensure_types_loaded()
     return _INSTANCE
+
+
+def reset_tag_types_manager() -> None:
+    """Reset the global TagTypesManager instance.
+    
+    Called when the integration storage files are being removed
+    to ensure the singleton gets recreated on next access.
+    """
+    global _INSTANCE
+    _INSTANCE = None
 
 
 def get_hw_dimensions(hw_type: int) -> Tuple[int, int]:

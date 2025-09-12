@@ -1,12 +1,7 @@
 """Tests for icon rendering in ImageGen."""
 import os
-from io import BytesIO
-import pytest
-from unittest.mock import patch
-from PIL import Image
 
-from conftest import BASE_IMG_PATH, images_equal, save_image
-from homeassistant.exceptions import HomeAssistantError
+from conftest import BASE_IMG_PATH
 
 ICON_IMG_PATH = os.path.join(BASE_IMG_PATH, 'icon')
 

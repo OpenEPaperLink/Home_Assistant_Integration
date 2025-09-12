@@ -2,18 +2,21 @@
 import os
 import sys
 import pytest
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
-from PIL import Image, ImageFont, ImageDraw
-from io import BytesIO
+from unittest.mock import AsyncMock, MagicMock, patch
+from PIL import ImageFont
 
 from PIL import ImageChops
-
+sys.modules['serial'] = MagicMock()
+sys.modules['serial.tools'] = MagicMock()
+sys.modules['serial.tools.list_ports'] = MagicMock()
+sys.modules['homeassistant.components.bluetooth'] = MagicMock()
 from homeassistant.core import HomeAssistant
 from custom_components.open_epaper_link.imagegen import ImageGen
 from custom_components.open_epaper_link.const import DOMAIN
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 BASE_IMG_PATH = os.path.join(current_dir, "test_images")
+
 
 @pytest.fixture
 def mock_hass():
