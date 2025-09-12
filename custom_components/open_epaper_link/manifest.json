@@ -1,11 +1,11 @@
 {
+  "domain": "open_epaper_link",
+  "name": "OpenEPaperLink",
   "bluetooth": [
     {
       "manufacturer_id": 4919
     }
   ],
-  "domain": "open_epaper_link",
-  "name": "OpenEPaperLink",
   "codeowners": [
     "@jonasniesner"
   ],
