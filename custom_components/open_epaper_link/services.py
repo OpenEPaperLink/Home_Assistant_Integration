@@ -13,7 +13,8 @@ from requests_toolbelt import MultipartEncoder
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
-from .const import DOMAIN
+from homeassistant.helpers.dispatcher import async_dispatcher_send
+from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
 from .imagegen import ImageGen
 from .tag_types import get_tag_types_manager
 from .util import send_tag_cmd, reboot_ap, is_ble_entry, get_hub_from_hass
@@ -404,6 +405,12 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
 
                     if service.data.get("dry-run", False):
                         _LOGGER.info("Dry run completed for %s", entity_id)
+                        tag_mac = entity_id.split(".")[1].upper()
+                        async_dispatcher_send(
+                            hass,
+                            f"{SIGNAL_TAG_IMAGE_UPDATE}_{tag_mac}",
+                            image_data
+                        )
                         continue
 
                     # Choose upload method based on device type
