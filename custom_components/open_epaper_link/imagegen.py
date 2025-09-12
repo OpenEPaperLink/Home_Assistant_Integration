@@ -856,24 +856,24 @@ class ImageGen:
         img_byte_arr = io.BytesIO()
         rgb_image.save(img_byte_arr, format='JPEG', quality="maximum")
         image_data = img_byte_arr.getvalue()
-
-        # Save files in executor
-        async def save_files():
-            """Save generated image to web directory."""
-            web_path = get_image_path(self.hass, entity_id)
-
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(web_path), exist_ok=True)
-
-            def _save_file():
-                with open(web_path, 'wb') as f:
-                    f.write(image_data)
-
-            await self.hass.async_add_executor_job(_save_file)
-            async_dispatcher_send(self.hass, f"{SIGNAL_TAG_IMAGE_UPDATE}_{entity_id.split('.')[1].upper()}", False)
-
-        # Start saving files in the background
-        self.hass.async_create_task(save_files())
+        #
+        # # Save files in executor
+        # async def save_files():
+        #     """Save generated image to web directory."""
+        #     web_path = get_image_path(self.hass, entity_id)
+        #
+        #     # Ensure directory exists
+        #     os.makedirs(os.path.dirname(web_path), exist_ok=True)
+        #
+        #     def _save_file():
+        #         with open(web_path, 'wb') as f:
+        #             f.write(image_data)
+        #
+        #     await self.hass.async_add_executor_job(_save_file)
+        #     async_dispatcher_send(self.hass, f"{SIGNAL_TAG_IMAGE_UPDATE}_{entity_id.split('.')[1].upper()}", False)
+        #
+        # # Start saving files in the background
+        # self.hass.async_create_task(save_files())
 
         return image_data
 

@@ -8,7 +8,7 @@ import zlib
 from PIL import Image
 
 from .tag_types import TagType
-
+from .g5_decoder import parse_g5_header, process_g5
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -17,6 +17,7 @@ def decode_esl_raw(data: bytes, tag_type: TagType) -> bytes:
 
     Processes raw image data from the OpenEPaperLink AP, handling:
 
+    - G5 compression detection and decompression
     - Zlib compression detection and decompression
     - BWR/BWY dual-plane formats for 2-bit displays
     - Packed pixel formats for higher color depths
@@ -35,6 +36,27 @@ def decode_esl_raw(data: bytes, tag_type: TagType) -> bytes:
     Raises:
         Exception: For decompression errors or invalid data format
     """
+    _LOGGER.debug(f"decode_esl_raw received data (first 16 bytes): {data[:16].hex()}")
+
+    # Check for G5 compression using our working decoder
+    if len(data) >= 6:
+        try:
+            header_size, width, height, compression_mode = parse_g5_header(data)
+            if compression_mode in [1, 2]:  # Valid G5 compression modes
+                _LOGGER.debug(f"Found G5 compressed data: {width}x{height}, mode {compression_mode}")
+                tagtype_dict = {
+                    'width': tag_type.width,
+                    'height': tag_type.height,
+                    'bpp': tag_type.bpp,
+                    'rotatebuffer': tag_type.rotatebuffer,
+                    'colortable': tag_type.color_table
+                }
+                bitmap_data = process_g5(data, tagtype_dict, output_format='bytes')
+                return bitmap_data
+        except Exception as e:
+            _LOGGER.debug(f"Not G5 format: {e}")
+            # Fall through to other decompression methods
+
     _LOGGER.debug(f"Input size: {len(data)} bytes")
     _LOGGER.debug(f"Tag type: {tag_type.name}")
     _LOGGER.debug(f"Dimensions: {tag_type.width}x{tag_type.height}")
@@ -106,57 +128,6 @@ def decode_esl_raw(data: bytes, tag_type: TagType) -> bytes:
             data = data.ljust(total_size, b'\x00')
 
     return data
-
-
-def decode_g5(data: bytes, width: int, height: int) -> bytes:
-    """DOES NOT WORK YET and is a completely wrong implementation."""
-    output_size = (width * height + 7) // 8
-    output = bytearray(output_size)
-    out_pos = 0
-    in_pos = 0
-
-    # Process each display line
-    y = 0
-    while y < height:
-        x = 0
-        while x < width:
-            if in_pos >= len(data):
-                raise ValueError(f"Unexpected end of G5 data at y={y}, x={x}")
-
-            cmd = data[in_pos]
-            in_pos += 1
-
-            if cmd & 0x80:  # Repeat command
-                count = ((cmd & 0x7f) + 1) * 8  # Count in bits
-                val = 0xFF if (cmd & 0x40) else 0x00
-
-                # Calculate how many bytes we can write
-                bytes_remaining = (width - x + 7) // 8
-                bytes_to_write = min(count // 8, bytes_remaining)
-
-                # Write repeated value
-                for _ in range(bytes_to_write):
-                    if out_pos < len(output):
-                        output[out_pos] = val
-                        out_pos += 1
-                x += bytes_to_write * 8
-
-            else:  # Copy literal data
-                count = (cmd + 1) * 8  # Count in bits
-                bytes_remaining = (width - x + 7) // 8
-                bytes_to_copy = min(count // 8, bytes_remaining)
-
-                # Copy literal bytes
-                for _ in range(bytes_to_copy):
-                    if in_pos < len(data) and out_pos < len(output):
-                        output[out_pos] = data[in_pos]
-                        out_pos += 1
-                        in_pos += 1
-                x += bytes_to_copy * 8
-
-        y += 1
-
-    return bytes(output)
 
 
 def to_image(raw_data: bytes, tag_type: TagType) -> bytes:

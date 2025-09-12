@@ -1,23 +1,17 @@
-"""Camera implementation for OpenEPaperLink integration."""
 from __future__ import annotations
-
 import logging
-import os
+from datetime import datetime
 from typing import Final
-
-from homeassistant.components.camera import Camera
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import requests
 
-from .tag_types import TagType
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
+from homeassistant.components.image import ImageEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .image_decompressor import to_image
-from .tag_types import get_hw_string, get_tag_types_manager
-from .util import get_image_path
+from .tag_types import TagType, get_tag_types_manager
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -26,72 +20,42 @@ async def async_setup_entry(
         entry: ConfigEntry,
         async_add_entities: AddEntitiesCallback,
 ) -> bool:
-    """Set up ESL cameras from a config entry.
+    """Set up the OpenEPaperLink image platform."""
 
-    Creates camera entities for all known tags to display
-    their current content in the Home Assistant UI.
-
-    Also sets up listeners to:
-    - Add cameras for newly discovered tags
-    - Remove cameras for blacklisted tags
-
-    Args:
-        hass: Home Assistant instance
-        entry: Configuration entry
-        async_add_entities: Callback to register new entities
-
-    Returns:
-        bool: True if setup was successful
-    """
     hub = hass.data[DOMAIN][entry.entry_id]
 
-    # Track added cameras to prevent duplicates
-    added_cameras = set()
+    # Track added image entities to prevent duplicates
+    added_image_entities = set()
 
-    async def async_add_camera(tag_mac: str) -> None:
-        """Add camera for a newly discovered tag.
+    async def async_add_image_entity(tag_mac: str) -> None:
 
-        Creates and registers a camera entity for a specific tag
-        when it's discovered by the integration. The function:
-
-        - Checks if the tag is blacklisted (skips if it is)
-        - Verifies the tag isn't already added (prevents duplicates)
-        - Creates a new EPDCamera entity for the tag
-        - Adds the entity to Home Assistant
-
-        This function is called both during initial setup and
-        dynamically when new tags connect to the AP.
-
-        Args:
-            tag_mac: MAC address of the tag to create a camera for
-        """
-        # Skip if camera already exists
-        if tag_mac in added_cameras:
+        # Skip if image entity already exists
+        if tag_mac in added_image_entities:
             return
 
         # Skip if tag is blacklisted
         if tag_mac in hub.get_blacklisted_tags():
-            _LOGGER.debug("Skipping camera creation for blacklisted tag: %s", tag_mac)
+            _LOGGER.debug("Skipping image entity creation for blacklisted tag: %s", tag_mac)
             return
 
         # Skip AP (it's not a tag)
         if tag_mac == "ap":
             return
 
-        camera = EPDCamera(hass, tag_mac, hub)
-        added_cameras.add(tag_mac)
-        async_add_entities([camera], True)
+        image_entity = ESLImage(hass, tag_mac, hub)
+        added_image_entities.add(tag_mac)
+        async_add_entities([image_entity], True)
 
-    # Add cameras for existing tags
+    # Add image entity for existing tags
     for tag_mac in hub.tags:
-        await async_add_camera(tag_mac)
+        await async_add_image_entity(tag_mac)
 
     # Register callback for new tag discovery
     entry.async_on_unload(
         async_dispatcher_connect(
             hass,
             f"{DOMAIN}_tag_discovered",
-            async_add_camera
+            async_add_image_entity
         )
     )
 
@@ -100,20 +64,20 @@ async def async_setup_entry(
         """Handle updates to the tag blacklist.
 
     Processes changes to the blacklisted tags configuration by
-    removing camera entities for tags that have been blacklisted.
+    removing image entities for tags that have been blacklisted.
 
         When a tag is added to the blacklist:
 
-        1. Its entry is removed from the 'added_cameras' set
-        2. Its corresponding camera entity is removed from Home Assistant
-        3. The camera will automatically be excluded from future discoveries
+        1. Its entry is removed from the 'added_image_entities' set
+        2. Its corresponding image entity is removed from Home Assistant
+        3. The image entity will automatically be excluded from future discoveries
 
         This ensures blacklisted tags don't appear in the UI and
         don't consume resources with unnecessary image processing.
         """
         for tag_mac in hub.get_blacklisted_tags():
-            if tag_mac in added_cameras:
-                added_cameras.remove(tag_mac)
+            if tag_mac in added_image_entities:
+                added_image_entities.remove(tag_mac)
 
     entry.async_on_unload(
         async_dispatcher_connect(
@@ -125,44 +89,43 @@ async def async_setup_entry(
 
     return True
 
-class EPDCamera(Camera):
-    """Camera class for OpenEPaperLink tags.
+class ESLImage(ImageEntity):
+    """Image entity class for OpenEPaperLink tags.
 
-    Provides a camera entity that shows the current content displayed
+    Provides an image entity that shows the current content displayed
     on a tag by fetching its raw image data from the AP and
     converting it to a standard image format.
 
-    The camera:
+    The image:
 
     - Fetches raw image data on demand
     - Converts proprietary tag-specific formats to JPEG
     - Caches converted images for performance
     - Updates when tag content changes
     """
-
     def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
-        """Initialize the camera entity.
+        """Initialize the image entity.
 
-        Sets up the camera with appropriate name, ID, and device association.
-        Also initializes paths for image storage and establishes the JPEG
-        content type for browser compatibility.
+       Sets up the image with appropriate name, ID, and device association.
+       Also initializes paths for image storage and establishes the JPEG
+       content type for browser compatibility.
 
-        Args:
-            hass: Home Assistant instance
-            tag_mac: MAC address of the tag
-            hub: Hub instance for AP communication
-        """
-        super().__init__()
+       Args:
+           hass: Home Assistant instance
+           tag_mac: MAC address of the tag
+           hub: Hub instance for AP communication
+       """
+        super().__init__(hass)
         self._tag_mac = tag_mac
         self._hub = hub
         self._attr_has_entity_name = True
         self._attr_translation_key = "content"
-        self._attr_unique_id = f"{tag_mac}_content"
+        self._attr_unique_id = f"{tag_mac}_display_content"
         tag_data = hub.get_tag_data(tag_mac)
         self._name = f"{tag_data.get('tag_name', tag_mac)}"
-        self.content_type = "image/jpeg"
-        self._image_path = get_image_path(hass, f"{DOMAIN}.{tag_mac}")
-        self._last_image = None
+        self._attr_content_type = "image/jpeg"
+        self._cached_image: bytes | None = None
+        self._last_updated: datetime | None = None
         self._tag_type = None
         self._last_error = None
 
@@ -199,6 +162,11 @@ class EPDCamera(Camera):
                 self._tag_mac in self._hub.tags and
                 self._tag_mac not in self._hub.get_blacklisted_tags()
         )
+
+    @property
+    def image_last_updated(self) -> datetime | None:
+        """Return the last updated image timestamp."""
+        return self._last_updated
 
     async def _fetch_raw_image(self) -> bytes | None:
         """Fetch raw image data from AP.
@@ -279,63 +247,47 @@ class EPDCamera(Camera):
 
         return self._tag_type
 
+    async  def async_image(self) -> bytes | None:
+        """Return cached image bytes, fetching if needed."""
+        if self._cached_image is None:
+            await self._refresh_image()
+        return self._cached_image
 
+    async def _refresh_image(self) -> None:
+        """Refresh the cached image data.
 
-    async def async_camera_image(
-            self, width: int | None = None, height: int | None = None
-    ) -> bytes | None:
-        """Return image response."""
+        Fetches new raw image data, processes it, and updates the cache.
+        Only called when tag content changes.
+        """
         try:
-            # First check if we have an image on disk
-            if os.path.exists(self._image_path):
-                if not self._last_image:
-                    self._last_image = await self.hass.async_add_executor_job(
-                        lambda: open(self._image_path, 'rb').read()
-                    )
-                return self._last_image
-
-            # No image on disk, try to fetch and decode
             raw_data = await self._fetch_raw_image()
             if raw_data:
                 tag_def = await self._get_tag_def()
                 if tag_def:
                     try:
-                        # Create decoder and process image in executor to avoid blocking
-                        def process_image():
-                            # Log first byte of raw data for debugging
-                            return to_image(raw_data, tag_def)
-
-                        jpeg_data = await self.hass.async_add_executor_job(process_image)
-
-                        # Save to disk
-                        await self.hass.async_add_executor_job(
-                            lambda: os.makedirs(os.path.dirname(self._image_path), exist_ok=True)
-                        )
-                        await self.hass.async_add_executor_job(
-                            lambda: open(self._image_path, 'wb').write(jpeg_data)
+                        jpeg_data = await self.hass.async_add_executor_job(
+                            lambda: to_image(raw_data, tag_def)
                         )
 
-                        self._last_image = jpeg_data
-                        return jpeg_data
+                        # Update cache and timestamp
+                        self._cached_image = jpeg_data
+                        self._last_updated = datetime.now()
+
+                        self.async_write_ha_state()
                     except Exception as err:
-                        _LOGGER.error(
-                            "Error decoding image for %s: %s",
-                            self._tag_mac,
-                            str(err)
-                        )
+                        _LOGGER.error("Error decoding image for %s: %s", self._tag_mac, str(err))
+                        self._cached_image = None
+            else:
+                self._cached_image = None
 
         except Exception as err:
-            _LOGGER.error(
-                "Error getting camera image for %s: %s",
-                self._tag_mac,
-                str(err)
-            )
-
-        return None
+            _LOGGER.error("Error refreshing image for %s: %s", self._tag_mac, str(err))
+            self._cached_image = None
 
     async def async_added_to_hass(self) -> None:
-        """Register callbacks when entity is added."""
-        # Update state on tag updates
+        """Register callback when entity is added."""
+
+        # Update image on tag updates
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
@@ -356,14 +308,18 @@ class EPDCamera(Camera):
     @callback
     def _handle_tag_update(self, data) -> None:
         """Handle tag data updates."""
-        # Clear cached image to force refresh on next request
-        self._last_image = None
-        # clear image file if not dry run
-        if data:
-            if os.path.exists(self._image_path):
-                os.remove(self._image_path)
-        # Update entity state
+        if isinstance(data, bytes):
+            # Dry run
+            self._cached_image = data
+            self._last_updated = datetime.now()
+            self.async_write_ha_state()
+        elif data:
+            # Update from AP
+            self.hass.async_create_task(self._refresh_image())
+            self.async_write_ha_state()
+
         self.async_write_ha_state()
+
 
     @callback
     def _handle_connection_status(self, is_online: bool) -> None:
