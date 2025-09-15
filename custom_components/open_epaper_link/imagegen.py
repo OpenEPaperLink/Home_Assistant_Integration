@@ -912,7 +912,15 @@ class ImageGen:
         # Get canvas dimensions from tag type
         canvas_width = tag_type.width
         canvas_height = tag_type.height
-        
+
+        # Validate dimensions to prevent PIL errors
+        if canvas_width <= 0 or canvas_height <= 0:
+            raise HomeAssistantError(
+                f"Invalid canvas dimensions {canvas_width}x{canvas_height} for {entity_id}. "
+                f"Device metadata may be corrupt or missing. Try reloading the integration or "
+                f"re-adding the device."
+            )
+
         _LOGGER.debug("Canvas dimensions for %s: %dx%d", entity_id, canvas_width, canvas_height)
 
         # Get rotation and create base image

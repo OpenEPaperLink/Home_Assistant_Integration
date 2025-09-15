@@ -82,6 +82,25 @@ To maximize tag battery life when using this integration:
 
 ## Installation
 
+### ⚠️ Important: BLE Tag Firmware & Configuration
+For the integration to discover and control BLE-based e-paper tags, they **MUST** be running the correct firmware and be properly configured. Tags with their original stock firmware will **not** be discovered by Home Assistant.
+
+#### Step 1: Flash `ATC_BLE_OEPL` Firmware
+The flashing method depends on the tag model:
+- **For tags previously used with an OpenEPaperLink BLE AP:** The [web-based OTA flasher](https://atc1441.github.io/BLE_EPaper_OTA.html) can likely be used.
+- **For other tags:** A manual flash is often required. This video provides a comprehensive guide: [Universal E-Paper Firmware Flashing](https://youtu.be/9oKWkHGI-Yk).
+
+#### Step 2: Set the Device Type
+After flashing, the correct device type for the tag model **must** be set.
+1.  Connect to the tag using the [ATC_BLE_OEPL Image Upload tool](https://atc1441.github.io/ATC_BLE_OEPL_Image_Upload.html).
+2.  Use the "Set Type" dropdown to select the specific tag model (e.g., "`12: 290 Gici BWR SSD`").
+3.  Click the "Set Type" button.
+
+#### Getting Help
+For any issues, the `#atc_ble_oepl` and `#home_assistant` channel on the [OpenEPaperLink Discord](https://discord.com/invite/eRUHt4u5CZ) is a great resource for community support.
+
+Once flashed and configured, tags are discovered by HA automatically.
+
 ### Option 1: HACS Installation (Recommended)
 1. Click on HACS in the Home Assistant menu
 2. Click `Integrations`

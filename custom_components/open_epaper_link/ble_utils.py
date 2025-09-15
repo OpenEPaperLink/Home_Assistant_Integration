@@ -12,10 +12,9 @@ import io
 from functools import wraps
 from typing import Dict
 from dataclasses import dataclass
-import time
 from datetime import datetime, timezone
 from bleak import BleakClient
-from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
+from bleak_retry_connector import establish_connection, BleakClientWithServiceCache, BleakOutOfConnectionSlotsError
 from habluetooth.scanner import BleakError
 
 from homeassistant.components import bluetooth
@@ -24,7 +23,12 @@ import numpy as np
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from .const import SERVICE_UUID, MANUFACTURER_ID, CMD_INIT, CMD_GET_DISPLAY_INFO, CMD_LED_ON, CMD_LED_OFF, CMD_LED_OFF_FINAL, CMD_SET_CLOCK_MODE, CMD_DISABLE_CLOCK_MODE
+from .const import (
+    SERVICE_UUID, MANUFACTURER_ID, CMD_INIT, CMD_GET_DISPLAY_INFO,
+    CMD_LED_ON, CMD_LED_OFF, CMD_LED_OFF_FINAL, CMD_SET_CLOCK_MODE, CMD_DISABLE_CLOCK_MODE,
+    BLEResponse, BLECommand, BLEDataType,
+    BLE_BLOCK_SIZE, BLE_MAX_PACKET_DATA_SIZE, BLE_MIN_RESPONSE_LENGTH
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -104,7 +108,20 @@ class BLEConnection:
             await asyncio.sleep(2.0)  # Wait as specified in protocol
                 
             return self
-            
+
+        except BleakOutOfConnectionSlotsError as e:
+            if self.client and self.client.is_connected:
+                if self._notification_active:
+                    try:
+                        await self.client.stop_notify(self.write_char)
+                    except Exception:
+                        _LOGGER.debug("Failed to stop notifications during cleanup")
+                await self.client.disconnect()
+            raise BLEConnectionError(
+                f"No available Bluetooth connection slots for {self.mac_address}. "
+                f"Add more ESPHome Bluetooth proxies near this device or wait for existing connections to free up. "
+                f"Details: {e}"
+            )
         except (BleakError, asyncio.TimeoutError) as e:
             if self.client and self.client.is_connected:
                 if self._notification_active:
@@ -200,6 +217,27 @@ def ble_device_operation(func):
                 try:
                     async with BLEConnection(hass, mac_address) as conn:
                         return await func(conn, *args, **kwargs)
+                except BLEConnectionError as e:
+                    # Check if it's a connection slots error specifically
+                    if "No available Bluetooth connection slots" in str(e):
+                        _LOGGER.error(
+                            "BLE operation %s failed: %s",
+                            func.__name__, e
+                        )
+                        raise HomeAssistantError(str(e))
+                    # For other connection errors, retry
+                    if attempt == max_attempts - 1:
+                        _LOGGER.error(
+                            "BLE operation %s failed after %d attempts: %s",
+                            func.__name__, max_attempts, e
+                        )
+                        raise HomeAssistantError(str(e))
+                    backoff_time = 0.25 * (attempt + 1)
+                    _LOGGER.warning(
+                        "BLE operation %s failed on attempt %d: %s. Retrying in %.2f seconds...",
+                        func.__name__, attempt + 1, e, backoff_time
+                    )
+                    await asyncio.sleep(backoff_time)
                 except BleakError as e:
                     if attempt == max_attempts - 1:
                         _LOGGER.error(
@@ -280,9 +318,12 @@ async def interrogate_ble_device(conn: BLEConnection) -> DisplayInfo | None:
     # Request display information using protocol command 0005
     response = await conn.write_command_with_response(CMD_GET_DISPLAY_INFO)
 
+    _LOGGER.debug("Device interrogation for %s: received %d bytes: %s",
+                 conn.mac_address, len(response), response[:10].hex() + "..." if len(response) > 10 else response.hex())
+
     # Verify response format: 00 05 + payload (based on real data analysis)
-    if len(response) < 33:  # Minimum 2 bytes command + 31 bytes payload
-        raise BLEProtocolError(f"Invalid display info response length: {len(response)}")
+    if len(response) < BLE_MIN_RESPONSE_LENGTH:
+        raise BLEProtocolError(f"Invalid display info response length: {len(response)} for {conn.mac_address}")
 
     # Verify command ID (should be 0005)
     if response[0] != 0x00 or response[1] != 0x05:
@@ -409,9 +450,9 @@ def _convert_image_to_bytes(image: Image.Image, multi_color: bool = False, compr
         the_compressor = zlib.compressobj(wbits=12)
         compressed_data = the_compressor.compress(buffer)
         compressed_data += the_compressor.flush()
-        return 0x30, struct.pack('<I', len(buffer)) + compressed_data
-    
-    return 0x21 if multi_color else 0x20, bpp_array
+        return BLEDataType.COMPRESSED.value, struct.pack('<I', len(buffer)) + compressed_data
+
+    return BLEDataType.RAW_COLOR.value if multi_color else BLEDataType.RAW_BW.value, bpp_array
 
 
 class BLEImageUploader:
@@ -428,41 +469,55 @@ class BLEImageUploader:
         self._upload_error = None
         self._upload_task = None
         
-    def _handle_response(self, data: bytes) -> bool:
+    async def _handle_response(self, data: bytes) -> bool:
         """Handle upload responses from notification queue."""
         if len(data) < 2:
             return False
-            
+
         response_code = data[:2].hex().upper()
         _LOGGER.debug("Upload response for %s: %s", self.mac_address, response_code)
-        
-        if response_code == "00C6":
-            _LOGGER.debug("Received block request")
-            block_id = data[11]
-            asyncio.create_task(self._send_block_data(block_id))
-            return True
-        elif response_code == "00C4":
-            _LOGGER.debug("Block part acknowledged")
-            asyncio.create_task(self._send_next_block_part())
-            return True
-        elif response_code == "00C5":
-            _LOGGER.debug("Block part acknowledged, continuing")
-            if self._packet_index >= len(self._packets):
-                _LOGGER.error("Packet index out of range")
-                return True
-            self._packet_index += 1
-            asyncio.create_task(self._send_next_block_part())
-            return True
-        elif response_code == "00C7":
-            _LOGGER.debug("Image upload completed successfully")
-            self._upload_complete.set()
-            return True
-        elif response_code == "00C8":
-            _LOGGER.debug("Image already displayed")
-            self._upload_complete.set()
-            return True
-            
-        return False  # Not an upload response
+
+        try:
+            response_enum = BLEResponse(response_code)
+            match response_enum:
+                case BLEResponse.BLOCK_REQUEST:
+                    _LOGGER.debug("Received block request")
+                    block_id = data[11]
+                    # Parse requested parts from block request (6 bytes starting at offset 12)
+                    if len(data) >= 18:
+                        requested_parts_hex = data[12:18].hex().upper()
+                        _LOGGER.debug("Device requested block %d, parts bitmask: %s", block_id, requested_parts_hex)
+                    else:
+                        _LOGGER.debug("Device requested block %d (partial block request data)", block_id)
+                    await self._send_block_data(block_id)
+                    return True
+
+                case BLEResponse.BLOCK_PART_ACK:
+                    _LOGGER.debug("Block part acknowledged")
+                    await self._send_next_block_part()
+                    return True
+
+                case BLEResponse.BLOCK_PART_CONTINUE:
+                    _LOGGER.debug("Block part acknowledged, continuing")
+                    if self._packet_index >= len(self._packets):
+                        _LOGGER.error("Packet index out of range")
+                        return True
+                    self._packet_index += 1
+                    await self._send_next_block_part()
+                    return True
+
+                case BLEResponse.UPLOAD_COMPLETE:
+                    _LOGGER.debug("Image upload completed successfully")
+                    self._upload_complete.set()
+                    return True
+
+                case BLEResponse.IMAGE_ALREADY_DISPLAYED:
+                    _LOGGER.debug("Image already displayed")
+                    self._upload_complete.set()
+                    return True
+
+        except ValueError:
+            return False  # Unknown response code
 
     async def upload_image(self, image_data: bytes, metadata: DeviceMetadata) -> bool:
         """Upload image using block-based protocol with existing notification system."""
@@ -481,78 +536,64 @@ class BLEImageUploader:
             # Convert image to device format
             data_type, pixel_array = _convert_image_to_bytes(image, multi_color, compressed=True)
             
-            _LOGGER.debug("Upload for %s: DataType=0x%02x, DataLen=%d", 
+            _LOGGER.debug("Upload for %s: DataType=0x%02x, DataLen=%d",
                          self.mac_address, data_type, len(pixel_array))
-            
+            _LOGGER.info("Starting BLE image upload to %s (%d bytes)", self.mac_address, len(pixel_array))
+
             self._img_array = pixel_array
             self._img_array_len = len(self._img_array)
-            
-            # Start monitoring notification queue for upload responses
-            self._upload_task = asyncio.create_task(self._monitor_responses())
-            
-            try:
-                # Send data info to initiate upload
-                data_info = _create_data_info(255, zlib.crc32(self._img_array) & 0xfffffff, self._img_array_len, data_type, 0, 0)
-                await self.connection._write_raw(bytes.fromhex("0064") + data_info)
-                
-                # Wait for upload completion (timeout after 30 seconds)
-                await asyncio.wait_for(self._upload_complete.wait(), timeout=30.0)
-                
-                if self._upload_error:
-                    raise BLEError(f"Upload failed: {self._upload_error}")
-                
-                _LOGGER.debug("Image upload completed successfully for %s", self.mac_address)
-                return True
-                
-            finally:
-                # Cancel monitoring task
-                if self._upload_task:
-                    self._upload_task.cancel()
-                    try:
-                        await self._upload_task
-                    except asyncio.CancelledError:
-                        _LOGGER.debug("Upload monitoring task cancelled")
+
+            # Send data info to initiate upload
+            data_info = _create_data_info(255, zlib.crc32(self._img_array) & 0xfffffff, self._img_array_len, data_type, 0, 0)
+            await self.connection._write_raw(bytes.fromhex(BLECommand.DATA_INFO.value) + data_info)
+
+            # Wait for responses using request-response pattern instead of continuous monitoring
+            while not self._upload_complete.is_set():
+                response = await self._wait_for_response()
+                if response and await self._handle_response(response):
+                    continue
+                elif response is None:
+                    # Timeout - this is a failure
+                    _LOGGER.error("Upload failed for %s: timeout waiting for response", self.mac_address)
+                    return False
+
+            if self._upload_error:
+                raise BLEError(f"Upload failed: {self._upload_error}")
+
+            # Only reach here if upload_complete was set by a success response
+            _LOGGER.info("BLE image upload completed successfully for %s", self.mac_address)
+            return True
                 
         except Exception as e:
             _LOGGER.error("Image upload failed for %s: %s", self.mac_address, e)
             return False
     
-    async def _monitor_responses(self):
-        """Monitor notification queue for upload responses."""
+    async def _wait_for_response(self, timeout: float = 10.0) -> bytes | None:
+        """Wait for next upload response with timeout."""
         try:
-            while not self._upload_complete.is_set():
-                try:
-                    # Get response from connection's notification queue
-                    response = await asyncio.wait_for(
-                        self.connection._response_queue.get(), 
-                        timeout=1.0
-                    )
-                    
-                    # Check if it's an upload response
-                    if not self._handle_response(response):
-                        # Not an upload response, put it back for other operations
-                        try:
-                            self.connection._response_queue.put_nowait(response)
-                        except asyncio.QueueFull:
-                            _LOGGER.warning("Could not return non-upload response to queue")
-                            
-                except asyncio.TimeoutError:
-                    # Timeout waiting for response, continue monitoring
-                    continue
-                    
-        except asyncio.CancelledError:
-            _LOGGER.debug("Upload response monitoring cancelled for %s", self.mac_address)
-        except Exception as e:
-            _LOGGER.error("Error monitoring upload responses for %s: %s", self.mac_address, e)
-            self._upload_error = str(e)
+            response = await asyncio.wait_for(
+                self.connection._response_queue.get(),
+                timeout=timeout
+            )
+
+            # Basic validation only
+            if not response or len(response) < 2:
+                return None
+
+            return response
+
+        except asyncio.TimeoutError:
+            return None
     
     async def _send_block_data(self, block_id: int):
         """Send block data for specified block ID."""
         _LOGGER.debug("Building block %d for %s", block_id, self.mac_address)
-        block_size = 4096
-        block_start = block_id * block_size
-        block_end = block_start + block_size
+        block_start = block_id * BLE_BLOCK_SIZE
+        block_end = block_start + BLE_BLOCK_SIZE
         block_data = self._img_array[block_start:block_end]
+
+        _LOGGER.debug("Sending block %d: %d bytes (offset %d-%d)",
+                     block_id, len(block_data), block_start, min(block_end, len(self._img_array)))
         
         crc_block = sum(block_data) & 0xFFFF
         buffer = bytearray(4)
@@ -563,11 +604,11 @@ class BLEImageUploader:
         block_data = buffer + block_data
         
         # Create packets
-        packet_count = (len(block_data) + 229) // 230
+        packet_count = (len(block_data) + BLE_MAX_PACKET_DATA_SIZE - 1) // BLE_MAX_PACKET_DATA_SIZE
         self._packets = []
         for i in range(packet_count):
-            start = i * 230
-            end = start + 230
+            start = i * BLE_MAX_PACKET_DATA_SIZE
+            end = start + BLE_MAX_PACKET_DATA_SIZE
             slice_data = block_data[start:end]
             packet = _create_block_part(block_id, i, slice_data)
             self._packets.append(packet)
@@ -584,7 +625,7 @@ class BLEImageUploader:
             return
         
         _LOGGER.debug("Sending packet %d/%d", self._packet_index + 1, len(self._packets))
-        await self.connection._write_raw(bytes.fromhex("0065") + self._packets[self._packet_index])
+        await self.connection._write_raw(bytes.fromhex(BLECommand.BLOCK_PART.value) + self._packets[self._packet_index])
 
 @ble_device_operation
 async def upload_image(conn: BLEConnection, image_data: bytes, metadata: DeviceMetadata) -> bool:
