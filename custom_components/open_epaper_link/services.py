@@ -303,7 +303,7 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
     """
 
     # Separate queues for different device types
-    ble_upload_queue = UploadQueueHandler(max_concurrent=3, cooldown=0.1)
+    ble_upload_queue = UploadQueueHandler(max_concurrent=1, cooldown=0.1)
     hub_upload_queue = UploadQueueHandler(max_concurrent=1, cooldown=1.0)
 
 
