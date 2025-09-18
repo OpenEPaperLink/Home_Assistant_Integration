@@ -153,6 +153,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "hw_type": device_info.get("hw_type", 0),
             "battery_mv": device_info.get("battery_mv", 0),
             "fw_version": device_info.get("fw_version", 0),
+            "version": device_info.get("version", 0),
         }
         _LOGGER.debug("Discovered device info: %s", self._discovered_device)
 
@@ -225,6 +226,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "address": self._discovered_device["address"],
                 "rssi": str(self._discovered_device["rssi"]),
                 "battery": f"{self._discovered_device['battery_mv']/1000:.2f}V" if self._discovered_device["battery_mv"] > 0 else "Unknown",
+                "fw_version": str(self._discovered_device["fw_version"]) if self._discovered_device["fw_version"] > 0 else "Unknown",
+                "config_version": str(self._discovered_device["version"]) if self._discovered_device["version"] > 0 else "Unknown",
             },
         )
 
