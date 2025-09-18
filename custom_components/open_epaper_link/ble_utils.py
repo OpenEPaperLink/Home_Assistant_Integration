@@ -641,21 +641,42 @@ async def upload_image(conn: BLEConnection, image_data: bytes, metadata: DeviceM
 
 def parse_ble_advertisement(manufacturer_data: bytes) -> dict:
     """Parse manufacturer data for device state updates."""
-    if len(manufacturer_data) < 10:
+    if not manufacturer_data:
         return {}
-    
+
     try:
-        return {
-            "version": manufacturer_data[0],
-            "hw_type": int.from_bytes(manufacturer_data[1:3], 'little'),
-            "fw_version": int.from_bytes(manufacturer_data[3:5], 'little'),
-            "capabilities": int.from_bytes(manufacturer_data[5:7], 'little'), 
-            "battery_mv": int.from_bytes(manufacturer_data[7:9], 'little'),
-            "counter": manufacturer_data[9],
-        }
+        version = manufacturer_data[0]
+        if version == 1:
+            if len(manufacturer_data) < 10:
+                return {}
+            return {
+                "version": version,
+                "hw_type": int.from_bytes(manufacturer_data[1:3], 'little'),
+                "fw_version": int.from_bytes(manufacturer_data[3:5], 'little'),
+                "capabilities": int.from_bytes(manufacturer_data[5:7], 'little'),
+                "battery_mv": int.from_bytes(manufacturer_data[7:9], 'little'),
+                "counter": manufacturer_data[9],
+            }
+        elif version == 2:
+            if len(manufacturer_data) < 11:
+                return {}
+            return {
+                "version": version,
+                "hw_type": int.from_bytes(manufacturer_data[1:3], 'little'),
+                "fw_version": int.from_bytes(manufacturer_data[3:5], 'little'),
+                "capabilities": int.from_bytes(manufacturer_data[5:7], 'little'),
+                "battery_mv": int.from_bytes(manufacturer_data[7:9], 'little'),
+                "temperature": struct.unpack('<b', manufacturer_data[9:10])[0],
+                "counter": manufacturer_data[10],
+            }
+        else:
+            _LOGGER.debug("Unsupported manufacturer data version: %d", version)
+            return {}
+
     except (IndexError, struct.error) as e:
         _LOGGER.warning("Error parsing BLE advertising data: %s", e)
-        return {}
+    
+    return {}
 
 
 def calculate_battery_percentage(voltage_mv: int) -> int:

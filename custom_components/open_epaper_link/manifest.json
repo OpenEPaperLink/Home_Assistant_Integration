@@ -24,7 +24,10 @@
     "websocket-client==1.7.0",
     "websockets>=14.2",
     "python-resize-image==1.1.20",
-    "bleak>=1.0.1"
+    "bleak>=1.0.1",
+    "bleak-retry-connector>=3.4.0",
+    "numpy>=1.26.4",
+    "Pillow>=10.4.0"
   ],
-  "version": "2.0.0"
+  "version": "2.1.0"
 }

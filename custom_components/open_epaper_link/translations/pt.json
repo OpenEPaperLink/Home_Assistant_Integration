@@ -3,7 +3,7 @@
     "step": {
       "bluetooth_confirm": {
         "title": "Configurar Etiqueta BLE",
-        "description": "Configurar **{name}**?\n\n**Detalhes:**\n- Endereço: {address}\n- Sinal: {rssi} dBm\n- Bateria: {battery}"
+        "description": "Configurar **{name}**?\n\n**Detalhes:**\n- Endereço: {address}\n- Sinal: {rssi} dBm\n- Bateria: {battery}\n- Firmware: {fw_version}\n- Versão Config: {config_version}"
       },
       "user": {
         "data": {

@@ -6,7 +6,7 @@ from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform, EVENT_HOMEASSISTANT_STARTED, CONF_HOST
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import entity_registry as er, device_registry as dr
 from .const import DOMAIN
 from .hub import Hub
 from .services import async_setup_services, async_unload_services
@@ -135,6 +135,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             change: bluetooth.BluetoothChange,
         ) -> None:
             """Handle BLE advertising data updates."""
+            
+
             # Only process the specific device
             if service_info.address != mac_address:
                 return
@@ -147,6 +149,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             parsed_data = parse_ble_advertisement(manufacturer_data)
             if not parsed_data:
                 return
+            
+            # Dynamically update device attributes
+            new_fw_version = parsed_data.get("fw_version")
+            if new_fw_version is not None:
+                device_registry = dr.async_get(hass)
+                device_entry = device_registry.async_get_device(
+                    identifiers={(DOMAIN, f"ble_{mac_address}")}
+                )
+                new_fw_string = str(new_fw_version)
+                if device_entry and device_entry.sw_version != new_fw_string:
+                    _LOGGER.debug(
+                        "Device %s firmware updated from %s to %s",
+                        mac_address,
+                        device_entry.sw_version,
+                        new_fw_string,
+                    )
+                    device_registry.async_update_device(
+                        device_entry.id,
+                        sw_version=new_fw_string
+                    )
 
             # Build sensor data
             battery_mv = parsed_data.get("battery_mv", 0)
@@ -155,6 +177,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "battery_voltage": battery_mv if battery_mv > 0 else None,
                 "rssi": service_info.rssi,
                 "last_seen": datetime.now(timezone.utc),
+                "temperature": parsed_data.get("temperature"),
             }
 
             # Update all registered sensors
