@@ -83,12 +83,7 @@ To maximize tag battery life when using this integration:
 ## Installation
 
 ### Option 1: HACS Installation (Recommended)
-1. Click on HACS in the Home Assistant menu
-2. Click `Integrations`
-3. Click the `EXPLORE & DOWNLOAD REPOSITORIES` button
-4. Search for `OpenEPaperLink`
-5. Click the `DOWNLOAD` button
-6. Restart Home Assistant
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=OpenEpaperLink&repository=Home_Assistant_Integration)
 
 ### Option 2: Manual Installation
 1. Download the `open_epaper_link` folder from the [latest release](https://github.com/jonasniesner/open_epaper_link_homeassistant/releases/latest)
