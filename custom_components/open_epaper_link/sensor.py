@@ -377,6 +377,15 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
 
 BLE_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
     OpenEPaperLinkSensorEntityDescription(
+        key="temperature",
+        name="Temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        value_fn=lambda data: data.get("temperature"),
+        icon="mdi:thermometer",
+    ),
+    OpenEPaperLinkSensorEntityDescription(
         key="battery_percentage",
         name="Battery Percentage",
         device_class=SensorDeviceClass.BATTERY,
@@ -770,7 +779,7 @@ class OpenEPaperLinkBLESensor(SensorEntity):
             "name": name,
             "manufacturer": "OpenEPaperLink",
             "model": model_string,
-            "sw_version": f"0x{device_metadata.get('fw_version', 0):04x}",
+            "sw_version": str(device_metadata.get("fw_version")),
             "hw_version": f"{width}x{height}" if width and height else None,
         }
 

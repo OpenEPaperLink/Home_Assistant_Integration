@@ -3,7 +3,7 @@
         "step": {
             "bluetooth_confirm": {
                 "title": "BLE-Tag einrichten",
-                "description": "**{name}** einrichten?\n\n**Details:**\n- Adresse: {address}\n- Signal: {rssi} dBm\n- Batterie: {battery}"
+                "description": "**{name}** einrichten?\n\n**Details:**\n- Adresse: {address}\n- Signal: {rssi} dBm\n- Batterie: {battery}\n- Firmware: {fw_version}\n- Config-Version: {config_version}"
             },
             "user": {
                 "data": {
