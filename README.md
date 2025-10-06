@@ -111,6 +111,8 @@ Once flashed and configured, tags are discovered by HA automatically.
 
 ## Configuration
 
+This step is only needed when using OpenEPaperLink in AP mode. When using a BLE-only setup, the tags will be detected automatically as soon as OpenEPaperLink has been installed.
+
 ### Automatic Configuration
 Add OpenEPaperLink to your Home Assistant instance using this button:
 
