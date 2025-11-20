@@ -12,10 +12,13 @@
       }
     },
     "error": {
-      "interrogation_failed": "Falha ao conectar ao dispositivo e recuperar informações do display. Erro: {error}. Tente novamente ou verifique a conectividade do dispositivo."
+      "interrogation_failed": "Falha ao conectar ao dispositivo e recuperar informações do display. Erro: {error}. Tente novamente ou verifique a conectividade do dispositivo.",
+      "invalid_device_config": "O dispositivo retornou dados de configuração inválidos. Por favor, reconfigure o dispositivo ou atualize o firmware."
     },
     "abort": {
-      "single_instance_allowed": "Apenas um hub OpenEPaperLink pode ser configurado. Múltiplos dispositivos BLE são suportados, mas apenas um hub AP é permitido."
+      "single_instance_allowed": "Apenas um hub OpenEPaperLink pode ser configurado. Múltiplos dispositivos BLE são suportados, mas apenas um hub AP é permitido.",
+      "unsupported_protocol": "Protocolo de firmware BLE não suportado. Apenas firmware ATC e OEPL são suportados.",
+      "invalid_advertising_data": "Não foi possível analisar os dados de advertising do dispositivo. Por favor, certifique-se de que o dispositivo está usando firmware compatível."
     }
   },
   "options": {
@@ -229,11 +232,8 @@
       "refresh_tag_types": {
         "name": "Atualizar Tipos de Etiqueta"
       },
-      "set_clock_mode": {
-        "name": "Ativar Modo Relógio"
-      },
-      "disable_clock_mode": {
-        "name": "Desativar Modo Relógio"
+      "refresh_config": {
+        "name": "Atualizar Configuração"
       }
     }
   }

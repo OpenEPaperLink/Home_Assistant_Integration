@@ -4,10 +4,14 @@
   "bluetooth": [
     {
       "manufacturer_id": 4919
+    },
+    {
+      "manufacturer_id": 9286
     }
   ],
   "codeowners": [
-    "@jonasniesner"
+    "@jonasniesner",
+    "@g4bri3lDev"
   ],
   "config_flow": true,
   "dependencies": [

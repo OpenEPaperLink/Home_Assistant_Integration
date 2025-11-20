@@ -16,11 +16,10 @@ import qrcode
 import base64
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.network import get_url
-from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
+from .const import DOMAIN
 from .tag_types import TagType, get_tag_types_manager
-from .util import get_image_path, get_hub_from_hass
+from .util import get_hub_from_hass
 from PIL import Image, ImageDraw, ImageFont
 from resizeimage import resizeimage
 from homeassistant.exceptions import HomeAssistantError

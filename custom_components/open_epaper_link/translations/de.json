@@ -12,10 +12,13 @@
             }
         },
         "error": {
-            "interrogation_failed": "Verbindung zum Gerät und Abrufen der Display-Informationen fehlgeschlagen. Fehler: {error}. Erneut versuchen oder Geräteverbindung prüfen."
+            "interrogation_failed": "Verbindung zum Gerät und Abrufen der Display-Informationen fehlgeschlagen. Fehler: {error}. Erneut versuchen oder Geräteverbindung prüfen.",
+            "invalid_device_config": "Gerät hat ungültige Konfigurationsdaten zurückgegeben. Bitte Gerät neu konfigurieren oder die Firmware aktualisieren."
         },
         "abort": {
-            "single_instance_allowed": "Nur ein OpenEPaperLink-Hub kann konfiguriert werden. Mehrere BLE-Geräte werden unterstützt, aber nur ein AP-Hub ist erlaubt."
+            "single_instance_allowed": "Nur ein OpenEPaperLink-Hub kann konfiguriert werden. Mehrere BLE-Geräte werden unterstützt, aber nur ein AP-Hub ist erlaubt.",
+            "unsupported_protocol": "Nicht unterstütztes BLE-Firmware-Protokoll. Nur ATC- und OEPL-Firmware werden unterstützt.",
+            "invalid_advertising_data": "Advertising-Daten des Geräts konnten nicht analysiert werden. Bitte sicherstellen, dass das Gerät eine kompatible Firmware verwendet."
         }
     },
     "options": {
@@ -272,11 +275,8 @@
             "refresh_tag_types": {
                 "name": "Tag-Typen aktualisieren"
             },
-            "set_clock_mode": {
-                "name": "Uhr-Modus aktivieren"
-            },
-            "disable_clock_mode": {
-                "name": "Uhr-Modus deaktivieren"
+            "refresh_config": {
+                "name": "Konfiguration aktualisieren"
             }
         }
     },

@@ -8,7 +8,6 @@ Python port with complete image assembly pipeline
 """
 
 import ctypes
-import struct
 import numpy as np
 from PIL import Image
 from typing import Union, Tuple, Dict, Any
