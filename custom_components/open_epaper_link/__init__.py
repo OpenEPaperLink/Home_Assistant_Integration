@@ -11,7 +11,6 @@ from .const import DOMAIN
 from .hub import Hub
 from .services import async_setup_services, async_unload_services
 from .util import is_ble_entry
-from .sensor import _get_power_mode
 _LOGGER: Final = logging.getLogger(__name__)
 
 PLATFORMS = [
@@ -141,14 +140,15 @@ async def async_remove_invalid_ble_entities(
     mac_address = entry.data.get("mac_address", "")
 
     # Check power mode - remove battery sensors if not battery/solar powered
-    power_mode = _get_power_mode(device_metadata)
-    if power_mode not in (1, 3):  # Not battery (1) or solar (3)
+    from .ble import BLEDeviceMetadata
+    metadata = BLEDeviceMetadata(device_metadata)
+    if metadata.power_mode not in (1, 3):  # Not battery (1) or solar (3)
         for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
             if entity.unique_id and (
                 f"oepl_ble_{mac_address}_battery_percentage" in entity.unique_id or
                 f"oepl_ble_{mac_address}_battery_voltage" in entity.unique_id
             ):
-                _LOGGER.info("Removing battery sensor (power_mode=%s): %s", power_mode, entity.entity_id)
+                _LOGGER.info("Removing battery sensor (power_mode=%s): %s", metadata.power_mode, entity.entity_id)
                 entity_registry.async_remove(entity.entity_id)
                 removed_entities.append(entity.entity_id)
 

@@ -3,6 +3,7 @@
 # Re-export key classes and functions for backward compatibility
 from .connection import BLEConnection
 from .image_upload import BLEImageUploader, DeviceMetadata
+from .metadata import BLEDeviceMetadata
 from .operations import (
     turn_led_on,
     turn_led_off,
@@ -29,6 +30,8 @@ __all__ = [
     # Image upload
     "BLEImageUploader",
     "DeviceMetadata",
+    # Metadata
+    "BLEDeviceMetadata",
     # Operations
     "turn_led_on",
     "turn_led_off",

@@ -12,7 +12,6 @@ import logging
 from .tag_types import get_tag_types_manager
 from .util import send_tag_cmd, reboot_ap, is_ble_entry
 from .const import DOMAIN
-from .sensor import _get_model_name, _get_height, _get_width, _get_fw_version
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -756,17 +755,16 @@ class RefreshConfigButton(ButtonEntity):
     @property
     def device_info(self):
         """Return device info for the BLE device."""
-        model_string = _get_model_name(self._device_metadata)
-        height = _get_height(self._device_metadata)
-        width = _get_width(self._device_metadata)
+        from .ble import BLEDeviceMetadata
+        metadata = BLEDeviceMetadata(self._device_metadata)
 
         return {
             "identifiers": {(DOMAIN, f"ble_{self._mac_address}")},
             "name": self._name,
             "manufacturer": "OpenEPaperLink",
-            "model": model_string,
-            "sw_version": f"0x{_get_fw_version(self._device_metadata):04x}",
-            "hw_version": f"{width}x{height}" if width and height else None,
+            "model": metadata.model_name,
+            "sw_version": f"0x{metadata.fw_version:04x}",
+            "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
         }
 
     async def async_press(self) -> None:

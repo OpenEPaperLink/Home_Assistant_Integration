@@ -21,16 +21,9 @@ from .util import send_tag_cmd, reboot_ap, is_ble_entry, get_hub_from_hass
 from .ble import (
     BLEConnection,
     BLEImageUploader,
+    BLEDeviceMetadata,
     DeviceMetadata,
     get_protocol_by_name,
-)
-from .sensor import (
-    _get_hw_type,
-    _get_fw_version,
-    _get_width,
-    _get_height,
-    _get_color_support,
-    _get_rotatebuffer,
 )
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -595,20 +588,21 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
             protocol = get_protocol_by_name(protocol_type)
             _LOGGER.debug("Using protocol %s for device %s", protocol_type, entity_id)
 
-            # Create DeviceMetadata object
+            # Wrap metadata and create DeviceMetadata object
+            metadata_wrapper = BLEDeviceMetadata(device_metadata)
             metadata = DeviceMetadata(
-                hw_type=_get_hw_type(device_metadata),
-                fw_version=_get_fw_version(device_metadata),
-                width=_get_width(device_metadata),
-                height=_get_height(device_metadata),
-                color_support=_get_color_support(device_metadata),
-                rotatebuffer=_get_rotatebuffer(device_metadata)
+                hw_type=metadata_wrapper.hw_type,
+                fw_version=metadata_wrapper.fw_version,
+                width=metadata_wrapper.width,
+                height=metadata_wrapper.height,
+                color_support=metadata_wrapper.color_support,
+                rotatebuffer=metadata_wrapper.rotatebuffer
             )
 
             # Upload via BLE using protocol-specific service UUID
             async with BLEConnection(hass, mac, protocol.service_uuid, protocol) as conn:
                 uploader = BLEImageUploader(conn, mac)
-                success = await uploader.upload_image(img, metadata)
+                success = await uploader.upload_image(img, metadata, protocol_type)
 
                 if not success:
                     raise HomeAssistantError(f"BLE image upload failed for {entity_id}")

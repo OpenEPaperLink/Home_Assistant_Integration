@@ -268,12 +268,13 @@ class BLEImageUploader:
         except ValueError:
             return False  # Unknown response code
 
-    async def upload_image(self, image_data: bytes, metadata: DeviceMetadata) -> bool:
+    async def upload_image(self, image_data: bytes, metadata: DeviceMetadata, protocol_type: str = "atc") -> bool:
         """Upload image using block-based protocol.
 
         Args:
             image_data: JPEG image data
             metadata: Device metadata with dimensions and color support
+            protocol_type: Protocol type ("atc" or "oepl")
 
         Returns:
             bool: True if upload succeeded, False otherwise
@@ -283,12 +284,13 @@ class BLEImageUploader:
             image = Image.open(io.BytesIO(image_data))
             _LOGGER.debug("Before transpose: image size %dx%d", image.width, image.height)
 
-            # Apply rotation based on device rotatebuffer flag
-            if metadata.rotatebuffer == 1:
+            # Apply rotation for ATC devices only (OEPL handles rotation firmware-side)
+            if protocol_type == "atc" and metadata.rotatebuffer == 1:
                 image = image.transpose(Image.Transpose.ROTATE_90)
-                _LOGGER.debug("Applied 90° rotation (rotatebuffer=1): %dx%d", image.width, image.height)
+                _LOGGER.debug("Applied 90° rotation for ATC device: %dx%d", image.width, image.height)
             else:
-                _LOGGER.debug("No rotation needed (rotatebuffer=0): %dx%d", image.width, image.height)
+                _LOGGER.debug("No client-side rotation (protocol=%s, rotatebuffer=%d): %dx%d",
+                             protocol_type, metadata.rotatebuffer, image.width, image.height)
 
             # Determine if device supports color
             multi_color = metadata.color_support in ("red", "bwry")

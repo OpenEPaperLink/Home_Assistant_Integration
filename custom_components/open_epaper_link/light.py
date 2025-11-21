@@ -17,7 +17,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .ble import turn_led_on, turn_led_off, get_protocol_by_name
-from .sensor import _get_model_name, _get_height, _get_width, _get_fw_version
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -89,19 +88,17 @@ class OpenEPaperLinkBLELight(LightEntity):
     def device_info(self):
         """Return device info - dynamically reads from current metadata."""
         # Get current metadata from hass.data (may have been updated by RefreshConfigButton)
+        from .ble import BLEDeviceMetadata
         current_metadata = self.hass.data[DOMAIN][self._entry_id].get("device_metadata", self._device_metadata)
-
-        model_string = _get_model_name(current_metadata)
-        height = _get_height(current_metadata)
-        width = _get_width(current_metadata)
+        metadata = BLEDeviceMetadata(current_metadata)
 
         return {
             "identifiers": {(DOMAIN, f"ble_{self._mac_address}")},
             "name": self._name,
             "manufacturer": "OpenEPaperLink",
-            "model": model_string,
-            "sw_version": f"0x{_get_fw_version(current_metadata):04x}",
-            "hw_version": f"{width}x{height}" if width and height else None,
+            "model": metadata.model_name,
+            "sw_version": f"0x{metadata.fw_version:04x}",
+            "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
         }
 
     @property
