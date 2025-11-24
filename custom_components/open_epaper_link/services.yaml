@@ -2,8 +2,6 @@ drawcustom:
   name: Draw Custom Image
   description: Draws a custom image on one or more ESL tags
   target:
-    device:
-      integration: open_epaper_link
   fields:
     payload:
       name: Payload
