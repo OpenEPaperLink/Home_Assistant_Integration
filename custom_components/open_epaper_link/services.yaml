@@ -2,8 +2,6 @@ drawcustom:
   name: Draw Custom Image
   description: Draws a custom image on one or more ESL tags
   target:
-    device:
-      integration: open_epaper_link
   fields:
     payload:
       name: Payload
@@ -77,8 +75,6 @@ setled:
   name: Set LED Pattern
   description: Sets the LED flash pattern for one or more ESL tags
   target:
-    device:
-      integration: open_epaper_link
   fields:
     mode:
       name: Mode
@@ -243,40 +239,28 @@ clear_pending:
   name: Clear Pending
   description: Clears the pending status for one or more ESL tags
   target:
-    device:
-      integration: open_epaper_link
 
 force_refresh:
   name: Force Refresh
   description: Forces one or more ESL tags to refresh their display
   target:
-    device:
-      integration: open_epaper_link
 
 reboot_tag:
   name: Reboot Tag
   description: Reboots one or more ESL tags
   target:
-    device:
-      integration: open_epaper_link
 
 scan_channels:
   name: Scan Channels
   description: Makes one or more ESL tags scan for channels
   target:
-    device:
-      integration: open_epaper_link
 
 reboot_ap:
   name: Reboot AP
   description: Reboots the AP
   target:
-    device:
-      integration: open_epaper_link
 
 refresh_tag_types:
   name: Refresh Tag Types
   description: Force refresh of tag type definitions from GitHub
   target:
-    device:
-      integration: open_epaper_link

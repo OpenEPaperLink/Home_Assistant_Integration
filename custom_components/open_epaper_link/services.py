@@ -18,7 +18,13 @@ from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
 from .imagegen import ImageGen
 from .tag_types import get_tag_types_manager
 from .util import send_tag_cmd, reboot_ap, is_ble_entry, get_hub_from_hass
-from .ble_utils import upload_image as ble_upload_image, DeviceMetadata
+from .ble import (
+    BLEConnection,
+    BLEImageUploader,
+    BLEDeviceMetadata,
+    DeviceMetadata,
+    get_protocol_by_name,
+)
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -547,6 +553,8 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
         Sends an image to a BLE tag using direct Bluetooth communication.
         This bypasses the AP and provides faster upload times.
 
+        Uses protocol-specific service UUID based on device firmware type.
+
         Args:
             hass: Home Assistant instance
             entity_id: Entity ID of the target tag
@@ -563,33 +571,42 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
             # Get device metadata from Home Assistant data
             domain_data = hass.data.get(DOMAIN, {})
             device_metadata = None
-            
+            protocol_type = "atc"  # Default to ATC for backward compatibility
+
             # Find the config entry for this BLE device
             for entry_id, entry_data in domain_data.items():
                 if (is_ble_entry(entry_data) and
                     entry_data.get("mac_address", "").upper() == mac):
                     device_metadata = entry_data.get("device_metadata", {})
+                    protocol_type = entry_data.get("protocol_type", "atc")
                     break
-            
+
             if not device_metadata:
                 raise HomeAssistantError(f"No metadata found for BLE device {entity_id}")
-            
-            # Create DeviceMetadata object
-            metadata = DeviceMetadata(
-                hw_type=device_metadata.get("hw_type", 0),
-                fw_version=device_metadata.get("fw_version", 0),
-                width=device_metadata.get("width", 0),
-                height=device_metadata.get("height", 0),
-                color_support=device_metadata.get("color_support", "mono"),
-                rotatebuffer=device_metadata.get("rotatebuffer", 0)
-            )
-            
 
-            # Upload via BLE
-            success = await ble_upload_image(hass, mac, img, metadata)
-            if not success:
-                raise HomeAssistantError(f"BLE image upload failed for {entity_id}")
-                
+            # Get protocol handler for service UUID
+            protocol = get_protocol_by_name(protocol_type)
+            _LOGGER.debug("Using protocol %s for device %s", protocol_type, entity_id)
+
+            # Wrap metadata and create DeviceMetadata object
+            metadata_wrapper = BLEDeviceMetadata(device_metadata)
+            metadata = DeviceMetadata(
+                hw_type=metadata_wrapper.hw_type,
+                fw_version=metadata_wrapper.fw_version,
+                width=metadata_wrapper.width,
+                height=metadata_wrapper.height,
+                color_support=metadata_wrapper.color_support,
+                rotatebuffer=metadata_wrapper.rotatebuffer
+            )
+
+            # Upload via BLE using protocol-specific service UUID
+            async with BLEConnection(hass, mac, protocol.service_uuid, protocol) as conn:
+                uploader = BLEImageUploader(conn, mac)
+                success = await uploader.upload_image(img, metadata, protocol_type)
+
+                if not success:
+                    raise HomeAssistantError(f"BLE image upload failed for {entity_id}")
+
         except Exception as err:
             _LOGGER.error("BLE upload error for %s: %s", entity_id, err)
             raise HomeAssistantError(f"Failed to upload image via BLE to {entity_id}: {str(err)}") from err

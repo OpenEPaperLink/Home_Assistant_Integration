@@ -17,7 +17,14 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import TextSelectorType
 
 from .const import DOMAIN
-from .ble_utils import interrogate_ble_device, parse_ble_advertisement
+from .ble import (
+    get_protocol_by_manufacturer_id,
+    BLEConnection,
+    UnsupportedProtocolError,
+    ConfigValidationError,
+    BLEConnectionError,
+    BLEProtocolError,
+)
 from .tag_types import get_tag_types_manager, get_hw_string
 from .util import is_ble_entry
 import logging
@@ -130,19 +137,46 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self, discovery_info: BluetoothServiceInfoBleak
     ):
         """Handle bluetooth discovery."""
-        _LOGGER.debug("BLE Discovery - Name: '%s', Address: %s", 
+        _LOGGER.debug("BLE Discovery - Name: '%s', Address: %s",
                      discovery_info.name, discovery_info.address)
-
 
         await self.async_set_unique_id(f"oepl_ble_{discovery_info.address}")
         self._abort_if_unique_id_configured()
 
         self._discovery_info = discovery_info
 
-        # Parse advertising data for initial info
-        device_info = parse_ble_advertisement(
-            discovery_info.manufacturer_data.get(4919, b'')
-        )
+        # Detect protocol from manufacturer data
+        manufacturer_id = None
+        manufacturer_data = b''
+
+        # Check for known manufacturer IDs (ATC: 4919, OEPL: 9286)
+        for mfg_id, mfg_data in discovery_info.manufacturer_data.items():
+            if mfg_id in (4919, 9286):
+                manufacturer_id = mfg_id
+                manufacturer_data = mfg_data
+                break
+
+        if manufacturer_id is None:
+            _LOGGER.error("No supported manufacturer ID found in advertising data")
+            return self.async_abort(reason="unsupported_protocol")
+
+        # Get protocol handler
+        try:
+            protocol = get_protocol_by_manufacturer_id(manufacturer_id)
+            _LOGGER.debug("Detected protocol: %s (manufacturer ID: 0x%04X)",
+                         protocol.protocol_name, manufacturer_id)
+        except UnsupportedProtocolError:
+            _LOGGER.error("Unsupported manufacturer ID: 0x%04X", manufacturer_id)
+            return self.async_abort(reason="unsupported_protocol")
+
+        # Parse advertising data using protocol-specific parser
+        try:
+            advertising_data = protocol.parse_advertising_data(manufacturer_data)
+            if not advertising_data:
+                raise ValueError("Failed to parse advertising data")
+        except Exception as e:
+            _LOGGER.error("Failed to parse advertising data: %s", e)
+            return self.async_abort(reason="invalid_advertising_data")
 
         device_name = discovery_info.name or f"OEPL_BLE_{discovery_info.address[-8:].replace(':', '')}"
 
@@ -150,10 +184,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "address": discovery_info.address,
             "name": device_name,
             "rssi": discovery_info.rssi,
-            "hw_type": device_info.get("hw_type", 0),
-            "battery_mv": device_info.get("battery_mv", 0),
-            "fw_version": device_info.get("fw_version", 0),
-            "version": device_info.get("version", 0),
+            "hw_type": advertising_data.hw_type,
+            "battery_mv": advertising_data.battery_mv,
+            "fw_version": advertising_data.fw_version,
+            "version": advertising_data.version,
+            "protocol_type": protocol.protocol_name,  # Store protocol type
         }
         _LOGGER.debug("Discovered device info: %s", self._discovered_device)
 
@@ -167,35 +202,78 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             # Perform device interrogation to get real metadata
             _LOGGER.debug("Interrogating device %s for metadata", self._discovered_device["address"])
-            
+
             try:
-                
-                # Initialize TagTypesManager to ensure get_hw_string works for BLE devices
-                await get_tag_types_manager(self.hass)
-                
-                # Get display info from device interrogation
-                display_info = await interrogate_ble_device(self.hass, self._discovered_device["address"])
-                _LOGGER.debug("Display info: %s", display_info)
-                
+                # Get protocol handler for this device
+                protocol = get_protocol_by_manufacturer_id(
+                    9286 if self._discovered_device["protocol_type"] == "oepl" else 4919
+                )
+
+                # Interrogate device using protocol-specific method
+                async with BLEConnection(
+                    self.hass,
+                    self._discovered_device["address"],
+                    protocol.service_uuid,
+                    protocol
+                ) as conn:
+                    capabilities = await protocol.interrogate_device(conn)
+
+                _LOGGER.debug("Device capabilities: %s", capabilities)
+
                 # Interrogation must succeed - no fallback
-                if not display_info:
-                    raise RuntimeError("Failed to interrogate device for display specifications")
-                
-                # Resolve hardware string once using initialized TagTypesManager
+                if not capabilities:
+                    raise ConfigValidationError("Device returned invalid configuration data")
+
+                # Generate model name based on protocol type
                 hw_type = self._discovered_device["hw_type"]
-                model_name = get_hw_string(hw_type) if hw_type else "Unknown"
-                _LOGGER.debug("Resolved hw_type %s to model: %s", hw_type, model_name)
-                
-                # Width and height are swapped on purpose for parity with AP devices
-                device_metadata = {
-                    "hw_type": hw_type,
-                    "fw_version": self._discovered_device["fw_version"],
-                    "width": display_info.width,
-                    "height": display_info.height,
-                    "rotatebuffer": display_info.rotatebuffer,
-                    "color_support": display_info.color_support,
-                    "model_name": model_name
-                }
+
+                if self._discovered_device["protocol_type"] == "oepl":
+                    # OEPL devices: Store complete config, generate model name from DisplayConfig
+                    from .ble.tlv_parser import config_to_dict, generate_model_name
+
+                    if hasattr(protocol, '_last_config') and protocol._last_config:
+                        # Store complete OEPL config for future use
+                        device_metadata = {
+                            "oepl_config": config_to_dict(protocol._last_config),
+                        }
+
+                        # Generate model name from display config
+                        if protocol._last_config.displays:
+                            model_name = generate_model_name(protocol._last_config.displays[0])
+                            device_metadata["model_name"] = model_name
+                            _LOGGER.debug("Generated model name from config: %s", model_name)
+                        else:
+                            _LOGGER.warning("OEPL config has no display config")
+                    else:
+                        # Fallback if config unavailable (shouldn't happen for OEPL)
+                        model_name = get_hw_string(hw_type) if hw_type else "Unknown"
+                        _LOGGER.warning("OEPL config unavailable, using tagtypes fallback: %s", model_name)
+                        # Store individual fields as fallback
+                        device_metadata = {
+                            "hw_type": hw_type,
+                            "fw_version": self._discovered_device["fw_version"],
+                            "width": capabilities.width,
+                            "height": capabilities.height,
+                            "rotatebuffer": capabilities.rotatebuffer,
+                            "color_support": capabilities.color_support,
+                            "model_name": model_name,
+                        }
+                else:
+                    # ATC devices: Use tagtypes.json lookup and store individual fields
+                    await get_tag_types_manager(self.hass)
+                    model_name = get_hw_string(hw_type) if hw_type else "Unknown"
+                    _LOGGER.debug("Resolved hw_type %s to model: %s", hw_type, model_name)
+
+                    # Build device metadata from capabilities
+                    device_metadata = {
+                        "hw_type": hw_type,
+                        "fw_version": self._discovered_device["fw_version"],
+                        "width": capabilities.width,
+                        "height": capabilities.height,
+                        "rotatebuffer": capabilities.rotatebuffer,
+                        "color_support": capabilities.color_support,
+                        "model_name": model_name,
+                    }
 
                 return self.async_create_entry(
                     title=self._discovered_device['name'],
@@ -203,11 +281,27 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         "mac_address": self._discovered_device["address"],
                         "name": self._discovered_device["name"],
                         "device_metadata": device_metadata,
-                        "device_type": "ble"
+                        "device_type": "ble",
+                        "protocol_type": self._discovered_device["protocol_type"],  # Store protocol
                     }
                 )
-                
-            except Exception as e:
+
+            except ConfigValidationError as e:
+                _LOGGER.error("Invalid device configuration: %s", e)
+                return self.async_show_form(
+                    step_id="bluetooth_confirm",
+                    errors={"base": "invalid_device_config"},
+                    description_placeholders={
+                        "name": self._discovered_device["name"],
+                        "address": self._discovered_device["address"],
+                        "rssi": str(self._discovered_device["rssi"]),
+                        "battery": f"{self._discovered_device['battery_mv']/1000:.2f}V" if self._discovered_device["battery_mv"] > 0 else "Unknown",
+                        "fw_version": str(self._discovered_device["fw_version"]) if self._discovered_device["fw_version"] > 0 else "Unknown",
+                        "config_version": str(self._discovered_device["version"]) if self._discovered_device["version"] > 0 else "Unknown",
+                    },
+                )
+
+            except (BLEConnectionError, BLEProtocolError) as e:
                 _LOGGER.error("Error during device interrogation: %s", e)
                 return self.async_show_form(
                     step_id="bluetooth_confirm",
@@ -215,20 +309,43 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     description_placeholders={
                         "name": self._discovered_device["name"],
                         "address": self._discovered_device["address"],
+                        "rssi": str(self._discovered_device["rssi"]),
+                        "battery": f"{self._discovered_device['battery_mv']/1000:.2f}V" if self._discovered_device["battery_mv"] > 0 else "Unknown",
+                        "fw_version": str(self._discovered_device["fw_version"]) if self._discovered_device["fw_version"] > 0 else "Unknown",
+                        "config_version": str(self._discovered_device["version"]) if self._discovered_device["version"] > 0 else "Unknown",
                         "error": str(e),
                     },
                 )
 
+            except Exception as e:
+                _LOGGER.error("Unexpected error during device interrogation: %s", e)
+                return self.async_show_form(
+                    step_id="bluetooth_confirm",
+                    errors={"base": "interrogation_failed"},
+                    description_placeholders={
+                        "name": self._discovered_device["name"],
+                        "address": self._discovered_device["address"],
+                        "rssi": str(self._discovered_device["rssi"]),
+                        "battery": f"{self._discovered_device['battery_mv']/1000:.2f}V" if self._discovered_device["battery_mv"] > 0 else "Unknown",
+                        "fw_version": str(self._discovered_device["fw_version"]) if self._discovered_device["fw_version"] > 0 else "Unknown",
+                        "config_version": str(self._discovered_device["version"]) if self._discovered_device["version"] > 0 else "Unknown",
+                        "error": str(e),
+                    },
+                )
+
+        # Build description placeholders from advertising data
+        description_placeholders = {
+            "name": self._discovered_device["name"],
+            "address": self._discovered_device["address"],
+            "rssi": str(self._discovered_device["rssi"]),
+            "battery": f"{self._discovered_device['battery_mv']/1000:.2f}V" if self._discovered_device["battery_mv"] > 0 else "Unknown",
+            "fw_version": str(self._discovered_device["fw_version"]) if self._discovered_device["fw_version"] > 0 else "Unknown",
+            "config_version": str(self._discovered_device["version"]) if self._discovered_device["version"] > 0 else "Unknown",
+        }
+
         return self.async_show_form(
             step_id="bluetooth_confirm",
-            description_placeholders={
-                "name": self._discovered_device["name"],
-                "address": self._discovered_device["address"],
-                "rssi": str(self._discovered_device["rssi"]),
-                "battery": f"{self._discovered_device['battery_mv']/1000:.2f}V" if self._discovered_device["battery_mv"] > 0 else "Unknown",
-                "fw_version": str(self._discovered_device["fw_version"]) if self._discovered_device["fw_version"] > 0 else "Unknown",
-                "config_version": str(self._discovered_device["version"]) if self._discovered_device["version"] > 0 else "Unknown",
-            },
+            description_placeholders=description_placeholders,
         )
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> FlowResult:

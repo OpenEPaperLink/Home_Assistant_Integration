@@ -24,12 +24,12 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 import logging
+
+from .const import DOMAIN
 from .util import is_ble_entry
 from .tag_types import get_hw_string, get_hw_dimensions
 
 _LOGGER: Final = logging.getLogger(__name__)
-
-from .const import DOMAIN
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -420,6 +420,8 @@ BLE_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         key="last_seen",
         name="Last Seen",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         value_fn=lambda data: data.get("last_seen"),
         icon="mdi:history",
     ),
@@ -769,18 +771,21 @@ class OpenEPaperLinkBLESensor(SensorEntity):
         self._attr_has_entity_name = True
         self._attr_translation_key = description.key
 
-        # Device info for entity registry
-        model_string = device_metadata.get('model_name', 'Unknown')
-        height = device_metadata.get('height', 0)
-        width = device_metadata.get('width', 0)
-        
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, f"ble_{mac_address}")},
-            "name": name,
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info - dynamically reads from current metadata."""
+        # Get current metadata from hass.data (may have been updated by RefreshConfigButton)
+        from .ble import BLEDeviceMetadata
+        current_metadata = self.hass.data[DOMAIN][self._entry_id].get("device_metadata", self._device_metadata)
+        metadata = BLEDeviceMetadata(current_metadata)
+
+        return {
+            "identifiers": {(DOMAIN, f"ble_{self._mac_address}")},
+            "name": self._name,
             "manufacturer": "OpenEPaperLink",
-            "model": model_string,
-            "sw_version": str(device_metadata.get("fw_version")),
-            "hw_version": f"{width}x{height}" if width and height else None,
+            "model": metadata.model_name,
+            "sw_version": str(metadata.fw_version),
+            "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
         }
 
     @property
@@ -869,10 +874,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         mac_address = entry_data["mac_address"]
         name = entry_data["name"]
         device_metadata = entry_data.get("device_metadata", {})
-        
+        protocol_type = entry_data.get("protocol_type", "atc")  # Default to ATC for backward compatibility
+
         # Create sensors for each description
+        from .ble import BLEDeviceMetadata
+        metadata = BLEDeviceMetadata(device_metadata)
         sensors = []
         for description in BLE_SENSOR_TYPES:
+            # Handle battery sensors based on device protocol
+            if description.key in ("battery_percentage", "battery_voltage"):
+                if protocol_type == "atc":
+                    # ATC devices always have batteries
+                    pass  # Continue to create sensor
+                elif protocol_type == "oepl":
+                    # OEPL devices: only create battery sensors for battery/solar power
+                    if metadata.power_mode not in (1, 3):  # Not battery (1) or solar (3)
+                        continue  # Skip battery sensors
+
             sensor = OpenEPaperLinkBLESensor(
                 mac_address=mac_address,
                 name=name,
@@ -881,7 +899,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 description=description,
             )
             sensors.append(sensor)
-            
+
             # Register sensor in the sensors registry so callback can update it
             entry_data["sensors"][description.key] = sensor
         

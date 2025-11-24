@@ -91,6 +91,73 @@ async def async_migrate_camera_entities(hass: HomeAssistant, entry: ConfigEntry)
 
     return removed_entities
 
+
+async def async_remove_clock_mode_buttons(hass: HomeAssistant, entry: ConfigEntry) -> list[str]:
+    """Remove deprecated clock mode button entities.
+
+    Clock mode was a tech demo feature that is no longer supported.
+    This removes the old button entities from the entity registry.
+
+    Returns:
+        list[str]: List of removed button entity IDs
+    """
+    entity_registry = er.async_get(hass)
+    removed_entities = []
+
+    # Find clock mode button entities for this config entry
+    for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
+        if entity.unique_id and ("_set_clock_mode" in entity.unique_id or "_disable_clock_mode" in entity.unique_id):
+            _LOGGER.info("Removing deprecated clock mode button: %s", entity.entity_id)
+            entity_registry.async_remove(entity.entity_id)
+            removed_entities.append(entity.entity_id)
+
+    return removed_entities
+
+
+async def async_remove_invalid_ble_entities(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    device_metadata: dict
+) -> list[str]:
+    """Remove BLE entities that are invalid for current device config.
+
+    Checks device configuration and removes entities that shouldn't exist based on
+    current hardware/firmware capabilities:
+    - Battery sensors when power_mode == 2 (USB powered)
+    - Future: LED entities when LED config missing
+    - Future: Sensor entities based on sensor config
+
+    Args:
+        hass: Home Assistant instance
+        entry: Configuration entry
+        device_metadata: Current device metadata with OEPL config
+
+    Returns:
+        list[str]: List of removed entity IDs
+    """
+    entity_registry = er.async_get(hass)
+    removed_entities = []
+    mac_address = entry.data.get("mac_address", "")
+
+    # Check power mode - remove battery sensors if not battery/solar powered
+    from .ble import BLEDeviceMetadata
+    metadata = BLEDeviceMetadata(device_metadata)
+    if metadata.power_mode not in (1, 3):  # Not battery (1) or solar (3)
+        for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
+            if entity.unique_id and (
+                f"oepl_ble_{mac_address}_battery_percentage" in entity.unique_id or
+                f"oepl_ble_{mac_address}_battery_voltage" in entity.unique_id
+            ):
+                _LOGGER.info("Removing battery sensor (power_mode=%s): %s", metadata.power_mode, entity.entity_id)
+                entity_registry.async_remove(entity.entity_id)
+                removed_entities.append(entity.entity_id)
+
+    # Future: Check LED config presence and remove LED entity if not present
+    # Future: Check sensor configs and remove/add sensor entities accordingly
+
+    return removed_entities
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up OpenEPaperLink integration from a config entry.
 
@@ -113,12 +180,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.debug("Setting up BLE device entry: %s", entry.data.get("name"))
 
         from homeassistant.components import bluetooth
-        from .ble_utils import MANUFACTURER_ID, parse_ble_advertisement, calculate_battery_percentage
+        from .ble import get_protocol_by_name
         from datetime import datetime, timezone
 
         mac_address = entry.data.get("mac_address")
         name = entry.data.get("name")
         device_metadata = entry.data.get("device_metadata", {})
+        protocol_type = entry.data.get("protocol_type", "atc")  # Default to ATC for backward compatibility
+
+        # Get protocol handler for this device
+        protocol = get_protocol_by_name(protocol_type)
+        _LOGGER.debug("Setting up BLE device with protocol: %s (manufacturer ID: 0x%04X)",
+                     protocol_type, protocol.manufacturer_id)
 
         # Store BLE device config in hass.data for entity access
         ble_data = {
@@ -126,6 +199,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "mac_address": mac_address,
             "name": name,
             "device_metadata": device_metadata,
+            "protocol_type": protocol_type,
             "sensors": {},  # Registry of sensor entities
         }
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = ble_data
@@ -134,30 +208,41 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             service_info: bluetooth.BluetoothServiceInfoBleak,
             change: bluetooth.BluetoothChange,
         ) -> None:
-            """Handle BLE advertising data updates."""
-            
+            """Handle BLE advertising data updates.
 
+            Uses protocol-specific parsing based on device firmware type.
+            """
             # Only process the specific device
             if service_info.address != mac_address:
                 return
 
-            # Parse manufacturer data
-            manufacturer_data = service_info.manufacturer_data.get(MANUFACTURER_ID)
+            # Parse manufacturer data using protocol-specific parser
+            manufacturer_data = service_info.manufacturer_data.get(protocol.manufacturer_id)
             if not manufacturer_data:
+                _LOGGER.debug(
+                    "No manufacturer data for 0x%04X on %s (available: %s)",
+                    protocol.manufacturer_id,
+                    mac_address,
+                    service_info.manufacturer_data.keys()
+                )
                 return
 
-            parsed_data = parse_ble_advertisement(manufacturer_data)
-            if not parsed_data:
+            try:
+                advertising_data = protocol.parse_advertising_data(manufacturer_data)
+                if not advertising_data:
+                    _LOGGER.debug("parse_advertising_data returned None for %s", mac_address)
+                    return
+            except Exception as err:
+                _LOGGER.debug("Failed to parse advertising data for %s: %s", mac_address, err, exc_info=True)
                 return
-            
+
             # Dynamically update device attributes
-            new_fw_version = parsed_data.get("fw_version")
-            if new_fw_version is not None:
+            if advertising_data.fw_version:
                 device_registry = dr.async_get(hass)
                 device_entry = device_registry.async_get_device(
                     identifiers={(DOMAIN, f"ble_{mac_address}")}
                 )
-                new_fw_string = str(new_fw_version)
+                new_fw_string = str(advertising_data.fw_version)
                 if device_entry and device_entry.sw_version != new_fw_string:
                     _LOGGER.debug(
                         "Device %s firmware updated from %s to %s",
@@ -171,32 +256,42 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     )
 
             # Build sensor data
-            battery_mv = parsed_data.get("battery_mv", 0)
             sensor_data = {
-                "battery_percentage": calculate_battery_percentage(battery_mv) if battery_mv > 0 else None,
-                "battery_voltage": battery_mv if battery_mv > 0 else None,
+                "battery_percentage": advertising_data.battery_pct,
+                "battery_voltage": advertising_data.battery_mv if advertising_data.battery_mv > 0 else None,
                 "rssi": service_info.rssi,
                 "last_seen": datetime.now(timezone.utc),
-                "temperature": parsed_data.get("temperature"),
+                "temperature": advertising_data.temperature,
             }
 
             # Update all registered sensors
             for sensor in ble_data["sensors"].values():
                 sensor.update_from_advertising_data(sensor_data)
 
-            _LOGGER.debug("Updated BLE sensors for %s: %s", mac_address, sensor_data)
+        # Remove deprecated clock mode button entities
+        removed_clock_buttons = await async_remove_clock_mode_buttons(hass, entry)
+        if removed_clock_buttons:
+            _LOGGER.info("Removed deprecated clock mode buttons: %s", removed_clock_buttons)
 
-        # Register BLE advertising listener
+        # Remove invalid entities based on current device config
+        removed_invalid = await async_remove_invalid_ble_entities(hass, entry, device_metadata)
+        if removed_invalid:
+            _LOGGER.info("Removed invalid BLE entities: %s", removed_invalid)
+
+        # Set up BLE-specific platforms FIRST (before callback registration)
+        # This ensures sensor entities exist before any advertising callbacks fire
+        await hass.config_entries.async_forward_entry_setups(entry, BLE_PLATFORMS)
+
+        # Register BLE advertising listener with protocol-specific manufacturer ID
+        # This must happen AFTER platforms are set up so sensors can receive updates
         unregister_callback = bluetooth.async_register_callback(
             hass,
             _ble_device_found,
-            {"manufacturer_id": MANUFACTURER_ID},
+            {"manufacturer_id": protocol.manufacturer_id},
             bluetooth.BluetoothScanningMode.ACTIVE,
         )
-        entry.async_on_unload(unregister_callback)
 
-        # Set up BLE-specific platforms
-        await hass.config_entries.async_forward_entry_setups(entry, BLE_PLATFORMS)
+        entry.async_on_unload(unregister_callback)
 
     else:
         # Traditional AP setup

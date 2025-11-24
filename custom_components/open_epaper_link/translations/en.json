@@ -12,10 +12,13 @@
             }
         },
         "error": {
-            "interrogation_failed": "Failed to connect to device and retrieve display information. Error: {error}. Retry or check device connectivity."
+            "interrogation_failed": "Failed to connect to device and retrieve display information. Error: {error}. Retry or check device connectivity.",
+            "invalid_device_config": "Device returned invalid configuration data. Please reconfigure the device or update its firmware."
         },
         "abort": {
-            "single_instance_allowed": "Only one OpenEPaperLink hub can be configured. Multiple BLE devices are supported, but only one AP hub is allowed."
+            "single_instance_allowed": "Only one OpenEPaperLink hub can be configured. Multiple BLE devices are supported, but only one AP hub is allowed.",
+            "unsupported_protocol": "Unsupported BLE firmware protocol. Only ATC and OEPL firmware are supported.",
+            "invalid_advertising_data": "Could not parse device advertising data. Please ensure the device is using compatible firmware."
         }
     },
     "options": {
@@ -229,11 +232,8 @@
             "refresh_tag_types": {
                 "name": "Refresh Tag Types"
             },
-            "set_clock_mode": {
-                "name": "Enable Clock Mode"
-            },
-            "disable_clock_mode": {
-                "name": "Disable Clock Mode"
+            "refresh_config": {
+                "name": "Refresh Configuration"
             }
         }
     }

@@ -16,11 +16,10 @@ import qrcode
 import base64
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.network import get_url
-from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
+from .const import DOMAIN
 from .tag_types import TagType, get_tag_types_manager
-from .util import get_image_path, get_hub_from_hass
+from .util import get_hub_from_hass
 from PIL import Image, ImageDraw, ImageFont
 from resizeimage import resizeimage
 from homeassistant.exceptions import HomeAssistantError
@@ -737,13 +736,17 @@ class ImageGen:
             
             if not device_metadata:
                 raise HomeAssistantError(f"No metadata found for BLE device {entity_id}")
-            
-            # Create TagType object from stored metadata
-            hw_type = device_metadata.get("hw_type", 0)
-            width = device_metadata.get("width", 184)
-            height = device_metadata.get("height", 384)
-            color_support = device_metadata.get("color_support", "mono")
-            
+
+            # Wrap metadata for clean access
+            from .ble import BLEDeviceMetadata
+            metadata = BLEDeviceMetadata(device_metadata)
+
+            # Extract device capabilities
+            hw_type = metadata.hw_type
+            width = metadata.width
+            height = metadata.height
+            color_support = metadata.color_support
+
             _LOGGER.debug("BLE device metadata for %s: width=%d, height=%d", entity_id, width, height)
             
             # Map color support to color table

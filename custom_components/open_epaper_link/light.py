@@ -16,7 +16,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .ble_utils import turn_led_on, turn_led_off
+from .ble import turn_led_on, turn_led_off, get_protocol_by_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,11 +35,17 @@ async def async_setup_entry(
     mac_address = entry_data["mac_address"]
     name = entry_data["name"]
     device_metadata = entry_data.get("device_metadata", {})
+    protocol_type = entry_data.get("protocol_type", "atc")  # Default to ATC for backward compatibility
+
+    # Skip LED entity for OEPL devices - LED config not yet implemented
+    if protocol_type == "oepl":
+        return
 
     light = OpenEPaperLinkBLELight(
         mac_address=mac_address,
         name=name,
         device_metadata=device_metadata,
+        protocol_type=protocol_type,
         entry_id=entry.entry_id,
     )
 
@@ -58,6 +64,7 @@ class OpenEPaperLinkBLELight(LightEntity):
         mac_address: str,
         name: str,
         device_metadata: dict,
+        protocol_type: str,
         entry_id: str,
     ) -> None:
         """Initialize the BLE light entity."""
@@ -68,23 +75,30 @@ class OpenEPaperLinkBLELight(LightEntity):
         self._is_on = False
         self._available = True
         self._auto_off_task = None
-        
+
+        # Get protocol handler for service UUID
+        self._protocol = get_protocol_by_name(protocol_type)
+        self._service_uuid = self._protocol.service_uuid
+
         # Set translation key for proper localization
         self._attr_has_entity_name = True
         self._attr_translation_key = "led"
 
-        # Device info for entity registry
-        model_string = device_metadata.get('model_name', 'Unknown')
-        height = device_metadata.get('height', 0)
-        width = device_metadata.get('width', 0)
-        
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, f"ble_{mac_address}")},
-            "name": name,
+    @property
+    def device_info(self):
+        """Return device info - dynamically reads from current metadata."""
+        # Get current metadata from hass.data (may have been updated by RefreshConfigButton)
+        from .ble import BLEDeviceMetadata
+        current_metadata = self.hass.data[DOMAIN][self._entry_id].get("device_metadata", self._device_metadata)
+        metadata = BLEDeviceMetadata(current_metadata)
+
+        return {
+            "identifiers": {(DOMAIN, f"ble_{self._mac_address}")},
+            "name": self._name,
             "manufacturer": "OpenEPaperLink",
-            "model": model_string,
-            "sw_version": f"0x{device_metadata.get('fw_version', 0):04x}",
-            "hw_version": f"{width}x{height}" if width and height else None,
+            "model": metadata.model_name,
+            "sw_version": f"0x{metadata.fw_version:04x}",
+            "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
         }
 
     @property
@@ -121,16 +135,16 @@ class OpenEPaperLinkBLELight(LightEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the light on."""
         try:
-            success = await turn_led_on(self.hass, self._mac_address)
+            success = await turn_led_on(self.hass, self._mac_address, self._service_uuid, self._protocol)
             if success:
                 self._is_on = True
                 self._available = True
                 self.async_write_ha_state()
-                
+
                 # Cancel any existing auto-off timer
                 if self._auto_off_task and not self._auto_off_task.done():
                     self._auto_off_task.cancel()
-                
+
                 # Start auto-off timer since LED turns off when BLE connection closes
                 self._auto_off_task = asyncio.create_task(self._auto_off_timer())
             else:
@@ -148,8 +162,8 @@ class OpenEPaperLinkBLELight(LightEntity):
             # Cancel auto-off timer since manual turn-off is requested
             if self._auto_off_task and not self._auto_off_task.done():
                 self._auto_off_task.cancel()
-                
-            success = await turn_led_off(self.hass, self._mac_address)
+
+            success = await turn_led_off(self.hass, self._mac_address, self._service_uuid, self._protocol)
             if success:
                 self._is_on = False
                 self._available = True
