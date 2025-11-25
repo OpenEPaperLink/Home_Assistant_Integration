@@ -11,6 +11,7 @@ from .const import DOMAIN
 from .hub import Hub
 from .services import async_setup_services, async_unload_services
 from .util import is_ble_entry
+
 _LOGGER: Final = logging.getLogger(__name__)
 
 PLATFORMS = [
@@ -25,9 +26,10 @@ PLATFORMS = [
 # BLE devices use a subset of platforms
 BLE_PLATFORMS = [
     Platform.SENSOR,  # Battery, RSSI, last seen
-    Platform.LIGHT,   # LED control
+    Platform.LIGHT,  # LED control
     Platform.BUTTON,  # Clock mode controls
 ]
+
 
 async def _setup_services_for_configured_devices(hass: HomeAssistant) -> None:
     """Set up services based on configured device types.
@@ -65,6 +67,7 @@ async def _setup_services_for_configured_devices(hass: HomeAssistant) -> None:
         service_type = "all"
 
     await async_setup_services(hass, service_type)
+
 
 async def async_migrate_camera_entities(hass: HomeAssistant, entry: ConfigEntry) -> list[str]:
     """Migrate old camera entities to image entities.
@@ -115,9 +118,9 @@ async def async_remove_clock_mode_buttons(hass: HomeAssistant, entry: ConfigEntr
 
 
 async def async_remove_invalid_ble_entities(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    device_metadata: dict
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        device_metadata: dict
 ) -> list[str]:
     """Remove BLE entities that are invalid for current device config.
 
@@ -145,8 +148,8 @@ async def async_remove_invalid_ble_entities(
     if metadata.power_mode not in (1, 3):  # Not battery (1) or solar (3)
         for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
             if entity.unique_id and (
-                f"oepl_ble_{mac_address}_battery_percentage" in entity.unique_id or
-                f"oepl_ble_{mac_address}_battery_voltage" in entity.unique_id
+                    f"oepl_ble_{mac_address}_battery_percentage" in entity.unique_id or
+                    f"oepl_ble_{mac_address}_battery_voltage" in entity.unique_id
             ):
                 _LOGGER.info("Removing battery sensor (power_mode=%s): %s", metadata.power_mode, entity.entity_id)
                 entity_registry.async_remove(entity.entity_id)
@@ -156,6 +159,68 @@ async def async_remove_invalid_ble_entities(
     # Future: Check sensor configs and remove/add sensor entities accordingly
 
     return removed_entities
+
+
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+    """
+    Migrate old config entries to new schema version.
+
+    Version 2 -> 3: Add device type and protocol type fields to BLE entries and fix boolean rotate buffer.
+
+    Returns:
+        bool: True if migration was successful, False otherwise.
+    """
+    _LOGGER.debug(
+        "Migrating config entry from version %s.%s",
+        config_entry.version,
+        config_entry.minor_version,
+    )
+    if config_entry.version == 2:
+        new_data = {**config_entry.data}
+
+        # Check if this is a BLE entry
+        if "mac_address" in config_entry.data:
+            if "device_type" not in config_entry.data:
+                new_data["device_type"] = "ble"
+                _LOGGER.info(
+                    "Adding device_type='ble' to BLE entry %s",
+                    new_data.get("name", new_data.get("mac_address"))
+                )
+
+            if "protocol_type" not in config_entry.data:
+                new_data["protocol_type"] = "atc"
+                _LOGGER.info(
+                    "Adding protocol_type='atc' to BLE entry %s",
+                    new_data.get("name", new_data.get("mac_address"))
+                )
+
+            if "device_metadata" in new_data:
+                device_metadata = new_data["device_metadata"]
+
+                if "oepl_config" not in device_metadata and "rotatebuffer" in device_metadata:
+                    rotatebuffer_value = device_metadata["rotatebuffer"]
+
+                    if isinstance(rotatebuffer_value, bool):
+                        new_metadata = {**device_metadata, "rotatebuffer": 1}
+                        new_data["device_metadata"] = new_metadata
+
+                        _LOGGER.info(
+                            "Converting rotatebuffer from %s (bool) to %s (int) for BLE entry %s",
+                            rotatebuffer_value,
+                            new_metadata["rotatebuffer"],
+                            new_data.get("name", new_data.get("mac_address"))
+                        )
+
+        # Update config entry with migrated data and new version
+        hass.config_entries.async_update_entry(
+            config_entry,
+            data=new_data,
+            version=3,
+            minor_version=0
+        )
+        _LOGGER.info("Successfully migrated config entry to version 3")
+
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -191,7 +256,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Get protocol handler for this device
         protocol = get_protocol_by_name(protocol_type)
         _LOGGER.debug("Setting up BLE device with protocol: %s (manufacturer ID: 0x%04X)",
-                     protocol_type, protocol.manufacturer_id)
+                      protocol_type, protocol.manufacturer_id)
 
         # Store BLE device config in hass.data for entity access
         ble_data = {
@@ -205,8 +270,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = ble_data
 
         def _ble_device_found(
-            service_info: bluetooth.BluetoothServiceInfoBleak,
-            change: bluetooth.BluetoothChange,
+                service_info: bluetooth.BluetoothServiceInfoBleak,
+                change: bluetooth.BluetoothChange,
         ) -> None:
             """Handle BLE advertising data updates.
 
@@ -337,6 +402,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     return True
 
+
 async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle updates to integration options.
 
@@ -357,6 +423,7 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
     # Traditional AP entry
     hub = entry_data
     await hub.async_reload_config()
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload the integration when removed or restarted.
@@ -392,6 +459,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     return unload_ok
 
+
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle complete removal of integration.
 
@@ -411,6 +479,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     if not remaining_entries:
         # This was the last entry, safe to remove shared storage
         await async_remove_storage_files(hass)
+
 
 async def async_remove_storage_files(hass: HomeAssistant) -> None:
     """Remove persistent storage files when removing integration.
