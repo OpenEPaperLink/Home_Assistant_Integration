@@ -140,3 +140,56 @@ class BLEDeviceMetadata:
             True if OEPL device, False if ATC device
         """
         return self._is_oepl
+
+    @property
+    def color_scheme(self) -> int:
+        """Get color scheme identifier.
+
+        Returns:
+            Color scheme: 0=b/w, 1=bwr, 2=bwy, 3=bwry, 4=bwgbry, 5=bw4 (4 grayscale)
+            Returns 0 for ATC devices (monochrome)
+        """
+        if self._is_oepl:
+            displays = self._metadata["oepl_config"].get("displays", [])
+            return displays[0].get("color_scheme", 0) if displays else 0
+        return 0  # ATC devices are monochrome
+
+    @property
+    def transmission_modes(self) -> int:
+        """Get supported transmission modes (bitfield).
+
+        Bit flags:
+        - Bit 0 (0x01): raw transfer (block-based uncompressed)
+        - Bit 1 (0x02): zip compressed transfer (block-based compressed)
+        - Bit 3 (0x08): direct_write mode
+
+        Returns:
+            Transmission modes bitfield, or 0 if not available
+            ATC devices return 0 (assume block-based only for backward compatibility)
+        """
+        if self._is_oepl:
+            displays = self._metadata["oepl_config"].get("displays", [])
+            return displays[0].get("transmission_modes", 0) if displays else 0
+        return 0  # ATC devices don't support direct_write
+
+    def get_best_upload_method(self) -> str:
+        """Determine the best upload method based on device capabilities.
+
+        Priority order:
+        1. direct_write_compressed: If direct_write (0x08) AND zip (0x02) are supported
+        2. direct_write: If direct_write (0x08) is supported but zip is not
+        3. block: Fallback to block-based upload (always supported)
+
+        Returns:
+            Upload method string: "direct_write_compressed", "direct_write", or "block"
+        """
+        modes = self.transmission_modes
+        has_direct_write = (modes & 0x08) != 0
+        has_zip = (modes & 0x02) != 0
+
+        if has_direct_write and has_zip:
+            return "direct_write_compressed"
+        elif has_direct_write:
+            return "direct_write"
+        else:
+            return "block"
