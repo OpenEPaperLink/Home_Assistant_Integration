@@ -369,9 +369,14 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
                 device_registry = dr.async_get(hass)
                 device = device_registry.async_get(device_id)
                 is_ble_device = False
+                mac = ""
                 if device and device.identifiers:
                     domain_mac = next(iter(device.identifiers))
                     is_ble_device = domain_mac[1].startswith("ble_")
+                    if is_ble_device:
+                        mac = domain_mac[1][4:].upper()  # Remove "ble_" prefix
+                    else:
+                        mac = entity_id.split(".")[1].upper() if "." in entity_id else ""
 
                 # For Hub devices, ensure Hub is online
                 if not is_ble_device:
@@ -429,14 +434,52 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
                                 "Bluetooth integration is disabled or no scanners available. "
                                 "Please enable Bluetooth integration in Home Assistant."
                             )
-                            
-                        # Queue BLE upload (only if Bluetooth is available)
-                        await ble_upload_queue.add_to_queue(
-                            upload_ble_image,
-                            hass,
-                            entity_id,
-                            image_data
-                        )
+                        
+                        # Get device metadata to determine upload method
+                        domain_data = hass.data.get(DOMAIN, {})
+                        device_metadata = None
+                        protocol_type = "atc"
+                        
+                        # Find the config entry for this BLE device
+                        for entry_id, entry_data in domain_data.items():
+                            if (is_ble_entry(entry_data) and
+                                entry_data.get("mac_address", "").upper() == mac.upper()):
+                                device_metadata = entry_data.get("device_metadata", {})
+                                protocol_type = entry_data.get("protocol_type", "atc")
+                                break
+                        
+                        # Determine upload method (only for OEPL devices)
+                        upload_method = "block"  # Default to block-based (for ATC)
+                        if device_metadata and protocol_type == "oepl":
+                            from .ble import BLEDeviceMetadata
+                            metadata_wrapper = BLEDeviceMetadata(device_metadata)
+                            upload_method = metadata_wrapper.get_best_upload_method()
+                            _LOGGER.debug(
+                                "Selected upload method for %s: %s (transmission_modes=0x%02x)",
+                                entity_id,
+                                upload_method,
+                                metadata_wrapper.transmission_modes
+                            )
+                        
+                        # Queue appropriate upload method
+                        if upload_method in ("direct_write", "direct_write_compressed"):
+                            # Use direct write (OEPL only)
+                            compressed = upload_method == "direct_write_compressed"
+                            await ble_upload_queue.add_to_queue(
+                                upload_ble_direct_write,
+                                hass,
+                                entity_id,
+                                image_data,
+                                compressed
+                            )
+                        else:
+                            # Use block-based upload (ATC or fallback)
+                            await ble_upload_queue.add_to_queue(
+                                upload_ble_image,
+                                hass,
+                                entity_id,
+                                image_data
+                            )
                     else:
                         # Queue Hub/AP upload
                         await hub_upload_queue.add_to_queue(
@@ -548,12 +591,13 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
                 raise HomeAssistantError(f"Failed to upload image for {entity_id}: {str(err)}")
 
     async def upload_ble_image(hass: HomeAssistant, entity_id: str, img: bytes) -> None:
-        """Upload image to BLE tag.
+        """Upload image to BLE tag using block-based protocol.
 
         Sends an image to a BLE tag using direct Bluetooth communication.
         This bypasses the AP and provides faster upload times.
 
         Uses protocol-specific service UUID based on device firmware type.
+        This method is used for ATC devices and as fallback for OEPL devices.
 
         Args:
             hass: Home Assistant instance
@@ -565,7 +609,7 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
         """
 
         mac = entity_id.split(".")[1].upper()
-        _LOGGER.debug("Preparing BLE upload for %s (MAC: %s)", entity_id, mac)
+        _LOGGER.debug("Preparing BLE block-based upload for %s (MAC: %s)", entity_id, mac)
 
         try:
             # Get device metadata from Home Assistant data
@@ -596,7 +640,8 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
                 width=metadata_wrapper.width,
                 height=metadata_wrapper.height,
                 color_support=metadata_wrapper.color_support,
-                rotatebuffer=metadata_wrapper.rotatebuffer
+                rotatebuffer=metadata_wrapper.rotatebuffer,
+                color_scheme=metadata_wrapper.color_scheme
             )
 
             # Upload via BLE using protocol-specific service UUID
@@ -610,6 +655,86 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
         except Exception as err:
             _LOGGER.error("BLE upload error for %s: %s", entity_id, err)
             raise HomeAssistantError(f"Failed to upload image via BLE to {entity_id}: {str(err)}") from err
+
+    async def upload_ble_direct_write(
+        hass: HomeAssistant, entity_id: str, img: bytes, compressed: bool = False
+    ) -> None:
+        """Upload image to BLE tag using direct write protocol (OEPL only).
+
+        Sends an image to an OEPL BLE tag using direct write mode.
+        This is faster than block-based upload and supports all color schemes.
+
+        Args:
+            hass: Home Assistant instance
+            entity_id: Entity ID of the target tag
+            img: JPEG image data as bytes
+            compressed: Whether to compress the image data
+
+        Raises:
+            HomeAssistantError: If BLE direct write upload fails
+        """
+        mac = entity_id.split(".")[1].upper()
+        _LOGGER.debug(
+            "Preparing BLE direct write upload for %s (MAC: %s, compressed=%s)",
+            entity_id,
+            mac,
+            compressed
+        )
+
+        try:
+            # Get device metadata from Home Assistant data
+            domain_data = hass.data.get(DOMAIN, {})
+            device_metadata = None
+            protocol_type = "oepl"  # Direct write is OEPL only
+
+            # Find the config entry for this BLE device
+            for entry_id, entry_data in domain_data.items():
+                if (is_ble_entry(entry_data) and
+                    entry_data.get("mac_address", "").upper() == mac):
+                    device_metadata = entry_data.get("device_metadata", {})
+                    protocol_type = entry_data.get("protocol_type", "oepl")
+                    break
+
+            if not device_metadata:
+                raise HomeAssistantError(f"No metadata found for BLE device {entity_id}")
+
+            # Verify this is an OEPL device
+            from .ble import BLEDeviceMetadata
+            metadata_wrapper = BLEDeviceMetadata(device_metadata)
+            if not metadata_wrapper.is_oepl:
+                raise HomeAssistantError(
+                    f"Direct write is only supported for OEPL devices, "
+                    f"but {entity_id} appears to be an ATC device"
+                )
+
+            # Get protocol handler for service UUID
+            protocol = get_protocol_by_name(protocol_type)
+            _LOGGER.debug("Using protocol %s for direct write on device %s", protocol_type, entity_id)
+
+            # Create DeviceMetadata object with color_scheme
+            metadata = DeviceMetadata(
+                hw_type=metadata_wrapper.hw_type,
+                fw_version=metadata_wrapper.fw_version,
+                width=metadata_wrapper.width,
+                height=metadata_wrapper.height,
+                color_support=metadata_wrapper.color_support,
+                rotatebuffer=metadata_wrapper.rotatebuffer,
+                color_scheme=metadata_wrapper.color_scheme
+            )
+
+            # Upload via BLE using direct write protocol
+            async with BLEConnection(hass, mac, protocol.service_uuid, protocol) as conn:
+                uploader = BLEImageUploader(conn, mac)
+                success = await uploader.upload_direct_write(img, metadata, compressed)
+
+                if not success:
+                    raise HomeAssistantError(f"BLE direct write upload failed for {entity_id}")
+
+        except Exception as err:
+            _LOGGER.error("BLE direct write error for %s: %s", entity_id, err)
+            raise HomeAssistantError(
+                f"Failed to upload image via BLE direct write to {entity_id}: {str(err)}"
+            ) from err
 
     async def setled_service(service: ServiceCall) -> None:
         """Handle LED pattern service calls.
