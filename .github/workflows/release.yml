@@ -1,0 +1,54 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 2.3.0)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version format
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+            echo "Error: Version must follow semantic versioning (e.g., 2.3.0 or 2.3.0-beta)"
+            exit 1
+          fi
+
+      - name: Update manifest.json
+        run: |
+          jq ".version = \"${{ inputs.version }}\"" custom_components/open_epaper_link/manifest.json > manifest.tmp.json
+          mv manifest.tmp.json custom_components/open_epaper_link/manifest.json
+
+      - name: Commit version bump
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add custom_components/open_epaper_link/manifest.json
+          git commit -m "Bump version to ${{ inputs.version }}"
+          git push
+
+      - name: Create and push tag
+        run: |
+          git tag ${{ inputs.version }}
+          git push origin ${{ inputs.version }}
+          
+      - name: Create GitHub Release with auto-generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ inputs.version }} \
+            --title "${{ inputs.version }}" \
+            --generate-notes
