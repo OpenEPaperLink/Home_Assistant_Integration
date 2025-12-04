@@ -283,6 +283,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         "device_metadata": device_metadata,
                         "device_type": "ble",
                         "protocol_type": self._discovered_device["protocol_type"],  # Store protocol
+                        "send_welcome_image": True,
                     }
                 )
 

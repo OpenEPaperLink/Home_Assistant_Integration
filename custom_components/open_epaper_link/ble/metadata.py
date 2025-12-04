@@ -152,7 +152,17 @@ class BLEDeviceMetadata:
         if self._is_oepl:
             displays = self._metadata["oepl_config"].get("displays", [])
             return displays[0].get("color_scheme", 0) if displays else 0
-        return 0  # ATC devices are monochrome
+        else:
+            color_support = self._metadata.get("color_support", "mono")
+            if color_support == "mono":
+                return 0
+            elif color_support == "red":
+                return 1
+            elif color_support == "yellow":
+                return 2
+            elif color_support == "bwry":
+                return 3
+        return 0
 
     @property
     def transmission_modes(self) -> int:

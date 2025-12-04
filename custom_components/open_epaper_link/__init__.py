@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from typing import Final
@@ -7,6 +8,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform, EVENT_HOMEASSISTANT_STARTED, CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er, device_registry as dr
+from homeassistant.const import __version__ as HA_VERSION
+from .ble import BLEDeviceMetadata
 from .const import DOMAIN
 from .hub import Hub
 from .services import async_setup_services, async_unload_services
@@ -268,6 +271,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "sensors": {},  # Registry of sensor entities
         }
         hass.data.setdefault(DOMAIN, {})[entry.entry_id] = ble_data
+
+        if entry.data.get("send_welcome_image", False):
+            new_data = dict(entry.data)
+            new_data.pop("send_welcome_image", None)
+            hass.config_entries.async_update_entry(entry, data=new_data)
+
+            hass.async_create_task(
+                    _send_welcome_image(
+                        hass,
+                        entry.entry_id,
+                        name,
+                    )
+                )
 
         def _ble_device_found(
                 service_info: bluetooth.BluetoothServiceInfoBleak,
@@ -538,3 +554,144 @@ async def async_remove_storage_files(hass: HomeAssistant) -> None:
     # Reset the tag types manager singleton since its storage was deleted
     reset_tag_types_manager()
     _LOGGER.debug("Reset tag types manager singleton")
+
+
+
+async def _send_welcome_image(
+        hass: HomeAssistant,
+        entry_id: str,
+        device_name: str,
+) -> None:
+    try:
+        for _ in range(10):
+            if hass.services.has_service(DOMAIN, "drawcustom"):
+                break
+            await asyncio.sleep(0.5)
+        else:
+            _LOGGER.debug("Welcome image: drawcustom service not available")
+            return
+        device_registry = dr.async_get(hass)
+        devices = [
+            device
+            for device in device_registry.devices.values()
+            if entry_id in device.config_entries
+        ]
+        for _ in range(20):
+            devices = dr.async_entries_for_config_entry(device_registry, entry_id)
+            if devices:
+                device_id = devices[0].id
+                break
+            await asyncio.sleep(0.5)
+
+        if not device_id:
+            _LOGGER.debug("Welcome image: No devices found for entry %s", entry_id)
+            return
+
+        device_id = devices[0].id
+
+        entry = hass.config_entries.async_get_entry(entry_id)
+        if not entry:
+            return
+
+        device_metadata = entry.data.get("device_metadata", {})
+
+        metadata = BLEDeviceMetadata(device_metadata)
+
+        width = metadata.width
+        height = metadata.height
+        color_scheme = metadata.color_scheme
+
+        colors = ["black", "white"]
+        if color_scheme == 1:  # BWR
+            colors.append("red")
+        elif color_scheme == 2:  # BWY
+            colors.append("yellow")
+        elif color_scheme == 3:  # BWRY
+            colors.extend(["red", "yellow"])
+
+        title_y_pct = 10
+        title_size = max(12, int(height * 0.08))
+        logo_y_pct = 40
+        logo_size = max(48, int(height * 0.25))
+        color_box_y_pct = 80
+        color_box_size = max(20, int(height * 0.12))
+
+        payload = [
+            {
+                "type": "text",
+                "value": f"Connected to HA {HA_VERSION}",
+                "x": "50%",
+                "y": f"{title_y_pct}%",
+                "size": title_size,
+                "color": "black",
+                "anchor": "mt",
+                "font": "ppb.ttf",
+            },
+            # Home Assistant logo (left side)
+            {
+                "type": "icon",
+                "value": "mdi:home-assistant",
+                "x": "35%",
+                "y": f"{logo_y_pct}%",
+                "size": logo_size,
+                "color": "black",
+                "anchor": "mm",
+            },
+            # Bluetooth icon (center)
+            {
+                "type": "icon",
+                "value": "mdi:bluetooth-connect",
+                "x": "50%",  # Center
+                "y": f"{logo_y_pct}%",
+                "size": int(logo_size * 0.5),
+                "color": "black",
+                "anchor": "mm",
+            },
+            # OEPL logo (right side)
+            {
+                "type": "dlimg",
+                "url": "https://openepaperlink.org/logo_black.png",
+                "x": int(width * 0.65 - logo_size // 2),
+                "y": int(height * logo_y_pct / 100 - logo_size // 2),
+                "xsize": logo_size,
+                "ysize": logo_size,
+                "resize_method": "contain",
+            },
+        ]
+
+        num_colors = len(colors)
+        spacing = 5
+        total_width = num_colors * color_box_size + (num_colors - 1) * spacing
+        start_x = (width - total_width) // 2
+        box_y = int(height * color_box_y_pct / 100)
+
+        for i, color in enumerate(colors):
+            box_x = start_x + i * (color_box_size + spacing)
+            payload.append({
+                "type": "rectangle",
+                "x_start": box_x,
+                "y_start": box_y,
+                "x_end": box_x + color_box_size,
+                "y_end": box_y + color_box_size,
+                "fill": color,
+                "outline": "black",
+                "width": 1,
+            })
+
+        _LOGGER.debug("Sending welcome image to %s", device_name)
+        await hass.services.async_call(
+            DOMAIN,
+            "drawcustom",
+            {
+                "device_id": device_id,
+                "payload": payload,
+                "background": "white",
+                "rotate": 0,
+                "dither": 2,
+                "ttl": 60,
+            },
+            blocking=False,
+        )
+
+    except Exception as err:
+        _LOGGER.debug("Welcome image failed: %s", err, exc_info=True)
