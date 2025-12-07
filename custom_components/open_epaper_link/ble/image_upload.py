@@ -591,9 +591,6 @@ class BLEImageUploader:
                 _LOGGER.debug("No client-side rotation (protocol=%s, rotatebuffer=%d): %dx%d",
                              protocol_type, metadata.rotatebuffer, image.width, image.height)
 
-            # DEBUG
-            pre_arr = np.array(image.convert('RGB'))
-            _LOGGER.info("Input yellow-ish: %d", np.sum((pre_arr[:,:,0]>250)&(pre_arr[:,:,1]>250)&(pre_arr[:,:,2]<10)))
 
             processed_image = process_image_for_device(
                 image,
@@ -601,10 +598,6 @@ class BLEImageUploader:
                 dither
             )
 
-            # DEBUG
-            debug_arr = np.array(processed_image)
-            _LOGGER.info("Yellow pixels: %d", np.sum((debug_arr[:,:,0]==255)&(debug_arr[:,:,1]==255)&(debug_arr[:,:,2]==0)))
-            _LOGGER.info("White pixels: %d", np.sum((debug_arr[:,:,0]==255)&(debug_arr[:,:,1]==255)&(debug_arr[:,:,2]==255)))
 
             # Convert image to device format
             data_type, pixel_array = _convert_image_to_bytes(
