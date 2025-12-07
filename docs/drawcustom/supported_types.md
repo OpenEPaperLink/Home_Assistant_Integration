@@ -64,13 +64,14 @@ Example payload:
 
 # Color Support
 
-ESLs currently come in two variants: red and yellow accent colors. You can specify colors in several ways:
+ESLs predominantly come in two variants: red and yellow accent colors (tags with more also exist). You can specify colors in several ways:
 
 - Using explicit colors: `"black"`, `"white"`, `"red"`, `"yellow"`
-- Using halftone colors (set `dither=2`): `"half_black"`, (or `"gray"`, or `"grey"`), `"half_red"`, `"half_yellow"`
+- Using halftone colors (set `dither=2`): `"half_black"` (or `"gray"`, `"grey"`, `"half_white"`), `"half_red"`, `"half_yellow"`
 - Using single letter shortcuts: `"b"` (black), `"w"` (white), `"r"` (red), `"y"` (yellow)
-- Using halftone shortcuts: `"hb"`, `"g"` (50% black), `"hr"` (50% red), `"hy"` (50% yellow)
+- Using halftone shortcuts: `"hb"`, `"hw"` (50% black/gray), `"hr"` (50% red), `"hy"` (50% yellow)
 - Using `"accent"`, `"a"`, `"half_accent"`, or `"ha"` to automatically use the tag's accent color (red or yellow depending on the hardware)
+- Using hex colors: `"#RGB"` or `"#RRGGBB"` (e.g., `"#F00"` or `"#FF0000"` for red)
 
 Example payload adapting to tag color:
 ```yaml
@@ -87,12 +88,12 @@ Example payload adapting to tag color:
 
 All elements that support colors (text, shapes, icons, etc.) accept the following color properties:
 
-| Property     | Description                        | Values                                      |
-|--------------|------------------------------------|---------------------------------------------|
-| `color`      | Primary color                      | `white`, `black`, `accent`, `red`, `yellow` |
-| `fill`       | Fill color                         | `white`, `black`, `accent`, `red`, `yellow` |
-| `outline`    | Outline/border color               | `white`, `black`, `accent`, `red`, `yellow` |
-| `background` | Background color (when applicable) | `white`, `black`, `accent`, `red`, `yellow` |
+| Property     | Description                        | Values                                                      |
+|--------------|------------------------------------|-------------------------------------------------------------|
+| `color`      | Primary color                      | `white`, `black`, `accent`, `red`, `yellow`, `#RRGGBB`      |
+| `fill`       | Fill color                         | `white`, `black`, `accent`, `red`, `yellow`, `#RRGGBB`      |
+| `outline`    | Outline/border color               | `white`, `black`, `accent`, `red`, `yellow`, `#RRGGBB`      |
+| `background` | Background color (when applicable) | `white`, `black`, `accent`, `red`, `yellow`, `#RRGGBB`      |
 
 Using `"accent"` is recommended for portable scripts that should work with both red and yellow tags.
 

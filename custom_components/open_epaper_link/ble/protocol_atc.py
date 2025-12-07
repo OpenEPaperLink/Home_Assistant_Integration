@@ -167,11 +167,11 @@ class ATCProtocol(BLEProtocol):
 
         # Determine color support from device response
         if colors >= 3:
-            color_support = "bwry"  # Black, white, red, yellow
+            color_scheme = 3  # BWRY
         elif colors >= 2:
-            color_support = "red"  # Black, white, red (or yellow)
+            color_scheme = 1  # BWR (default for 2-color, refined later)
         else:
-            color_support = "mono"  # Monochrome
+            color_scheme = 0  # MONO
 
         _LOGGER.debug(
             "ATC device %s dimensions: %dx%d, colors=%d, inverted=%s",
@@ -185,7 +185,7 @@ class ATCProtocol(BLEProtocol):
         return DeviceCapabilities(
             width=width if wh_inverted else height,
             height=height if wh_inverted else width,
-            color_support=color_support,
+            color_scheme=color_scheme,
             rotatebuffer=1,  # ATC devices always need 90° rotation
         )
 

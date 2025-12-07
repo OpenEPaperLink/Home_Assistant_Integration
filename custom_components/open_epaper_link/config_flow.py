@@ -49,7 +49,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     context between user interactions.
     """
 
-    VERSION = 3
+    VERSION = 4
 
     def __init__(self) -> None:
         """Initialize flow."""
@@ -255,14 +255,35 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             "width": capabilities.width,
                             "height": capabilities.height,
                             "rotatebuffer": capabilities.rotatebuffer,
-                            "color_support": capabilities.color_support,
+                            "color_scheme": capabilities.color_scheme,
                             "model_name": model_name,
                         }
                 else:
                     # ATC devices: Use tagtypes.json lookup and store individual fields
-                    await get_tag_types_manager(self.hass)
+                    tag_types_manager = await get_tag_types_manager(self.hass)
                     model_name = get_hw_string(hw_type) if hw_type else "Unknown"
                     _LOGGER.debug("Resolved hw_type %s to model: %s", hw_type, model_name)
+
+                    # Refine color_scheme using TagTypes db
+                    if tag_types_manager.is_in_hw_map(hw_type):
+                        tag_type = await tag_types_manager.get_tag_info(hw_type)
+                        color_table = tag_type.color_table
+
+                        if 'yellow' in color_table and 'red' in color_table:
+                            color_scheme = 3 # BWRY
+                        elif 'yellow' in color_table:
+                            color_scheme = 2 # BWY
+                        elif 'red' in color_table:
+                            color_scheme = 1 # BWR
+                        else:
+                            color_scheme = 0 # BW
+                    else:
+                        # Fallback to protocol detection
+                        color_scheme = capabilities.color_scheme
+                        _LOGGER.warning(
+                            "hw_type %s not in TagTypes, using protocol color_scheme: %d",
+                            hw_type, color_scheme
+                        )
 
                     # Build device metadata from capabilities
                     device_metadata = {
@@ -271,7 +292,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         "width": capabilities.width,
                         "height": capabilities.height,
                         "rotatebuffer": capabilities.rotatebuffer,
-                        "color_support": capabilities.color_support,
+                        "color_scheme": color_scheme,
                         "model_name": model_name,
                     }
 
@@ -283,6 +304,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         "device_metadata": device_metadata,
                         "device_type": "ble",
                         "protocol_type": self._discovered_device["protocol_type"],  # Store protocol
+                        "send_welcome_image": True,
                     }
                 )
 

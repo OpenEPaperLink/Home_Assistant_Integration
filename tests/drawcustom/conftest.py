@@ -166,6 +166,16 @@ def save_image(image_bytes):
     with open(img_path, 'wb') as f:
         f.write(image_bytes)
 
+async def generate_test_image(image_gen: ImageGen, service_data, entity_id="open_epaper_link.test_tag"):
+    """Helper to generate test images with standard dimensions."""
+    return  await image_gen.generate_custom_image(
+        entity_id=entity_id,
+        service_data=service_data,
+        width=296,
+        height=128,
+        accent_color="red"
+    )
+
 
 # Setup and cleanup code that runs before and after each test session
 def pytest_sessionstart(session):

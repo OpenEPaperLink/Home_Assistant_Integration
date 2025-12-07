@@ -1,8 +1,8 @@
 """BLE protocol abstraction for OpenEPaperLink devices."""
-
+from .color_scheme import ColorScheme
 # Re-export key classes and functions for backward compatibility
 from .connection import BLEConnection
-from .image_upload import BLEImageUploader, DeviceMetadata
+from .image_upload import BLEImageUploader
 from .metadata import BLEDeviceMetadata
 from .operations import (
     turn_led_on,
@@ -29,7 +29,6 @@ __all__ = [
     "BLEConnection",
     # Image upload
     "BLEImageUploader",
-    "DeviceMetadata",
     # Metadata
     "BLEDeviceMetadata",
     # Operations
@@ -43,6 +42,7 @@ __all__ = [
     # Data structures
     "AdvertisingData",
     "DeviceCapabilities",
+    "ColorScheme",
     # Exceptions
     "BLEError",
     "BLEConnectionError",

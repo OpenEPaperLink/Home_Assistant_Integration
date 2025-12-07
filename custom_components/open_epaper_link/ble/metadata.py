@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .color_scheme import ColorScheme
 
 class BLEDeviceMetadata:
     """Abstraction for BLE device metadata.
@@ -71,25 +72,6 @@ class BLEDeviceMetadata:
         # Fall back to stored value for now
         return self._metadata.get("fw_version", 0)
 
-    @property
-    def color_support(self) -> str:
-        """Get color support capability.
-
-        Returns:
-            Color support: "mono", "red", "yellow", or "bwry"
-        """
-        if self._is_oepl:
-            displays = self._metadata["oepl_config"].get("displays", [])
-            if displays:
-                color_scheme = displays[0].get("color_scheme", 0)
-                # 0=b/w, 1=bwr, 2=bwy, 3=bwry, 4=bwgbry, 5=bw4
-                if color_scheme == 0 or color_scheme == 5:
-                    return "mono"
-                if color_scheme in (1, 3, 4):  # Has red
-                    return "red"
-                if color_scheme == 2:  # Has yellow
-                    return "yellow"
-        return self._metadata.get("color_support", "mono")
 
     @property
     def rotatebuffer(self) -> int:
@@ -142,17 +124,38 @@ class BLEDeviceMetadata:
         return self._is_oepl
 
     @property
-    def color_scheme(self) -> int:
-        """Get color scheme identifier.
+    def color_scheme(self) -> ColorScheme:
+        """
+        Get ColorScheme enum for this device.
 
-        Returns:
-            Color scheme: 0=b/w, 1=bwr, 2=bwy, 3=bwry, 4=bwgbry, 5=bw4 (4 grayscale)
-            Returns 0 for ATC devices (monochrome)
+        ATC: Reads from root level device_metadata["color_scheme"]
+
+        OEPL: Reads from display config device_metadata["oepl_config"]["displays"][0]["color_scheme"]
         """
         if self._is_oepl:
             displays = self._metadata["oepl_config"].get("displays", [])
-            return displays[0].get("color_scheme", 0) if displays else 0
-        return 0  # ATC devices are monochrome
+            raw_scheme = displays[0].get("color_scheme", 0) if displays else 0
+        else:
+            raw_scheme = self._metadata.get("color_scheme", 0)
+        return ColorScheme.from_int(raw_scheme)
+
+    @property
+    def accent_color(self) -> str:
+        """Get accent color name.
+
+        Returns:
+            Accent color name from color scheme palette
+        """
+        return self.color_scheme.accent_color
+
+    @property
+    def is_multi_color(self) -> bool:
+        """Check if device supports multiple colors.
+
+        Returns:
+            True if color scheme has more than 2 colors, False otherwise
+        """
+        return self.color_scheme.is_multi_color
 
     @property
     def transmission_modes(self) -> int:

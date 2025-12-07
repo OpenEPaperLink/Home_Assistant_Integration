@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import patch
 from PIL import Image
 
-from conftest import BASE_IMG_PATH, images_equal
+from conftest import BASE_IMG_PATH, images_equal, generate_test_image
 
 DEBUG_GRID_IMG_PATH = os.path.join(BASE_IMG_PATH, 'debug_grid')
 
@@ -23,10 +23,7 @@ async def test_debug_grid_basic(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(DEBUG_GRID_IMG_PATH, 'debug_grid_basic.png'))
@@ -47,10 +44,7 @@ async def test_debug_grid_custom_spacing(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(DEBUG_GRID_IMG_PATH, 'debug_grid_custom_spacing.png'))
@@ -74,10 +68,7 @@ async def test_debug_grid_solid(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(DEBUG_GRID_IMG_PATH, 'debug_grid_solid.png'))
@@ -97,10 +88,7 @@ async def test_debug_grid_without_labels(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(DEBUG_GRID_IMG_PATH, 'debug_grid_without_labels.png'))
