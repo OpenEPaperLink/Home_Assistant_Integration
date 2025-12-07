@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import patch
 from PIL import Image
 
-from conftest import BASE_IMG_PATH, images_equal, save_image
+from conftest import BASE_IMG_PATH, images_equal, save_image, generate_test_image
 
 TEXT_IMG_PATH = os.path.join(BASE_IMG_PATH, 'text')
 
@@ -28,10 +28,7 @@ async def test_text_basic(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(TEXT_IMG_PATH, 'text_basic.png'))
@@ -55,10 +52,7 @@ async def test_small_font_size(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(TEXT_IMG_PATH, 'small_font.png'))
@@ -82,10 +76,7 @@ async def test_large_font_size(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(TEXT_IMG_PATH, 'large_font.png'))
@@ -110,10 +101,7 @@ async def test_text_wrapping(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(TEXT_IMG_PATH, 'text_wrapping.png'))
@@ -138,10 +126,7 @@ async def test_text_wrapping_with_anchor(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         save_image(image_data)
@@ -173,10 +158,7 @@ async def test_text_with_special_characters(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(TEXT_IMG_PATH, 'text_special_chars.png'))
@@ -210,10 +192,7 @@ async def test_text_color_markup(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(TEXT_IMG_PATH, 'text_color_markup.png'))
@@ -238,10 +217,7 @@ async def test_text_percentage(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(TEXT_IMG_PATH, 'text_percentage.png'))
@@ -332,10 +308,7 @@ async def test_text_anchors(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(TEXT_IMG_PATH, 'text_anchors.png'))
@@ -370,10 +343,7 @@ async def test_text_mixed_fonts(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(TEXT_IMG_PATH, 'text_mixed_fonts.png'))
@@ -397,10 +367,7 @@ async def test_text_empty_string(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(BASE_IMG_PATH, 'blank.png'))
@@ -425,10 +392,7 @@ async def test_text_truncate(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(TEXT_IMG_PATH, 'text_truncate.png'))

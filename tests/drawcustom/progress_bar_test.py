@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import patch
 from PIL import Image
 
-from conftest import BASE_IMG_PATH, images_equal
+from conftest import BASE_IMG_PATH, images_equal, generate_test_image
 
 QR_CODE_IMG_PATH = os.path.join(BASE_IMG_PATH, 'progress_bar')
 
@@ -31,10 +31,7 @@ async def test_basic_progress_bar(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(QR_CODE_IMG_PATH, 'progress_bar.png'))
@@ -62,10 +59,7 @@ async def test_progress_bar_zero_progress(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(QR_CODE_IMG_PATH, 'progress_bar_zero.png'))
@@ -94,10 +88,7 @@ async def test_progress_bar_full(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(QR_CODE_IMG_PATH, 'progress_bar_full.png'))
@@ -125,10 +116,7 @@ async def test_progress_bar_negative_progress(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(QR_CODE_IMG_PATH, 'progress_bar_zero.png'))
@@ -157,10 +145,7 @@ async def test_progress_bar_over_full(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(QR_CODE_IMG_PATH, 'progress_bar_full.png'))
@@ -187,10 +172,7 @@ async def test_basic_progress_bar_percentage(image_gen, mock_tag_info):
 
     with patch('custom_components.open_epaper_link.imagegen.ImageGen.get_tag_info',
                return_value=mock_tag_info):
-        image_data = await image_gen.generate_custom_image(
-            "open_epaper_link.test_tag",
-            service_data
-        )
+        image_data = await generate_test_image(image_gen, service_data)
 
         generated_img = Image.open(BytesIO(image_data))
         example_img = Image.open(os.path.join(QR_CODE_IMG_PATH, 'progress_bar_percentage.png'))
