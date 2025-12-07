@@ -10,7 +10,10 @@ from enum import Enum
 import numpy as np
 from PIL import Image
 
+from . import ColorScheme
 from .exceptions import BLEError
+from .image_processing import process_image_for_device
+from .metadata import BLEDeviceMetadata
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,19 +57,6 @@ class BLEDataType(Enum):
     RAW_BW = 0x20  # Uncompressed monochrome
     RAW_COLOR = 0x21  # Uncompressed color (BWR/BWY)
     COMPRESSED = 0x30  # Compressed image
-
-
-@dataclass
-class DeviceMetadata:
-    """Device metadata from BLE interrogation."""
-
-    hw_type: int
-    fw_version: int
-    width: int
-    height: int
-    color_support: str
-    rotatebuffer: int
-    color_scheme: int = 0  # Color scheme: 0=b/w, 1=bwr, 2=bwy, 3=bwry, 4=bwgbry, 5=bw4
 
 
 def _create_data_info(
@@ -129,48 +119,58 @@ def _create_block_part(block_id: int, part_id: int, data: bytes) -> bytearray:
 
 
 def _convert_image_to_bytes(
-    image: Image.Image, multi_color: bool = False, compressed: bool = False
+    image: Image.Image,
+    color_scheme: int = 0,
+    compressed: bool = False
 ) -> tuple[int, bytes]:
-    """Convert a PIL Image to device format.
+    """
+    Convert a PIL Image to device format.
+
+    Expects image to be pre-quantized to exact palette colors (via dithering).
+    Uses exact color matching instead of luminance-based detection.
 
     Supports:
     - Monochrome (1-bit)
-    - Color dual-plane (BWR/BWY)
+    - Color dual-plane (BWR/BWY/BWRY)
     - Optional zlib compression
 
     Args:
-        image: PIL Image to convert
-        multi_color: Whether to use multi-color mode (BWR/BWY)
+        image: PIL Image to convert (should be pre-quantized)
+        color_scheme: Color scheme int (0=mono, 1=BWR, 2=BWY, 3=BWRY)
         compressed: Whether to compress the data
 
     Returns:
         tuple: (data_type, pixel_array)
-    """
+      """
     pixel_array = np.array(image.convert("RGB"))
     height, width, _ = pixel_array.shape
 
-    # Get RGB channels as float arrays
-    r, g, b = (
-        pixel_array[:, :, 0].astype(np.float32),
-        pixel_array[:, :, 1].astype(np.float32),
-        pixel_array[:, :, 2].astype(np.float32),
-    )
+    # Get RGB channels
+    r = pixel_array[:, :, 0]
+    g = pixel_array[:, :, 1]
+    b = pixel_array[:, :, 2]
 
-    # Calculate luminance for the whole image
-    luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    # Exact color matching (image already quantized by dithering)
+    black_pixels = (r == 0) & (g == 0) & (b == 0)
+    white_pixels = (r == 255) & (g == 255) & (b == 255)
+    red_pixels = (r == 255) & (g == 0) & (b == 0)
+    yellow_pixels = (r == 255) & (g == 255) & (b == 0)
 
-    # BW Channel
-    white_pixels = luminance > 128
-    bw_channel_bits = ~white_pixels
+    # Determine if multi-color mode
+    multi_color = color_scheme in (1, 2, 3)  # BWR, BWY, or BWRY
+
+    # Dual-plane encoding:
+    # Plane 1 (BW): 1 = black or yellow, 0 = white or red
+    # Plane 2 (color): 1 = red or yellow, 0 = black or white
+    bw_channel_bits = black_pixels | yellow_pixels
 
     byte_data = np.packbits(bw_channel_bits).tobytes()
-
-    # Red channel (if multi-color)
     bpp_array = bytearray(byte_data)
+
     if multi_color:
-        red_pixels = (pixel_array[:, :, 0] > 170) & ~white_pixels
-        byte_data_red = np.packbits(red_pixels).tobytes()
-        bpp_array += byte_data_red
+        color_pixels = red_pixels | yellow_pixels
+        byte_data_color = np.packbits(color_pixels).tobytes()
+        bpp_array += byte_data_color
 
     if compressed:
         buffer = bytearray(6)
@@ -560,13 +560,20 @@ class BLEImageUploader:
         except ValueError:
             return False  # Unknown response code
 
-    async def upload_image(self, image_data: bytes, metadata: DeviceMetadata, protocol_type: str = "atc") -> bool:
+    async def upload_image(
+            self,
+            image_data: bytes,
+            metadata: BLEDeviceMetadata,
+            protocol_type: str = "atc",
+            dither: int = 2
+    ) -> bool:
         """Upload image using block-based protocol.
 
         Args:
             image_data: JPEG image data
             metadata: Device metadata with dimensions and color support
             protocol_type: Protocol type ("atc" or "oepl")
+            dither: 0=none, 1=ordered, 2=floyd-steinberg
 
         Returns:
             bool: True if upload succeeded, False otherwise
@@ -584,12 +591,24 @@ class BLEImageUploader:
                 _LOGGER.debug("No client-side rotation (protocol=%s, rotatebuffer=%d): %dx%d",
                              protocol_type, metadata.rotatebuffer, image.width, image.height)
 
-            # Determine if device supports color
-            multi_color = metadata.color_support in ("red", "bwry")
+            # DEBUG
+            pre_arr = np.array(image.convert('RGB'))
+            _LOGGER.info("Input yellow-ish: %d", np.sum((pre_arr[:,:,0]>250)&(pre_arr[:,:,1]>250)&(pre_arr[:,:,2]<10)))
+
+            processed_image = process_image_for_device(
+                image,
+                metadata.color_scheme.value,
+                dither
+            )
+
+            # DEBUG
+            debug_arr = np.array(processed_image)
+            _LOGGER.info("Yellow pixels: %d", np.sum((debug_arr[:,:,0]==255)&(debug_arr[:,:,1]==255)&(debug_arr[:,:,2]==0)))
+            _LOGGER.info("White pixels: %d", np.sum((debug_arr[:,:,0]==255)&(debug_arr[:,:,1]==255)&(debug_arr[:,:,2]==255)))
 
             # Convert image to device format
             data_type, pixel_array = _convert_image_to_bytes(
-                image, multi_color, compressed=True
+                processed_image, metadata.color_scheme.value, compressed=True
             )
 
             _LOGGER.debug(
@@ -709,7 +728,11 @@ class BLEImageUploader:
         )
 
     async def upload_direct_write(
-        self, image_data: bytes, metadata: DeviceMetadata, compressed: bool = False
+        self,
+        image_data: bytes,
+        metadata: BLEDeviceMetadata,
+        compressed: bool = False,
+        dither: int = 2
     ) -> bool:
         """Upload image using direct write protocol (OEPL only).
         
@@ -717,6 +740,7 @@ class BLEImageUploader:
             image_data: JPEG image data
             metadata: Device metadata with dimensions and color scheme
             compressed: Whether to compress the data
+            dither: 0=none, 1=ordered, 2=floyd-steinberg
             
         Returns:
             bool: True if upload succeeded, False otherwise
@@ -729,9 +753,15 @@ class BLEImageUploader:
             # Convert JPEG to PIL Image
             image = Image.open(io.BytesIO(image_data))
             _LOGGER.debug("Direct write: image size %dx%d", image.width, image.height)
+
+            processed_image = process_image_for_device(
+                image,
+                metadata.color_scheme.value,
+                dither
+            )
             
             # Encode image based on color scheme
-            encoded_data = _encode_direct_write(image, metadata.color_scheme)
+            encoded_data = _encode_direct_write(processed_image, metadata.color_scheme.value)
             
             # Compress if requested
             if compressed:

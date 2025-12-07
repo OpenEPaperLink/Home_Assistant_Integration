@@ -25,7 +25,7 @@ class DeviceCapabilities:
 
     width: int
     height: int
-    color_support: str  # "mono" | "red" | "bwry"
+    color_scheme: int  # 0=MONO, 1=BWR, 2=BWY, 3=BWRY, 4=BWGBRY, 5=GRAYSCALE
     rotatebuffer: int
 
 

@@ -546,25 +546,19 @@ def extract_display_capabilities(config: GlobalConfig) -> DeviceCapabilities:
     # Use first display
     display = config.displays[0]
 
-    # Determine color support
-    if display.color_scheme == 1:
-        color_support = "bwry"  # BWR/BWY dual-plane
-    else:
-        color_support = "mono"
-
     # Swap dimensions when rotation is 90/270 (consistent with ATC wh_inverted behavior)
     if display.rotation in (90, 270):
         return DeviceCapabilities(
             width=display.pixel_height,   # Swapped for portrait rotation
             height=display.pixel_width,   # Swapped for portrait rotation
-            color_support=color_support,
+            color_scheme=display.color_scheme,
             rotatebuffer=1,
         )
     else:
         return DeviceCapabilities(
             width=display.pixel_width,
             height=display.pixel_height,
-            color_support=color_support,
+            color_scheme=display.color_scheme,
             rotatebuffer=0,
         )
 

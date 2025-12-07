@@ -22,7 +22,6 @@ from .ble import (
     BLEConnection,
     BLEImageUploader,
     BLEDeviceMetadata,
-    DeviceMetadata,
     get_protocol_by_name,
 )
 
@@ -388,23 +387,19 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
                         )
 
                 try:
-                    # Generate image (BLE vs Hub path will be handled in ImageGen)
-                    if is_ble_device:
-                        # For BLE devices, tag info must be provided since they don't use Hub
-                        tag_info = await generator.get_ble_tag_info(hass, entity_id)
-                        image_data = await generator.generate_custom_image(
-                            entity_id=entity_id,
-                            service_data=service.data,
-                            error_collector=device_errors,
-                            tag_info=tag_info
-                        )
-                    else:
-                        # Hub devices use existing path
-                        image_data = await generator.generate_custom_image(
-                            entity_id=entity_id,
-                            service_data=service.data,
-                            error_collector=device_errors
-                        )
+                    # Get dimensions (unified for both AP and BLE)
+                    width, height, accent_color = await generator.get_tag_dimensions(
+                        entity_id, is_ble=is_ble_device
+                    )
+
+                    image_data = await generator.generate_custom_image(
+                        entity_id=entity_id,
+                        service_data=service.data,
+                        error_collector=device_errors,
+                        width=width,
+                        height=height,
+                        accent_color=accent_color,
+                    )
 
                     if device_errors:
                         errors.extend([f"Device {entity_id}: {err}" for err in device_errors])
@@ -470,7 +465,8 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
                                 hass,
                                 entity_id,
                                 image_data,
-                                compressed
+                                compressed,
+                                int(service.data.get("dither", DITHER_DEFAULT))
                             )
                         else:
                             # Use block-based upload (ATC or fallback)
@@ -478,7 +474,8 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
                                 upload_ble_image,
                                 hass,
                                 entity_id,
-                                image_data
+                                image_data,
+                                int(service.data.get("dither", DITHER_DEFAULT))
                             )
                     else:
                         # Queue Hub/AP upload
@@ -487,7 +484,7 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
                             hub,
                             entity_id,
                             image_data,
-                            service.data.get("dither", DITHER_DEFAULT),
+                            int(service.data.get("dither", DITHER_DEFAULT)),
                             service.data.get("ttl", 60),
                             service.data.get("preload_type", 0),
                             service.data.get("preload_lut", 0)
@@ -590,7 +587,7 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
             except Exception as err:
                 raise HomeAssistantError(f"Failed to upload image for {entity_id}: {str(err)}")
 
-    async def upload_ble_image(hass: HomeAssistant, entity_id: str, img: bytes) -> None:
+    async def upload_ble_image(hass: HomeAssistant, entity_id: str, img: bytes, dither: int = 2) -> None:
         """Upload image to BLE tag using block-based protocol.
 
         Sends an image to a BLE tag using direct Bluetooth communication.
@@ -603,6 +600,7 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
             hass: Home Assistant instance
             entity_id: Entity ID of the target tag
             img: JPEG image data as bytes
+            dither: Dithering mode (0=none, 1=Floyd-Steinberg, 2=ordered)
 
         Raises:
             HomeAssistantError: If BLE upload fails
@@ -633,21 +631,12 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
             _LOGGER.debug("Using protocol %s for device %s", protocol_type, entity_id)
 
             # Wrap metadata and create DeviceMetadata object
-            metadata_wrapper = BLEDeviceMetadata(device_metadata)
-            metadata = DeviceMetadata(
-                hw_type=metadata_wrapper.hw_type,
-                fw_version=metadata_wrapper.fw_version,
-                width=metadata_wrapper.width,
-                height=metadata_wrapper.height,
-                color_support=metadata_wrapper.color_support,
-                rotatebuffer=metadata_wrapper.rotatebuffer,
-                color_scheme=metadata_wrapper.color_scheme
-            )
+            metadata = BLEDeviceMetadata(device_metadata)
 
             # Upload via BLE using protocol-specific service UUID
             async with BLEConnection(hass, mac, protocol.service_uuid, protocol) as conn:
                 uploader = BLEImageUploader(conn, mac)
-                success = await uploader.upload_image(img, metadata, protocol_type)
+                success = await uploader.upload_image(img, metadata, protocol_type, dither)
 
                 if not success:
                     raise HomeAssistantError(f"BLE image upload failed for {entity_id}")
@@ -657,7 +646,7 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
             raise HomeAssistantError(f"Failed to upload image via BLE to {entity_id}: {str(err)}") from err
 
     async def upload_ble_direct_write(
-        hass: HomeAssistant, entity_id: str, img: bytes, compressed: bool = False
+        hass: HomeAssistant, entity_id: str, img: bytes, compressed: bool = False, dither: int = 2
     ) -> None:
         """Upload image to BLE tag using direct write protocol (OEPL only).
 
@@ -669,6 +658,7 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
             entity_id: Entity ID of the target tag
             img: JPEG image data as bytes
             compressed: Whether to compress the image data
+            dither: Dithering mode (0=none, 1=Floyd-Steinberg, 2=ordered)
 
         Raises:
             HomeAssistantError: If BLE direct write upload fails
@@ -699,9 +689,8 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
                 raise HomeAssistantError(f"No metadata found for BLE device {entity_id}")
 
             # Verify this is an OEPL device
-            from .ble import BLEDeviceMetadata
-            metadata_wrapper = BLEDeviceMetadata(device_metadata)
-            if not metadata_wrapper.is_oepl:
+            metadata = BLEDeviceMetadata(device_metadata)
+            if not metadata.is_oepl:
                 raise HomeAssistantError(
                     f"Direct write is only supported for OEPL devices, "
                     f"but {entity_id} appears to be an ATC device"
@@ -711,21 +700,10 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
             protocol = get_protocol_by_name(protocol_type)
             _LOGGER.debug("Using protocol %s for direct write on device %s", protocol_type, entity_id)
 
-            # Create DeviceMetadata object with color_scheme
-            metadata = DeviceMetadata(
-                hw_type=metadata_wrapper.hw_type,
-                fw_version=metadata_wrapper.fw_version,
-                width=metadata_wrapper.width,
-                height=metadata_wrapper.height,
-                color_support=metadata_wrapper.color_support,
-                rotatebuffer=metadata_wrapper.rotatebuffer,
-                color_scheme=metadata_wrapper.color_scheme
-            )
-
             # Upload via BLE using direct write protocol
             async with BLEConnection(hass, mac, protocol.service_uuid, protocol) as conn:
                 uploader = BLEImageUploader(conn, mac)
-                success = await uploader.upload_direct_write(img, metadata, compressed)
+                success = await uploader.upload_direct_write(img, metadata, compressed, dither)
 
                 if not success:
                     raise HomeAssistantError(f"BLE direct write upload failed for {entity_id}")

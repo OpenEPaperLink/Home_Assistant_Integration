@@ -13,6 +13,7 @@ from .ble import BLEDeviceMetadata
 from .const import DOMAIN
 from .hub import Hub
 from .services import async_setup_services, async_unload_services
+from .tag_types import get_tag_types_manager
 from .util import is_ble_entry
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -170,6 +171,8 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
 
     Version 2 -> 3: Add device type and protocol type fields to BLE entries and fix boolean rotate buffer.
 
+    Version 3 -> 4: Fix color support.
+
     Returns:
         bool: True if migration was successful, False otherwise.
     """
@@ -222,6 +225,72 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
             minor_version=0
         )
         _LOGGER.info("Successfully migrated config entry to version 3")
+
+    if config_entry.version == 3:
+        new_data = {**config_entry.data}
+
+        # Only migrate BLE entries
+        if "mac_address" in config_entry.data:
+            device_metadata = dict(new_data.get("device_metadata", {}))
+
+            # OEPL: No migration needed - color scheme is already in oepl_config.displays[0]
+            # ATC: Need to add color_scheme at root level
+
+            if "oepl_config" not in device_metadata and "color_scheme" not in device_metadata:
+                hw_type = device_metadata.get("hw_type", 0)
+                tag_types_manager = await get_tag_types_manager(hass)
+
+                if tag_types_manager.is_in_hw_map(hw_type):
+                    tag_type = await tag_types_manager.get_tag_info(hw_type)
+                    color_table = tag_type.color_table
+
+                    _LOGGER.info(
+                        "Migrating color support for BLE entry %s based on hw_type=%s with colors: %s",
+                        new_data.get("name", new_data.get("mac_address")),
+                        hw_type,
+                        color_table
+                    )
+
+                    if 'yellow' in color_table and 'red' in color_table:
+                        color_scheme = 3  # BWRY
+                    elif 'yellow' in color_table:
+                        color_scheme = 2  # BWY
+                    elif 'red' in color_table:
+                        color_scheme = 1  # BWR
+                    else:
+                        color_scheme = 0  # BW
+
+                    _LOGGER.info(
+                        "Determined color_scheme=%s for BLE entry %s",
+                        color_scheme,
+                        new_data.get("name", new_data.get("mac_address"))
+                    )
+                else:
+                    # Fallback from old color_support string
+                    cs = device_metadata.get("color_support", "mono")
+                    color_scheme = {"red": 1, "yellow": 2, "bwry": 3}.get(cs, 0)
+                    _LOGGER.info(
+                        "Fallback color_scheme=%s for BLE entry %s from color_support='%s'",
+                        color_scheme,
+                        new_data.get("name", new_data.get("mac_address")),
+                        cs
+                    )
+
+                device_metadata["color_scheme"] = color_scheme
+                new_data["device_metadata"] = device_metadata
+
+                _LOGGER.info(
+                    "Adding color_scheme=%s to BLE entry %s",
+                    color_scheme,
+                    new_data.get("name", new_data.get("mac_address"))
+                )
+
+        hass.config_entries.async_update_entry(
+            config_entry,
+            data=new_data,
+            version=4
+        )
+        _LOGGER.info("Successfully migrated config entry to version 4")
 
     return True
 
