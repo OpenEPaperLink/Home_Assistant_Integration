@@ -287,24 +287,11 @@ class UploadQueueHandler:
             _LOGGER.debug("Upload task for %s finished. %s", entity_id, self)
 
 
-async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -> None:
-    """Set up the OpenEPaperLink services.
-
-    Registers service handlers for the integration based on device type:
-
-    - service_type="all": All services (AP and BLE compatible)
-    - service_type="ble": Only BLE-compatible services (drawcustom)
-    - service_type="ap": All services (backwards compatibility)
-
-    Services by category:
-    - BLE compatible: drawcustom
-    - AP only: setled, clear_pending, force_refresh, reboot_tag, scan_channels, reboot_ap, refresh_tag_types
-
-    Also registers handlers for deprecated services that show errors.
-
+async def async_setup_services(hass: HomeAssistant) -> None:
+    """
+    Set up the OpenEPaperLink services.
     Args:
         hass: Home Assistant instance
-        service_type: Type of services to register ("all", "ble", "ap")
     """
 
     # Separate queues for different device types
@@ -880,74 +867,13 @@ async def async_setup_services(hass: HomeAssistant, service_type: str = "all") -
                 "notification_id": "tag_types_refresh_notification",
             },
         )
-    # Register services available for all device types
+    # Register all services
     hass.services.async_register(DOMAIN, "drawcustom", drawcustom_service)
+    hass.services.async_register(DOMAIN, "setled", setled_service)
+    hass.services.async_register(DOMAIN, "clear_pending", clear_pending_service)
+    hass.services.async_register(DOMAIN, "force_refresh", force_refresh_service)
+    hass.services.async_register(DOMAIN, "reboot_tag", reboot_tag_service)
+    hass.services.async_register(DOMAIN, "scan_channels", scan_channels_service)
+    hass.services.async_register(DOMAIN, "reboot_ap", reboot_ap_service)
+    hass.services.async_register(DOMAIN, "refresh_tag_types", refresh_tag_types_service)
 
-    # Register AP-only services based on service_type
-    if service_type in ["all", "ap"]:
-        hass.services.async_register(DOMAIN, "setled", setled_service)
-        hass.services.async_register(DOMAIN, "clear_pending", clear_pending_service)
-        hass.services.async_register(DOMAIN, "force_refresh", force_refresh_service)
-        hass.services.async_register(DOMAIN, "reboot_tag", reboot_tag_service)
-        hass.services.async_register(DOMAIN, "scan_channels", scan_channels_service)
-        hass.services.async_register(DOMAIN, "reboot_ap", reboot_ap_service)
-        hass.services.async_register(DOMAIN, "refresh_tag_types", refresh_tag_types_service)
-
-    # Register handlers for deprecated services that just show error
-    async def deprecated_service_handler(service: ServiceCall, old_service: str) -> None:
-        """Handler for deprecated services that raises an error.
-
-        Provides informative error messages when users try to use
-        deprecated services (dlimg, lines4, lines5), guiding them
-        to use the current drawcustom service instead.
-
-        Args:
-            service: Service call object
-            old_service: Name of the deprecated service
-
-        Raises:
-            HomeAssistantError: Always raises this with migration information
-        """
-        raise HomeAssistantError(
-            f"The service {DOMAIN}.{old_service} has been removed. "
-            f"Please use {DOMAIN}.drawcustom instead. "
-            "See the documentation for more details."
-        )
-
-    # Register deprecated services with error message (only if all services are being registered)
-    if service_type in ["all", "ap"]:
-        for old_service in ["dlimg", "lines5", "lines4"]:
-            hass.services.async_register(
-                DOMAIN,
-                old_service,
-                lambda call, name=old_service: deprecated_service_handler(call, name)
-            )
-
-
-async def async_unload_services(hass: HomeAssistant) -> None:
-    """Unload OpenEPaperLink services.
-
-    Removes all registered service handlers when the integration
-    is unloaded. This prevents service calls to a non-existent
-    integration.
-
-    Only removes services that were actually registered to prevent errors.
-
-    Args:
-        hass: Home Assistant instance
-    """
-    # Always try to remove drawcustom service (registered for all device types)
-    if hass.services.has_service(DOMAIN, "drawcustom"):
-        hass.services.async_remove(DOMAIN, "drawcustom")
-
-    # Remove AP-only services if they exist
-    ap_services = ["setled", "clear_pending", "force_refresh", "reboot_tag", "scan_channels", "reboot_ap", "refresh_tag_types"]
-    for service in ap_services:
-        if hass.services.has_service(DOMAIN, service):
-            hass.services.async_remove(DOMAIN, service)
-
-    # Remove deprecated services if they exist
-    deprecated_services = ["dlimg", "lines5", "lines4"]
-    for service in deprecated_services:
-        if hass.services.has_service(DOMAIN, service):
-            hass.services.async_remove(DOMAIN, service)
