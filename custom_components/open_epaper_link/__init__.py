@@ -637,13 +637,7 @@ async def _send_welcome_image(
         height = metadata.height
         color_scheme = metadata.color_scheme
 
-        colors = ["black", "white"]
-        if color_scheme == 1:  # BWR
-            colors.append("red")
-        elif color_scheme == 2:  # BWY
-            colors.append("yellow")
-        elif color_scheme == 3:  # BWRY
-            colors.extend(["red", "yellow"])
+        colors = list(color_scheme.palette.colors.keys())
 
         title_y_pct = 10
         title_size = max(12, int(height * 0.08))
@@ -719,11 +713,11 @@ async def _send_welcome_image(
             DOMAIN,
             "drawcustom",
             {
-                "device_id": device_id,
+                "device_id": [device_id],
                 "payload": payload,
                 "background": "white",
                 "rotate": 0,
-                "dither": 2,
+                "dither": 0,
                 "ttl": 60,
             },
             blocking=False,
