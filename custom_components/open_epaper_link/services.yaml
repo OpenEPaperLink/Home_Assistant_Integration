@@ -44,7 +44,7 @@ drawcustom:
           options:
             - label: "No dithering"
               value: "0"
-            - label: "Floyd-Steinberg (best for photos)"
+            - label: "Burkes (best for photos)"
               value: "1"
             - label: "Ordered (best for halftone colors)"
               value: "2"

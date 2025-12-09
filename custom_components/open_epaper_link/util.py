@@ -236,3 +236,78 @@ def is_ble_entry(entry_data) -> bool:
         bool: True if the entry represents a BLE device
     """
     return isinstance(entry_data, dict) and entry_data.get("type") == "ble"
+
+
+def rgb_to_rgb332(rgb: tuple[int, int, int]) -> str:
+    """Convert RGB values to RGB332 format.
+
+    Converts a standard RGB color tuple (0-255 for each component)
+    to the 8-bit RGB332 format used by OpenEPaperLink for LED patterns.
+
+    Args:
+        rgb: Tuple of (r, g, b) values, each 0-255
+
+    Returns:
+        str: Hexadecimal string representation of the RGB332 value
+    """
+    r, g, b = [max(0, min(255, x)) for x in rgb]
+    r = (r // 32) & 0b111
+    g = (g // 32) & 0b111
+    b = (b // 64) & 0b11
+    rgb332 = (r << 5) | (g << 2) | b
+    return str(hex(rgb332)[2:].zfill(2))
+
+
+def int_to_hex_string(number: int) -> str:
+    """Convert integer to two-digit hex string.
+
+    Args:
+        number: Integer value to convert
+
+    Returns:
+        str: Two-digit hexadecimal string
+    """
+    hex_string = hex(number)[2:]
+    return '0' + hex_string if len(hex_string) == 1 else hex_string
+
+
+def get_mac_from_entity_id(entity_id: str) -> str:
+    """Extract MAC address from entity_id.
+
+    Args:
+        entity_id: Entity ID in format 'domain.mac_address'
+
+    Returns:
+        str: Uppercase MAC address
+    """
+    return entity_id.split(".")[1].upper()
+
+
+def is_ble_device(hass: HomeAssistant, entity_id: str) -> bool:
+    """Check if entity represents a BLE device (vs AP/Hub device).
+
+    Looks up device in registry and checks if identifier starts with 'ble_'.
+
+    Args:
+        hass: Home Assistant instance
+        entity_id: Entity ID in format 'domain.mac_address'
+
+    Returns:
+        bool: True if BLE device, False if Hub device or not found
+    """
+    from homeassistant.helpers import device_registry as dr
+
+    mac = entity_id.split(".")[1].upper()
+    device_registry = dr.async_get(hass)
+
+    for device in device_registry.devices.values():
+        for identifier in device.identifiers:
+            if identifier[0] == DOMAIN:
+                device_mac = identifier[1]
+                if device_mac.startswith("ble_"):
+                    device_mac = device_mac[4:]
+                if device_mac.upper() == mac:
+                    return identifier[1].startswith("ble_")
+
+    return False
+
