@@ -9,6 +9,7 @@ from typing import Final
 import async_timeout
 import requests
 from requests_toolbelt import MultipartEncoder
+from PIL import Image
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
@@ -314,8 +315,13 @@ async def upload_to_ble_block(hass: HomeAssistant, entity_id: str, img: bytes, d
                 raise ServiceValidationError(f"BLE image upload failed for {entity_id}")
 
             if processed_image is not None:
+                # Undo rotation for display (ATC rotation is for device memory, not viewing)
+                display_image = processed_image
+                if protocol_type == "atc" and metadata.rotatebuffer == 1:
+                    display_image = processed_image.transpose(Image.Transpose.ROTATE_270)
+
                 buffer = BytesIO()
-                processed_image.save(buffer, format="JPEG", quality=95)
+                display_image.save(buffer, format="JPEG", quality=95)
                 jpeg_bytes = buffer.getvalue()
                 async_dispatcher_send(
                     hass,
