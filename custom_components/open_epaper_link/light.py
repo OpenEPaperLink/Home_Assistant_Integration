@@ -10,10 +10,10 @@ from homeassistant.components.light import (
     LightEntity,
     LightEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from .runtime_data import OpenEPaperLinkConfigEntry, OpenEPaperLinkBLERuntimeData
 
 from .const import DOMAIN
 from .ble import turn_led_on, turn_led_off, get_protocol_by_name
@@ -23,19 +23,19 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: OpenEPaperLinkConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up BLE light entities."""
     # Only create light entity for BLE devices
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    if entry_data.get("type") != "ble":
+    entry_data = entry.runtime_data
+    if not isinstance(entry_data, OpenEPaperLinkBLERuntimeData):
         return
 
-    mac_address = entry_data["mac_address"]
-    name = entry_data["name"]
-    device_metadata = entry_data.get("device_metadata", {})
-    protocol_type = entry_data.get("protocol_type", "atc")  # Default to ATC for backward compatibility
+    mac_address = entry_data.mac_address
+    name = entry_data.name
+    device_metadata = entry_data.device_metadata
+    protocol_type = entry_data.protocol_type  # Default to ATC for backward compatibility
 
     # Skip LED entity for OEPL devices - LED config not yet implemented
     if protocol_type == "oepl":
@@ -46,7 +46,7 @@ async def async_setup_entry(
         name=name,
         device_metadata=device_metadata,
         protocol_type=protocol_type,
-        entry_id=entry.entry_id,
+        entry=entry,
     )
 
     async_add_entities([light])
@@ -65,13 +65,14 @@ class OpenEPaperLinkBLELight(LightEntity):
         name: str,
         device_metadata: dict,
         protocol_type: str,
-        entry_id: str,
+        entry: OpenEPaperLinkConfigEntry,
     ) -> None:
         """Initialize the BLE light entity."""
         self._mac_address = mac_address
         self._name = name
         self._device_metadata = device_metadata
-        self._entry_id = entry_id
+        self._entry = entry
+        self._entry_id = entry.entry_id
         self._is_on = False
         self._available = True
         self._auto_off_task = None
@@ -89,7 +90,8 @@ class OpenEPaperLinkBLELight(LightEntity):
         """Return device info - dynamically reads from current metadata."""
         # Get current metadata from hass.data (may have been updated by RefreshConfigButton)
         from .ble import BLEDeviceMetadata
-        current_metadata = self.hass.data[DOMAIN][self._entry_id].get("device_metadata", self._device_metadata)
+
+        current_metadata = self._entry.runtime_data.device_metadata
         metadata = BLEDeviceMetadata(current_metadata)
 
         return {

@@ -3,11 +3,11 @@ from __future__ import annotations
 import requests
 
 from homeassistant.components.text import TextEntity, TextMode
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from .runtime_data import OpenEPaperLinkConfigEntry
 
 from .const import DOMAIN
 from .util import set_ap_config_item
@@ -356,7 +356,7 @@ class TagNameText(TextEntity):
             )
         )
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up text entities for AP configuration and tag names.
 
     Creates text input entities for:
@@ -373,7 +373,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         entry: Configuration entry
         async_add_entities: Callback to register new entities
     """
-    hub = hass.data[DOMAIN][entry.entry_id]
+    hub = entry.runtime_data
 
     # Wait for initial AP config to be loaded
     if not hub.ap_config:

@@ -11,6 +11,7 @@ from homeassistant.exceptions import HomeAssistantError
 from ..const import DOMAIN
 from ..tag_types import TagType, get_tag_types_manager
 from ..util import get_hub_from_hass
+from ..runtime_data import OpenEPaperLinkBLERuntimeData
 
 from .types import ElementType, DrawingContext
 from .colors import ColorResolver
@@ -72,13 +73,13 @@ class ImageGen:
 
         # Load font manager - find a Hub entry with .entry attribute, or None for BLE-only setups
         self._entry = None
-        if DOMAIN in hass.data and hass.data[DOMAIN]:
-            for entry_id, entry_data in hass.data[DOMAIN].items():
-                # Look for Hub entries (which have .entry attribute) vs BLE entries (which are dicts)
-                if hasattr(entry_data, 'entry'):
-                    self._entry = entry_data.entry
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            if hasattr(entry, 'runtime_data') and entry.runtime_data is not None:
+                # Look for Hub entries (not BLE entries)
+                if not isinstance(entry.runtime_data, OpenEPaperLinkBLERuntimeData):
+                    self._entry = entry
                     break
-            # If no Hub found, self._entry stays None (BLE-only setup)
+        # If no Hub found, self._entry stays None (BLE-only setup)
 
         self._font_manager = FontManager(self.hass, self._entry)
 
@@ -196,17 +197,17 @@ class ImageGen:
             except IndexError:
                 raise HomeAssistantError(f"Invalid entity ID format: {entity_id}")
 
-            # Get device metadata from config entry data
-            domain_data = hass.data.get(DOMAIN, {})
+            # Get device metadata from config entry runtime_data
             device_metadata = None
 
             # Find the config entry for this BLE device
-            for entry_id, entry_data in domain_data.items():
-                if (isinstance(entry_data, dict) and
-                        entry_data.get("type") == "ble" and
-                        entry_data.get("mac_address", "").upper() == tag_mac):
-                    device_metadata = entry_data.get("device_metadata", {})
-                    break
+            for entry in hass.config_entries.async_entries(DOMAIN):
+                runtime_data = getattr(entry, 'runtime_data', None)
+                if runtime_data is not None and isinstance(runtime_data, OpenEPaperLinkBLERuntimeData):
+                    if runtime_data.mac_address.upper() == tag_mac:
+                        device_metadata = runtime_data.device_metadata
+                        protocol_type = runtime_data.protocol_type
+                        break
 
             if not device_metadata:
                 raise HomeAssistantError(f"No metadata found for BLE device {entity_id}")
@@ -285,7 +286,7 @@ class ImageGen:
             entity_id: str,
             service_data: Dict[str, Any],
             error_collector: list = None,
-            *,  #TODO why the star here?
+            *,
             width: int,
             height: int,
             accent_color: str,

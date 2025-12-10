@@ -11,6 +11,7 @@ from requests_toolbelt import MultipartEncoder
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
+from .runtime_data import OpenEPaperLinkBLERuntimeData
 from .const import DOMAIN
 from .util import is_ble_entry
 from .ble import BLEConnection, BLEImageUploader, BLEDeviceMetadata, get_protocol_by_name
@@ -280,17 +281,18 @@ async def upload_to_ble_block(hass: HomeAssistant, entity_id: str, img: bytes, d
 
     try:
         # Get device metadata from Home Assistant data
-        domain_data = hass.data.get(DOMAIN, {})
         device_metadata = None
         protocol_type = "atc"  # Default to ATC for backward compatibility
 
         # Find the config entry for this BLE device
-        for entry_id, entry_data in domain_data.items():
-            if (is_ble_entry(entry_data) and
-                    entry_data.get("mac_address", "").upper() == mac):
-                device_metadata = entry_data.get("device_metadata", {})
-                protocol_type = entry_data.get("protocol_type", "atc")
-                break
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            runtime_data = getattr(entry, 'runtime_data', None)
+            if runtime_data is not None and isinstance(runtime_data, OpenEPaperLinkBLERuntimeData):
+                if runtime_data.mac_address.upper() == mac:
+                    device_metadata = runtime_data.device_metadata
+                    protocol_type = runtime_data.protocol_type
+                    break
+
 
         if not device_metadata:
             raise ServiceValidationError(f"No metadata found for BLE device {entity_id}")
@@ -343,17 +345,17 @@ async def upload_to_ble_direct(
 
     try:
         # Get device metadata from Home Assistant data
-        domain_data = hass.data.get(DOMAIN, {})
         device_metadata = None
         protocol_type = "oepl"  # Direct write is OEPL only
 
         # Find the config entry for this BLE device
-        for entry_id, entry_data in domain_data.items():
-            if (is_ble_entry(entry_data) and
-                    entry_data.get("mac_address", "").upper() == mac):
-                device_metadata = entry_data.get("device_metadata", {})
-                protocol_type = entry_data.get("protocol_type", "oepl")
-                break
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            runtime_data = getattr(entry, 'runtime_data', None)
+            if runtime_data is not None and isinstance(runtime_data, OpenEPaperLinkBLERuntimeData):
+                if runtime_data.mac_address.upper() == mac:
+                    device_metadata = runtime_data.device_metadata
+                    protocol_type = runtime_data.protocol_type
+                    break
 
         if not device_metadata:
             raise ServiceValidationError(f"No metadata found for BLE device {entity_id}")

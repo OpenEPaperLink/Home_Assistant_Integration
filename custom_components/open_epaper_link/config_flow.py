@@ -463,7 +463,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self._custom_font_dirs = self.config_entry.options.get("custom_font_dirs", "")
 
         # Check if this is a BLE device
-        entry_data = self.hass.data[DOMAIN][self.config_entry.entry_id]
+        entry_data = self.config_entry.runtime_data
         is_ble_device = is_ble_entry(entry_data)
         
         if is_ble_device:

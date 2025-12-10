@@ -13,6 +13,7 @@ from homeassistant.helpers.typing import ConfigType
 from .ble import BLEDeviceMetadata
 from .const import DOMAIN
 from .hub import Hub
+from .runtime_data import OpenEPaperLinkConfigEntry, OpenEPaperLinkBLERuntimeData
 from .services import async_setup_services
 from .tag_types import get_tag_types_manager
 from .util import is_ble_entry
@@ -265,7 +266,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     await async_setup_services(hass)
     return True
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry) -> bool:
     """Set up OpenEPaperLink integration from a config entry.
 
     This is the main entry point for integration initialization, which handles both:
@@ -300,16 +301,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.debug("Setting up BLE device with protocol: %s (manufacturer ID: 0x%04X)",
                       protocol_type, protocol.manufacturer_id)
 
-        # Store BLE device config in hass.data for entity access
-        ble_data = {
-            "type": "ble",
-            "mac_address": mac_address,
-            "name": name,
-            "device_metadata": device_metadata,
-            "protocol_type": protocol_type,
-            "sensors": {},  # Registry of sensor entities
-        }
-        hass.data.setdefault(DOMAIN, {})[entry.entry_id] = ble_data
+        # Store BLE device config in runtime_data for entity access
+        ble_data = OpenEPaperLinkBLERuntimeData(
+            mac_address=mac_address,
+            name=name,
+            device_metadata=device_metadata,
+            protocol_type=protocol_type,
+            sensors={},
+        )
+        entry.runtime_data = ble_data
 
         if entry.data.get("send_welcome_image", False):
             new_data = dict(entry.data)
@@ -385,7 +385,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             }
 
             # Update all registered sensors
-            for sensor in ble_data["sensors"].values():
+            for sensor in ble_data.sensors.values():
                 sensor.update_from_advertising_data(sensor_data)
 
         # Remove deprecated clock mode button entities
@@ -423,7 +423,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not await hub.async_setup_initial():
             return False
 
-        hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
+        entry.runtime_data = hub
 
         removed_entities = await async_migrate_camera_entities(hass, entry)
         if removed_entities:
@@ -456,7 +456,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def async_update_options(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry) -> None:
     """Handle updates to integration options.
 
     Called when the user updates integration options through the UI.
@@ -466,7 +466,7 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
         hass: Home Assistant instance
         entry: Updated configuration entry
     """
-    entry_data = hass.data[DOMAIN][entry.entry_id]
+    entry_data = entry.runtime_data
 
     # Only AP entries have hub with reload_config method
     if is_ble_entry(entry_data):
@@ -478,7 +478,7 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await hub.async_reload_config()
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry) -> bool:
     """Unload the integration when removed or restarted.
 
     Handles both BLE and AP entries with appropriate cleanup.
@@ -490,7 +490,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     Returns:
         bool: True if unload was successful, False otherwise
     """
-    entry_data = hass.data[DOMAIN][entry.entry_id]
+    entry_data = entry.runtime_data
 
     # Determine if BLE or AP entry
     is_ble_device = is_ble_entry(entry_data)
@@ -505,9 +505,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         if unload_ok:
             await hub.shutdown()
-
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
 

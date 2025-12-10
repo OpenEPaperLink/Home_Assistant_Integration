@@ -257,10 +257,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
                 # Find device metadata
                 device_metadata = {}
-                for entry_data in hass.data.get(DOMAIN, {}).values():
-                    if is_ble_entry(entry_data) and entry_data.get("mac_address", "").upper() == mac:
-                        device_metadata = entry_data.get("device_metadata", {})
-                        break
+                for entry in hass.config_entries.async_entries(DOMAIN):
+                    runtime_data = getattr(entry, 'runtime_data', None)
+                    if runtime_data is not None and is_ble_entry(runtime_data):
+                        if runtime_data.mac_address.upper() == mac:
+                            device_metadata = runtime_data.device_metadata
+                            break
 
                 metadata = BLEDeviceMetadata(device_metadata)
                 upload_method = metadata.get_best_upload_method(len(image_data))
@@ -271,7 +273,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     await ble_upload_queue.add_to_queue(upload_to_ble_direct, hass, entity_id, image_data, upload_method == "direct_write_compressed", dither)
             else:
                 await hub_upload_queue.add_to_queue(
-                    upload_to_hub, hass, hub, entity_id, image_data, dither,
+                    upload_to_hub, hub, entity_id, image_data, dither,
                     service.data.get("ttl", 60),
                     service.data.get("preload_type", 0),
                     service.data.get("preload_lut", 0)

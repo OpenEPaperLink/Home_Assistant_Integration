@@ -47,7 +47,7 @@ class ColorResolver:
         if color_str in ("black", "b"):
             return BLACK
         if color_str in ("half_black", "hb", "gray", "grey", "half_white",
-                         "hw"):  # TODO update docs that g was removed (could be mistaken for green) and half_white added
+                         "hw"):
             return HALF_BLACK
         if color_str in ("accent", "a"):
             return YELLOW if self.accent_color == "yellow" else RED

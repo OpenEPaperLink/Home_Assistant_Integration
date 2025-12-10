@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
@@ -9,6 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .util import set_ap_config_item
+from .runtime_data import OpenEPaperLinkConfigEntry
 
 import logging
 
@@ -222,7 +222,7 @@ class APConfigSwitch(SwitchEntity):
             )
         )
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up switch entities for AP configuration.
 
     Creates switch entities for all defined AP configuration options
@@ -239,7 +239,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         entry: Configuration entry
         async_add_entities: Callback to register new entities
     """
-    hub = hass.data[DOMAIN][entry.entry_id]
+    hub = entry.runtime_data
 
     # Wait for initial AP config to be loaded
     if not hub.ap_config:

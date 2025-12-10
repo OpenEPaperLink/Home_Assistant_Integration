@@ -5,9 +5,9 @@ from typing import Final
 import requests
 
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from .runtime_data import OpenEPaperLinkConfigEntry
 from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
 from homeassistant.components.image import ImageEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .image_decompressor import to_image
@@ -17,12 +17,12 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 async def async_setup_entry(
         hass: HomeAssistant,
-        entry: ConfigEntry,
+        entry: OpenEPaperLinkConfigEntry,
         async_add_entities: AddEntitiesCallback,
 ) -> bool:
     """Set up the OpenEPaperLink image platform."""
 
-    hub = hass.data[DOMAIN][entry.entry_id]
+    hub = entry.runtime_data
 
     # Track added image entities to prevent duplicates
     added_image_entities = set()

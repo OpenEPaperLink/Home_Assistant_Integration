@@ -6,6 +6,8 @@ import logging
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from .runtime_data import OpenEPaperLinkBLERuntimeData
+
 _LOGGER = logging.getLogger(__name__)
 
 def is_bluetooth_available(hass: HomeAssistant) -> bool:
@@ -202,40 +204,40 @@ async def set_ap_config_item(hub, key: str, value: str | int) -> bool:
 
 
 def get_hub_from_hass(hass: HomeAssistant):
-    """Get the AP Hub instance from Home Assistant data.
-    
-    Searches through all integration entries to find the AP Hub object,
-    filtering out BLE entries which are dictionaries.
-    
+    """
+    Get the AP Hub instance from config entries.
+
+    Iterates through all integration config entries to find the AP Hub object,
+    filtering out BLE entries which are OpenEPaperLinkBLEData instances.
+
     Args:
         hass: Home Assistant instance
-    
+
     Returns:
         Hub: The OpenEPaperLink AP Hub instance
-        
+
     Raises:
         HomeAssistantError: If no AP hub is configured
     """
-    if DOMAIN not in hass.data or not hass.data[DOMAIN]:
-        raise HomeAssistantError("OpenEPaperLink integration not configured")
-    
-    for entry_data in hass.data[DOMAIN].values():
-        if not is_ble_entry(entry_data):
-            return entry_data  # This is the Hub object
-    
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if hasattr(entry, 'runtime_data') and entry.runtime_data is not None:
+            if not isinstance(entry.runtime_data, OpenEPaperLinkBLERuntimeData):
+                return entry.runtime_data
+
     raise HomeAssistantError("No AP hub configured. Only BLE devices found.")
 
 
 def is_ble_entry(entry_data) -> bool:
-    """Check if entry data represents a BLE device.
-    
+    """
+    Check if entry data represents a BLE device.
+
     Args:
-        entry_data: Entry data from hass.data[DOMAIN][entry_id]
-        
+        entry_data: Runtime data from entry.runtime_data
+
     Returns:
         bool: True if the entry represents a BLE device
     """
-    return isinstance(entry_data, dict) and entry_data.get("type") == "ble"
+    return isinstance(entry_data, OpenEPaperLinkBLERuntimeData)
 
 
 def rgb_to_rgb332(rgb: tuple[int, int, int]) -> str:

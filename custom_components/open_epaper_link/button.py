@@ -1,5 +1,4 @@
 from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -9,6 +8,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 import logging
 
+from .runtime_data import OpenEPaperLinkConfigEntry, OpenEPaperLinkBLERuntimeData
 from .tag_types import get_tag_types_manager
 from .util import send_tag_cmd, reboot_ap, is_ble_entry
 from .const import DOMAIN
@@ -116,7 +116,7 @@ def _format_value(value: any) -> str:
     return str(value)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up button entities from a config entry.
 
     Creates button entities based on device type:
@@ -142,24 +142,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         entry: Configuration entry
         async_add_entities: Callback to register new entities
     """
-    entry_data = hass.data[DOMAIN][entry.entry_id]
+    entry_data = entry.runtime_data
     
     # Check if this is a BLE device
     is_ble_device = is_ble_entry(entry_data)
     
     if is_ble_device:
         # BLE device setup - create clock mode buttons
-        mac_address = entry_data["mac_address"]
-        name = entry_data["name"]
-        device_metadata = entry_data.get("device_metadata", {})
-        protocol_type = entry_data.get("protocol_type", "atc")  # Default to ATC for backward compatibility
+        mac_address = entry_data.mac_address
+        name = entry_data.name
+        device_metadata = entry_data.device_metadata
+        protocol_type = entry_data.protocol_type  # Default to ATC for backward compatibility
 
         ble_buttons = []
 
         # Add refresh config button for OEPL devices only
         if protocol_type == "oepl":
             ble_buttons.append(
-                RefreshConfigButton(mac_address, name, device_metadata, protocol_type, entry.entry_id)
+                RefreshConfigButton(mac_address, name, device_metadata, protocol_type, entry)
             )
 
         async_add_entities(ble_buttons)
@@ -725,7 +725,7 @@ class RefreshConfigButton(ButtonEntity):
     updated configuration and update the device metadata in Home Assistant.
     This is useful when device configuration has been changed externally.
     """
-    def __init__(self, mac_address: str, name: str, device_metadata: dict, protocol_type: str, entry_id: str) -> None:
+    def __init__(self, mac_address: str, name: str, device_metadata: dict, protocol_type: str, entry: OpenEPaperLinkConfigEntry) -> None:
         """Initialize the button entity.
 
         Args:
@@ -733,14 +733,15 @@ class RefreshConfigButton(ButtonEntity):
             name: Human-readable name for the device
             device_metadata: Device metadata dictionary
             protocol_type: BLE protocol type (should be "oepl")
-            entry_id: Configuration entry ID
+            entry: Configuration entry for the device
         """
         from .ble import get_protocol_by_name
 
         self._mac_address = mac_address
         self._name = name
         self._device_metadata = device_metadata
-        self._entry_id = entry_id
+        self._entry = entry
+        self._entry_id = entry.entry_id
         self._protocol_type = protocol_type
         self._attr_has_entity_name = True
         self._attr_translation_key = "refresh_config"
@@ -839,43 +840,39 @@ class RefreshConfigButton(ButtonEntity):
                 else:
                     _LOGGER.info("No configuration changes for %s", self._mac_address)
 
-                # Update config entry
-                entry = self.hass.config_entries.async_get_entry(self._entry_id)
-                if entry:
-                    self.hass.config_entries.async_update_entry(
-                        entry,
-                        data={**entry.data, "device_metadata": new_metadata}
+                # Update config entry (persisted data)
+                self.hass.config_entries.async_update_entry(
+                    self._entry,
+                    data={**self._entry.data, "device_metadata": new_metadata}
+                )
+
+                # Update runtime_data so existing entities pick up new metadata
+                self._entry.runtime_data.device_metadata = new_metadata
+
+                # Update device registry attributes
+                device_registry = dr.async_get(self.hass)
+                device = device_registry.async_get_device(
+                    identifiers={(DOMAIN, f"ble_{self._mac_address}")}
+                )
+
+                if device:
+                    device_registry.async_update_device(
+                        device.id,
+                        hw_version=f"{capabilities.width}x{capabilities.height}",
+                        model=model_name,
                     )
 
-                    # Update hass.data so existing entities pick up new metadata
-                    if self._entry_id in self.hass.data[DOMAIN]:
-                        self.hass.data[DOMAIN][self._entry_id]["device_metadata"] = new_metadata
+                # Remove entities that will become invalid with new config
+                from . import async_remove_invalid_ble_entities
+                removed = await async_remove_invalid_ble_entities(self.hass, self._entry, new_metadata)
+                if removed:
+                    _LOGGER.info("Removed invalid entities: %s", removed)
 
-                    # Update device registry attributes
-                    device_registry = dr.async_get(self.hass)
-                    device = device_registry.async_get_device(
-                        identifiers={(DOMAIN, f"ble_{self._mac_address}")}
-                    )
-                    if device:
-                        device_registry.async_update_device(
-                            device.id,
-                            hw_version=f"{capabilities.width}x{capabilities.height}",
-                            model=model_name,
-                        )
+                # Reload integration to re-create entities based on new config
+                _LOGGER.info("Reloading integration to apply config changes for %s", self._mac_address)
+                await self.hass.config_entries.async_reload(self._entry_id)
 
-                    # Remove entities that will become invalid with new config
-                    from . import async_remove_invalid_ble_entities
-                    removed = await async_remove_invalid_ble_entities(self.hass, entry, new_metadata)
-                    if removed:
-                        _LOGGER.info("Removed invalid entities: %s", removed)
-
-                    # Reload integration to re-create entities based on new config
-                    _LOGGER.info("Reloading integration to apply config changes for %s", self._mac_address)
-                    await self.hass.config_entries.async_reload(self._entry_id)
-
-                    _LOGGER.info("Successfully refreshed configuration for %s", self._mac_address)
-                else:
-                    raise HomeAssistantError("Configuration entry not found")
+                _LOGGER.info("Successfully refreshed configuration for %s", self._mac_address)
 
         except Exception as e:
             _LOGGER.error("Failed to refresh configuration for %s: %s", self._mac_address, e)
