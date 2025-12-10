@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime
+from io import BytesIO
 from typing import Final
 
 import async_timeout
@@ -11,8 +12,9 @@ from requests_toolbelt import MultipartEncoder
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from .runtime_data import OpenEPaperLinkBLERuntimeData
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
 from .ble import BLEConnection, BLEImageUploader, BLEDeviceMetadata, get_protocol_by_name
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -306,10 +308,20 @@ async def upload_to_ble_block(hass: HomeAssistant, entity_id: str, img: bytes, d
         # Upload via BLE using protocol-specific service UUID
         async with BLEConnection(hass, mac, protocol.service_uuid, protocol) as conn:
             uploader = BLEImageUploader(conn, mac)
-            success = await uploader.upload_image(img, metadata, protocol_type, dither)
+            success, processed_image = await uploader.upload_image_block_based(img, metadata, protocol_type, dither)
 
             if not success:
                 raise ServiceValidationError(f"BLE image upload failed for {entity_id}")
+
+            if processed_image is not None:
+                buffer = BytesIO()
+                processed_image.save(buffer, format="JPEG", quality=95)
+                jpeg_bytes = buffer.getvalue()
+                async_dispatcher_send(
+                    hass,
+                    f"{SIGNAL_TAG_IMAGE_UPDATE}_{mac}",
+                    jpeg_bytes
+                )
 
     except Exception as err:
         _LOGGER.error("BLE upload error for %s: %s", entity_id, err)
@@ -374,10 +386,20 @@ async def upload_to_ble_direct(
         # Upload via BLE using direct write protocol
         async with BLEConnection(hass, mac, protocol.service_uuid, protocol) as conn:
             uploader = BLEImageUploader(conn, mac)
-            success = await uploader.upload_direct_write(img, metadata, compressed, dither)
+            success, processed_image = await uploader.upload_direct_write(img, metadata, compressed, dither)
 
             if not success:
                 raise ServiceValidationError(f"BLE direct write upload failed for {entity_id}")
+
+            if processed_image is not None:
+                buffer = BytesIO()
+                processed_image.save(buffer, format="JPEG", quality=95)
+                jpeg_bytes = buffer.getvalue()
+                async_dispatcher_send(
+                    hass,
+                    f"{SIGNAL_TAG_IMAGE_UPDATE}_{mac}",
+                    jpeg_bytes
+                )
 
     except Exception as err:
         _LOGGER.error("BLE direct write error for %s: %s", entity_id, err)

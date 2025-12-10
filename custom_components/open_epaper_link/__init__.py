@@ -34,6 +34,7 @@ BLE_PLATFORMS = [
     Platform.SENSOR,  # Battery, RSSI, last seen
     Platform.LIGHT,  # LED control
     Platform.BUTTON,  # Clock mode controls
+    Platform.IMAGE, # Display content (captured from drawcustom)
 ]
 
 
