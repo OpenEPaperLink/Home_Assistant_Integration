@@ -46,7 +46,10 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
         height = y_end - y_start + 1
 
         # Get time range
-        duration = timedelta(seconds=element.get("duration", 60 * 60 * 24))
+        duration_seconds = float(element.get("duration", 60 * 60 * 24))
+        if duration_seconds <= 0:
+            raise HomeAssistantError("duration must be greater than 0 seconds")
+        duration = timedelta(seconds=duration_seconds)
         end = dt.now()
         start = end - duration
 
@@ -163,6 +166,8 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
             y_axis_tick_length = y_axis.get("tick_length", 4)
             y_axis_tick_width = y_axis.get("tick_width", 2)
             y_axis_tick_every = float(y_axis.get("tick_every", 1))
+            if y_axis_tick_every <= 0:
+                raise HomeAssistantError("yaxis.tick_every must be greater than 0") # TODO: raise properly
             y_axis_grid = y_axis.get("grid", True)
             y_axis_grid_color = ctx.colors.resolve(y_axis.get("grid_color", "black"))
             y_axis_grid_style = y_axis.get("grid_style", "dotted")
@@ -178,7 +183,9 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
 
         if x_legend:
             time_format = x_legend.get("format", "%H:%M")
-            time_interval = x_legend.get("interval", time_interval)
+            interval = x_legend.get("interval")
+            if interval is not None:
+                time_interval = float(interval)
             time_size = x_legend.get("size", 10)
             time_font = ctx.fonts.get_font(font_name, time_size)
             time_color = ctx.colors.resolve(x_legend.get("color", "black"))
@@ -186,6 +193,8 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
             x_legend_height = x_legend.get("height", -1)
             if time_position not in ("top", "bottom", None):
                 time_position = "bottom"
+        if time_interval <= 0:
+            raise HomeAssistantError("xlegend.interval must be greater than 0")
 
         # Configure x axis
         x_axis = element.get("xaxis", {})
