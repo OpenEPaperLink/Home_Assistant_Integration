@@ -357,8 +357,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
                 _LOGGER.debug("Failed to parse advertising data for %s: %s", mac_address, err, exc_info=True)
                 return
 
-            # Dynamically update device attributes
-            if advertising_data.fw_version:
+            # Dynamically update device attributes (skip OEPL fw to avoid incorrect value)
+            if advertising_data.fw_version and protocol_type != "oepl":
                 device_registry = dr.async_get(hass)
                 device_entry = device_registry.async_get_device(
                     identifiers={(DOMAIN, f"ble_{mac_address}")}

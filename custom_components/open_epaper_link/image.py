@@ -389,7 +389,7 @@ class OpenEPaperLinkBLEImage(ImageEntity):
             name=self._name,
             manufacturer="OpenEPaperLink",
             model=metadata.model_name,
-            sw_version=str(metadata.fw_version),
+            sw_version=metadata.formatted_fw_version(),
             hw_version=f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
         )
 

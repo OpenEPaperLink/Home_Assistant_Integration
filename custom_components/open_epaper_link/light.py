@@ -99,7 +99,7 @@ class OpenEPaperLinkBLELight(LightEntity):
             "name": self._name,
             "manufacturer": "OpenEPaperLink",
             "model": metadata.model_name,
-            "sw_version": f"0x{metadata.fw_version:04x}",
+            "sw_version": metadata.formatted_fw_version(),
             "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
         }
 

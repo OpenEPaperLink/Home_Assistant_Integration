@@ -764,7 +764,7 @@ class RefreshConfigButton(ButtonEntity):
             "name": self._name,
             "manufacturer": "OpenEPaperLink",
             "model": metadata.model_name,
-            "sw_version": f"0x{metadata.fw_version:04x}",
+            "sw_version": metadata.formatted_fw_version(),
             "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
         }
 
@@ -779,10 +779,19 @@ class RefreshConfigButton(ButtonEntity):
         try:
             # Get protocol handler
             protocol = get_protocol_by_name(self._protocol_type)
+            fw_info = None
 
             # Connect and interrogate device
             async with BLEConnection(self.hass, self._mac_address, self._service_uuid, protocol) as conn:
                 capabilities = await protocol.interrogate_device(conn)
+                try:
+                    fw_info = await protocol.read_firmware_version(conn)
+                except Exception as fw_err:
+                    _LOGGER.warning(
+                        "Failed to read firmware version for %s: %s",
+                        self._mac_address,
+                        fw_err,
+                    )
 
                 if not capabilities:
                     raise HomeAssistantError("Device returned invalid configuration data")
@@ -797,6 +806,18 @@ class RefreshConfigButton(ButtonEntity):
                 new_metadata = {
                     "oepl_config": config_to_dict(config),
                 }
+                if fw_info:
+                    new_metadata["fw_version"] = fw_info.get("version")
+                    new_metadata["fw_version_raw"] = fw_info.get("raw")
+                    if fw_info.get("sha"):
+                        new_metadata["fw_sha"] = fw_info["sha"]
+                elif "fw_version" in self._device_metadata:
+                    # Preserve previously known firmware version if read fails
+                    new_metadata["fw_version"] = self._device_metadata.get("fw_version")
+                    if "fw_version_raw" in self._device_metadata:
+                        new_metadata["fw_version_raw"] = self._device_metadata.get("fw_version_raw")
+                    if "fw_sha" in self._device_metadata:
+                        new_metadata["fw_sha"] = self._device_metadata.get("fw_sha")
 
                 # Generate and store model name
                 if config.displays:
@@ -848,6 +869,7 @@ class RefreshConfigButton(ButtonEntity):
 
                 # Update runtime_data so existing entities pick up new metadata
                 self._entry.runtime_data.device_metadata = new_metadata
+                self._device_metadata = new_metadata
 
                 # Update device registry attributes
                 device_registry = dr.async_get(self.hass)
@@ -856,10 +878,12 @@ class RefreshConfigButton(ButtonEntity):
                 )
 
                 if device:
+                    sw_version = fw_info.get("version") if fw_info else device.sw_version
                     device_registry.async_update_device(
                         device.id,
                         hw_version=f"{capabilities.width}x{capabilities.height}",
                         model=model_name,
+                        sw_version=str(sw_version) if sw_version else None,
                     )
 
                 # Remove entities that will become invalid with new config

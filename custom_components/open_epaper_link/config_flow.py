@@ -209,6 +209,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
 
                 # Interrogate device using protocol-specific method
+                fw_info: dict[str, Any] | None = None
+
                 async with BLEConnection(
                     self.hass,
                     self._discovered_device["address"],
@@ -216,6 +218,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     protocol
                 ) as conn:
                     capabilities = await protocol.interrogate_device(conn)
+                    # OEPL devices expose firmware version via 0x0043
+                    if self._discovered_device["protocol_type"] == "oepl":
+                        try:
+                            fw_info = await protocol.read_firmware_version(conn)
+                        except Exception as fw_err:
+                            _LOGGER.warning(
+                                "Failed to read firmware version for %s: %s",
+                                self._discovered_device["address"],
+                                fw_err,
+                            )
 
                 _LOGGER.debug("Device capabilities: %s", capabilities)
 
@@ -235,6 +247,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         device_metadata = {
                             "oepl_config": config_to_dict(protocol._last_config),
                         }
+                        if fw_info:
+                            device_metadata["fw_version"] = fw_info.get("version")
+                            device_metadata["fw_version_raw"] = fw_info.get("raw")
+                            if fw_info.get("sha"):
+                                device_metadata["fw_sha"] = fw_info["sha"]
 
                         # Generate model name from display config
                         if protocol._last_config.displays:

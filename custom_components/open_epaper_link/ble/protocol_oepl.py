@@ -13,6 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # OEPL protocol constants
 CMD_READ_CONFIG = bytes([0x00, 0x40])
+CMD_READ_FW_VERSION = bytes([0x00, 0x43])
 
 
 def _format_config_summary(config: GlobalConfig, mac_address: str) -> str:
@@ -119,6 +120,7 @@ class OEPLProtocol(BLEProtocol):
     def __init__(self):
         """Initialize OEPL protocol."""
         self._last_config: GlobalConfig | None = None
+        self._last_fw_version: dict | None = None
 
     @property
     def manufacturer_id(self) -> int:
@@ -396,3 +398,52 @@ class OEPLProtocol(BLEProtocol):
                          or None if no config has been read yet
         """
         return self._last_config
+
+    async def read_firmware_version(self, connection: "BLEConnection") -> dict:
+        """Read firmware version using command 0x0043.
+
+        Returns:
+            dict: Firmware version info with keys: major, minor, sha, version, raw
+        """
+        response = await connection.write_command_with_response(CMD_READ_FW_VERSION)
+
+        # Strip command echo if present
+        if response.startswith(CMD_READ_FW_VERSION):
+            payload = response[2:]
+        else:
+            payload = response
+
+        if len(payload) < 2:
+            raise ConfigValidationError(f"Firmware version response too short: {len(payload)} bytes")
+
+        major = payload[0]
+        minor = payload[1]
+        sha = ""
+
+        if len(payload) >= 3:
+            sha_length = payload[2]
+            if sha_length > 0:
+                if len(payload) < 3 + sha_length:
+                    raise ConfigValidationError(
+                        f"Firmware version SHA length {sha_length} exceeds payload ({len(payload)} bytes)"
+                    )
+                sha_bytes = payload[3:3 + sha_length]
+                sha = bytes(sha_bytes).decode("ascii", errors="ignore")
+
+        version_str = f"{major}.{minor}"
+        self._last_fw_version = {
+            "major": major,
+            "minor": minor,
+            "sha": sha,
+            "version": version_str,
+            "raw": (major << 8) | minor,
+        }
+
+        _LOGGER.debug(
+            "OEPL firmware version for %s: %s (sha=%s)",
+            connection.mac_address,
+            version_str,
+            sha[:8] if sha else "n/a",
+        )
+
+        return self._last_fw_version
