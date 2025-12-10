@@ -7,7 +7,7 @@ from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform, EVENT_HOMEASSISTANT_STARTED, CONF_HOST
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er, device_registry as dr
+from homeassistant.helpers import entity_registry as er, device_registry as dr, storage
 from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.helpers.typing import ConfigType
 from .ble import BLEDeviceMetadata
@@ -548,6 +548,8 @@ async def async_remove_storage_files(hass: HomeAssistant) -> None:
     """
     from .tag_types import reset_tag_types_manager
 
+    storage_dir = hass.config.path(".storage")
+
     # Remove tag types file
     tag_types_file = hass.config.path("open_epaper_link_tagtypes.json")
     if await hass.async_add_executor_job(os.path.exists, tag_types_file):
@@ -557,8 +559,14 @@ async def async_remove_storage_files(hass: HomeAssistant) -> None:
         except OSError as err:
             _LOGGER.error("Error removing tag types file: %s", err)
 
+    # Remove tag types storage entry
+    try:
+        await storage.async_remove_store(hass, "open_epaper_link_tagtypes")
+        _LOGGER.debug("Removed tag types storage file")
+    except Exception as err:
+        _LOGGER.error("Error removing tag types storage file: %s", err)
+
     # Remove tag storage file
-    storage_dir = hass.config.path(".storage")
     tags_file = os.path.join(storage_dir, f"{DOMAIN}_tags")
     if await hass.async_add_executor_job(os.path.exists, tags_file):
         try:
