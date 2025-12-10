@@ -131,7 +131,7 @@ Custom fonts are supported for text elements. The integration provides several w
 The integration searches for fonts in these locations in order:
 
 1. **Custom font directories** (configured in the integration options)
-2. **Integration directory** - contains default fonts (`ppb.ttf`, `rbm.ttf`)
+2. **Integration assets directory** (`custom_components/open_epaper_link/imagegen/assets`) - contains default fonts (`ppb.ttf`, `rbm.ttf`)
 3. **Web directory** - (`/config/www/fonts/`)
 4. **Media directory** - (`/media/fonts/`)
 
