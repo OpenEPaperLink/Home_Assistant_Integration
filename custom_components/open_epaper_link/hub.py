@@ -10,6 +10,7 @@ import websockets
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, CALLBACK_TYPE, callback
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
@@ -136,7 +137,7 @@ class Hub:
         await self.async_reload_blacklist()
         self._update_debounce_interval()
 
-    async def async_setup_initial(self) -> bool:
+    async def async_setup_initial(self) -> None:
         """Set up hub without establishing a WebSocket connection.
 
         Performs the initial setup tasks:
@@ -144,49 +145,48 @@ class Hub:
         - Loads stored tag data from persistent storage
         - Initializes the tag type manager
         - Registers the shutdown handler
-        - Attempts to load initial tag data from the AP
+        - Fetches AP info and loads tags from the AP
 
         This is called during integration setup before the platforms
         are loaded, allowing entities to be created with initial state.
 
-        Returns:
-            bool: True if setup completed successfully, False otherwise
+        Raises:
+            ConfigEntryNotReady: If AP is unreachable or tag loading fails
         """
+        # Load stored data
+        stored = await self._store.async_load()
+        if stored:
+            self._data = stored.get("tags", {})
+            self._known_tags = set(self._data.keys())
+            _LOGGER.debug("Restored %d tags from storage", len(self._known_tags))
+
+        # Initialize tag manager
+        self._tag_manager = await get_tag_types_manager(self.hass)
+        self._tag_manager_ready.set()
+
+        # Register shutdown handler only once
+        if self._shutdown_handler is None:
+            self._shutdown_handler = self.hass.bus.async_listen_once(
+                EVENT_HOMEASSISTANT_STOP,
+                self._handle_shutdown
+            )
+
+        # Fetch AP info - raises on failure (timeout, connection error, HTTP error)
         try:
-            # Load stored data
-            stored = await self._store.async_load()
-            if stored:
-                self._data = stored.get("tags", {})
-                self._known_tags = set(self._data.keys())
-                _LOGGER.debug("Restored %d tags from storage", len(self._known_tags))
+            await self.async_update_ap_info()
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            raise ConfigEntryNotReady(
+                f"Cannot connect to AP at {self.host}: {err}"
+            ) from err
 
-            # Initialize tag manager
-            self._tag_manager = await get_tag_types_manager(self.hass)
-            self._tag_manager_ready.set()
-
-            # Register shutdown handler only once
-            if self._shutdown_handler is None:
-                self._shutdown_handler = self.hass.bus.async_listen_once(
-                    EVENT_HOMEASSISTANT_STOP,
-                    self._handle_shutdown
-                )
-
-            # Fetch AP env
-            try:
-                await self.async_update_ap_info()
-            except Exception as err:
-                _LOGGER.warning("Could not load initial AP info: %s", str(err))
-
-            # Load all tags from AP
-            try:
-                await self.async_load_all_tags()
-            except Exception as err:
-                _LOGGER.warning("Could not load initial tags from AP: %s", str(err))
-            return True
-
+        # Load tags from AP - already has 10 retries built-in
+        # If this fails after retries, something is wrong with the AP
+        try:
+            await self.async_load_all_tags()
         except Exception as err:
-            _LOGGER.error("Failed to set up hub: %s", err)
-            return False
+            raise ConfigEntryNotReady(
+                f"Failed to load tags from AP at {self.host}: {err}"
+            ) from err
 
     async def async_start_websocket(self) -> bool:
         """Start WebSocket connection to the AP.
@@ -1307,20 +1307,18 @@ class Hub:
         This can be called manually to refresh configuration or
         is triggered automatically when the AP sends a configuration
         change notification.
+
+        Raises:
+            aiohttp.ClientError: If connection fails or HTTP error occurs
+            asyncio.TimeoutError: If request times out
         """
-        try:
-            async with async_timeout.timeout(10):
-                async with self._session.get(f"http://{self.host}/sysinfo") as response:
-                    if response.status != 200:
-                        _LOGGER.error("Failed to fetch AP sys info: HTTP %s", response.status)
-                        return
+        async with async_timeout.timeout(10):
+            async with self._session.get(f"http://{self.host}/sysinfo") as response:
+                response.raise_for_status()  # Raises ClientResponseError on non-2xx
 
-                    data = await response.json()
-                    self.ap_env = data.get("env")
-                    self.ap_model = self._format_ap_model(self.ap_env)
-
-        except Exception as err:
-            _LOGGER.error(f"Error updating AP info: {err}")
+                data = await response.json()
+                self.ap_env = data.get("env")
+                self.ap_model = self._format_ap_model(self.ap_env)
 
     @staticmethod
     def _format_ap_model(ap_env: str) -> str:

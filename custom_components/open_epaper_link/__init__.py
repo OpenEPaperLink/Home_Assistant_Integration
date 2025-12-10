@@ -7,6 +7,7 @@ from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform, EVENT_HOMEASSISTANT_STARTED, CONF_HOST
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import entity_registry as er, device_registry as dr, storage
 from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.helpers.typing import ConfigType
@@ -312,6 +313,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
         )
         entry.runtime_data = ble_data
 
+        # Lightweight presence check - only checks cached advertisement data
+        if not bluetooth.async_address_present(hass, mac_address, connectable=False):
+            raise ConfigEntryNotReady(
+                f"BLE device {name} ({mac_address}) not detected in Bluetooth range"
+            )
+
         if entry.data.get("send_welcome_image", False):
             new_data = dict(entry.data)
             new_data.pop("send_welcome_image", None)
@@ -421,8 +428,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
         hub = Hub(hass, entry)
 
         # Do basic setup without WebSocket connection
-        if not await hub.async_setup_initial():
-            return False
+        # Raises ConfigEntryNotReady if AP is unreachable
+        await hub.async_setup_initial()
 
         entry.runtime_data = hub
 
