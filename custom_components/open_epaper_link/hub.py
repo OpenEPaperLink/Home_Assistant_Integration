@@ -17,10 +17,11 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 import logging
 
-_LOGGER: Final = logging.getLogger(__name__)
-
 from .const import DOMAIN, SIGNAL_AP_UPDATE, SIGNAL_TAG_UPDATE, SIGNAL_TAG_IMAGE_UPDATE
 from .tag_types import get_tag_types_manager, get_hw_string
+
+_LOGGER: Final = logging.getLogger(__name__)
+
 
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_tags"

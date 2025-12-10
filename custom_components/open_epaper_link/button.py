@@ -8,7 +8,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 import logging
 
-from .runtime_data import OpenEPaperLinkConfigEntry, OpenEPaperLinkBLERuntimeData
+from .runtime_data import OpenEPaperLinkConfigEntry
 from .tag_types import get_tag_types_manager
 from .util import send_tag_cmd, reboot_ap, is_ble_entry
 from .const import DOMAIN

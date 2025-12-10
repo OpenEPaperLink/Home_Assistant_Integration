@@ -4,13 +4,11 @@ import io
 import struct
 import zlib
 import logging
-from dataclasses import dataclass
 from enum import Enum
 
 import numpy as np
 from PIL import Image
 
-from . import ColorScheme
 from .exceptions import BLEError
 from .image_processing import process_image_for_device
 from .metadata import BLEDeviceMetadata
@@ -152,7 +150,7 @@ def _convert_image_to_bytes(
 
     # Exact color matching (image already quantized by dithering)
     black_pixels = (r == 0) & (g == 0) & (b == 0)
-    white_pixels = (r == 255) & (g == 255) & (b == 255)
+    # white_pixels = (r == 255) & (g == 255) & (b == 255)
     red_pixels = (r == 255) & (g == 0) & (b == 0)
     yellow_pixels = (r == 255) & (g == 255) & (b == 0)
 

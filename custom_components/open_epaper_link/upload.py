@@ -13,7 +13,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from .runtime_data import OpenEPaperLinkBLERuntimeData
 from .const import DOMAIN
-from .util import is_ble_entry
 from .ble import BLEConnection, BLEImageUploader, BLEDeviceMetadata, get_protocol_by_name
 
 _LOGGER: Final = logging.getLogger(__name__)

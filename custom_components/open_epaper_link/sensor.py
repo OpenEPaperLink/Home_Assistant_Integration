@@ -24,7 +24,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 import logging
 
-from .runtime_data import OpenEPaperLinkConfigEntry, OpenEPaperLinkBLERuntimeData
+from .runtime_data import OpenEPaperLinkConfigEntry
 from .const import DOMAIN
 from .util import is_ble_entry
 from .tag_types import get_hw_string, get_hw_dimensions

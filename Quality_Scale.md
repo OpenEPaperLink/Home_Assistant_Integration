@@ -7,7 +7,7 @@
 - [x] `config-flow` - Integration needs to be able to be set up via the UI
     - [x] Uses `data_description` to give context to fields
     - [x] Uses `ConfigEntry.data` and `ConfigEntry.options` correctly
-- [ ] `dependency-transparency` - Dependency transparency
+- [x] `dependency-transparency` - Dependency transparency
 - [ ] `docs-actions` - The documentation describes the provided service actions that can be used
 - [ ] `docs-high-level-description` - The documentation includes a high-level description of the integration brand, product, or service
 - [ ] `docs-installation-instructions` - The documentation provides step-by-step installation instructions for the integration, including, if needed, prerequisites
@@ -15,7 +15,7 @@
 - [x] `entity-event-setup` - Entity events are subscribed in the correct lifecycle methods
 - [x] `entity-unique-id` - Entities have a unique ID
 - [x] `has-entity-name` - Entities use has_entity_name = True
-- [ ] `runtime-data` - Use ConfigEntry.runtime_data to store runtime data
+- [x] `runtime-data` - Use ConfigEntry.runtime_data to store runtime data
 - [x] `test-before-configure` - Test a connection in the config flow
 - [ ] `test-before-setup` - Check during integration initialization if we are able to set it up correctly
 - [x] `unique-config-entry` - Don't allow the same device or service to be able to be set up twice

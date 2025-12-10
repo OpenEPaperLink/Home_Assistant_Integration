@@ -63,7 +63,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
         """
         errors = {}
-        info = None
 
         # Remove any http:// or https:// prefix
         host = host.replace("http://", "").replace("https://", "")
