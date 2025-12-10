@@ -8,6 +8,9 @@
             "user": {
                 "data": {
                     "host": "Hostname oder IP"
+                },
+                "data_description": {
+                    "host": "Hostname oder IP des OpenEPaperLink-Access-Points."
                 }
             }
         },
@@ -31,6 +34,12 @@
                     "button_debounce": "Tasten-Entstörzeit (Sekunden)",
                     "nfc_debounce": "NFC-Entstörzeit (Sekunden)",
                     "custom_font_dirs": "Benutzerdefinierte Schriftarten-Verzeichnisse"
+                },
+                "data_description": {
+                    "blacklisted_tags":"Tags ausblenden; geblacklistete Tags werden nicht aktualisiert und lösen keine Dienste aus.",
+                    "button_debounce": "Wartezeit, bevor ein weiterer Tastendruck akzeptiert wird (Sekunden).",
+                    "nfc_debounce": "Wartezeit, bevor ein weiterer NFC-Tap akzeptiert wird (Sekunden).",
+                    "custom_font_dirs":  "Kommagetrennte Verzeichnisse mit zusätzlichen Schriftarten für erzeugte Bilder."
                 }
             }
         },

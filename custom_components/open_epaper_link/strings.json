@@ -8,6 +8,9 @@
       "user": {
         "data": {
           "host": "Host or IP"
+        },
+        "data_description": {
+          "host": "Hostname or IP of the OpenEPaperLink access point. Do not include http/https."
         }
       }
     },
@@ -31,6 +34,12 @@
           "button_debounce": "Button Debounce Time (seconds)",
           "nfc_debounce": "NFC Debounce Time (seconds)",
           "custom_font_dirs": "Custom Font Directories"
+        },
+        "data_description": {
+          "blacklisted_tags": "Tags to hide; blacklisted tags will not update or trigger services.",
+          "button_debounce": "Delay before another button press is accepted (seconds).",
+          "nfc_debounce": "Delay before another NFC tap is accepted (seconds).",
+          "custom_font_dirs": "Comma-separated directories containing additional fonts for generated images."
         }
       }
     },

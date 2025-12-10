@@ -4,9 +4,9 @@
 - [x] `brands` - Has branding assets available for the integration
 - [ ] `common-modules` - Place common patterns in common modules
 - [ ] `config-flow-test-coverage` - Full test coverage for the config flow
-- [ ] `config-flow` - Integration needs to be able to be set up via the UI
-    - [ ] Uses `data_description` to give context to fields
-    - [ ] Uses `ConfigEntry.data` and `ConfigEntry.options` correctly
+- [x] `config-flow` - Integration needs to be able to be set up via the UI
+    - [x] Uses `data_description` to give context to fields
+    - [x] Uses `ConfigEntry.data` and `ConfigEntry.options` correctly
 - [ ] `dependency-transparency` - Dependency transparency
 - [ ] `docs-actions` - The documentation describes the provided service actions that can be used
 - [ ] `docs-high-level-description` - The documentation includes a high-level description of the integration brand, product, or service
