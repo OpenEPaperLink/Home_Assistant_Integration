@@ -25,7 +25,7 @@
 - [x] `config-entry-unloading` - Support config entry unloading
 - [ ] `docs-configuration-parameters` - The documentation describes all integration configuration options
 - [ ] `docs-installation-parameters` - The documentation describes all integration installation parameters
-- [ ] `entity-unavailable` - Mark entity unavailable if appropriate
+- [x] `entity-unavailable` - Mark entity unavailable if appropriate
 - [x] `integration-owner` - Has an integration owner
 - [ ] `log-when-unavailable` - If internet/device/service is unavailable, log once when unavailable and once when back connected
 - [ ] `parallel-updates` - Number of parallel updates is specified
