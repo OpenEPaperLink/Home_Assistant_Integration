@@ -408,7 +408,7 @@ def _encode_direct_write_4bpp(image: Image.Image) -> bytes:
             r, g, b = pixel_array[y, x]
             color = _detect_color(int(r), int(g), int(b), 4)
             
-            # Map color to 4-bit value: 0=black, 1=white, 2=yellow, 3=red, 4=blue, 5=green
+            # Firmware expects: black=0, white=1, yellow=2, red=3, blue=5, green=6
             if color == 'black':
                 color_value = 0
             elif color == 'white':
@@ -417,9 +417,9 @@ def _encode_direct_write_4bpp(image: Image.Image) -> bytes:
                 color_value = 2
             elif color == 'red':
                 color_value = 3
-            elif color == 'blue':
-                color_value = 4
             elif color == 'green':
+                color_value = 6
+            elif color == 'blue':
                 color_value = 5
             else:
                 color_value = 0  # Fallback to black
