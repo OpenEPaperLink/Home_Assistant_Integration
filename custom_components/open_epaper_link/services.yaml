@@ -65,7 +65,7 @@ drawcustom:
           unit_of_measurement: seconds
     dry-run:
       name: Dry run
-      description: Generate image but don't send to AP
+      description: Generate image but don't send to device
       required: true
       default: false
       selector:
