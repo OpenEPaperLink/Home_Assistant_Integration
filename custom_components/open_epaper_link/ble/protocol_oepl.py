@@ -3,7 +3,12 @@ import logging
 from typing import TYPE_CHECKING
 
 from .protocol_base import BLEProtocol, AdvertisingData, DeviceCapabilities
-from .tlv_parser import parse_tlv_config, extract_display_capabilities, GlobalConfig
+from .tlv_parser import (
+    GlobalConfig,
+    describe_color_scheme,
+    extract_display_capabilities,
+    parse_tlv_config,
+)
 from .exceptions import ConfigValidationError
 
 if TYPE_CHECKING:
@@ -56,7 +61,7 @@ def _format_config_summary(config: GlobalConfig, mac_address: str) -> str:
             size_info += f" ({display.active_width_mm}x{display.active_height_mm}mm, {diagonal_inches:.1f}\")"
         lines.append(f"    - Dimensions: {size_info}")
 
-        color_scheme = "BWR" if display.color_scheme == 1 else "Monochrome"
+        color_scheme = describe_color_scheme(display.color_scheme)
         lines.append(f"    - Color Scheme: {color_scheme}")
         lines.append(f"    - Rotation: {display.rotation}°")
         lines.append(f"    - Panel IC: {display.panel_ic_type}")
