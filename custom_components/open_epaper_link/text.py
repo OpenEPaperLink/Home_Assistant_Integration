@@ -257,11 +257,13 @@ class TagNameText(TextEntity):
 
     @property
     def available(self) -> bool:
-        """Return if entity is available.
+        """
+        Return if entity is available.
 
         A tag name text entity is available if:
 
         - The AP is online
+        - The tag has not timed out
         - The tag is known to the AP
         - The tag is not blacklisted
 
@@ -270,6 +272,7 @@ class TagNameText(TextEntity):
         """
         return (
                 self._hub.online and
+                self._hub.is_tag_online(self._tag_mac) and
                 self._tag_mac in self._hub.tags and
                 self._tag_mac not in self._hub.get_blacklisted_tags()
         )

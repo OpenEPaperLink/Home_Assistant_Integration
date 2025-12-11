@@ -1,5 +1,6 @@
+from homeassistant.components import bluetooth
 from homeassistant.components.button import ButtonEntity
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -218,7 +219,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
     # Add AP-level buttons
     async_add_entities([
         RebootAPButton(hass, hub),
-        RefreshTagTypesButton(hass),
+        RefreshTagTypesButton(hass, hub),
     ])
 
     # Listen for new tag discoveries
@@ -333,7 +334,26 @@ class ClearPendingTagButton(ButtonEntity):
         Returns:
             bool: True if the tag is available, False otherwise
         """
-        return self._tag_mac not in self._hub.get_blacklisted_tags()
+        return (
+                self._hub.online and
+                self._hub.is_tag_online(self._tag_mac) and
+                self._tag_mac not in self._hub.get_blacklisted_tags()
+        )
+
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks when entity is added to Home Assistant."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{DOMAIN}_connection_status",
+                self._handle_connection_status
+            )
+        )
+
+    @callback
+    def _handle_connection_status(self, is_online: bool) -> None:
+        """Handle connection status updates."""
+        self.async_write_ha_state()
 
     async def async_press(self) -> None:
         """Handle the button press.
@@ -397,7 +417,26 @@ class ForceRefreshButton(ButtonEntity):
         Returns:
             bool: True if the tag is available, False otherwise
         """
-        return self._tag_mac not in self._hub.get_blacklisted_tags()
+        return (
+                self._hub.online and
+                self._hub.is_tag_online(self._tag_mac) and
+                self._tag_mac not in self._hub.get_blacklisted_tags()
+        )
+
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks when entity is added to Home Assistant."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{DOMAIN}_connection_status",
+                self._handle_connection_status
+            )
+        )
+
+    @callback
+    def _handle_connection_status(self, is_online: bool) -> None:
+        """Handle connection status updates."""
+        self.async_write_ha_state()
 
     async def async_press(self) -> None:
         """Handle the button press.
@@ -460,7 +499,26 @@ class RebootTagButton(ButtonEntity):
         Returns:
             bool: True if the tag is available, False otherwise
         """
-        return self._tag_mac not in self._hub.get_blacklisted_tags()
+        return (
+                self._hub.online and
+                self._hub.is_tag_online(self._tag_mac) and
+                self._tag_mac not in self._hub.get_blacklisted_tags()
+        )
+
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks when entity is added to Home Assistant."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{DOMAIN}_connection_status",
+                self._handle_connection_status
+            )
+        )
+
+    @callback
+    def _handle_connection_status(self, is_online: bool) -> None:
+        """Handle connection status updates."""
+        self.async_write_ha_state()
 
     async def async_press(self) -> None:
         """Handle the button press.
@@ -523,7 +581,26 @@ class ScanChannelsButton(ButtonEntity):
         Returns:
             bool: True if the tag is available, False otherwise
         """
-        return self._tag_mac not in self._hub.get_blacklisted_tags()
+        return (
+                self._hub.online and
+                self._hub.is_tag_online(self._tag_mac) and
+                self._tag_mac not in self._hub.get_blacklisted_tags()
+        )
+
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks when entity is added to Home Assistant."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{DOMAIN}_connection_status",
+                self._handle_connection_status
+            )
+        )
+
+    @callback
+    def _handle_connection_status(self, is_online: bool) -> None:
+        """Handle connection status updates."""
+        self.async_write_ha_state()
 
     async def async_press(self) -> None:
         """Handle the button press.
@@ -586,7 +663,26 @@ class DeepSleepButton(ButtonEntity):
         Returns:
             bool: True if the tag is available, False otherwise
         """
-        return self._tag_mac not in self._hub.get_blacklisted_tags()
+        return (
+                self._hub.online and
+                self._hub.is_tag_online(self._tag_mac) and
+                self._tag_mac not in self._hub.get_blacklisted_tags()
+        )
+
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks when entity is added to Home Assistant."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{DOMAIN}_connection_status",
+                self._handle_connection_status
+            )
+        )
+
+    @callback
+    def _handle_connection_status(self, is_online: bool) -> None:
+        """Handle connection status updates."""
+        self.async_write_ha_state()
 
     async def async_press(self) -> None:
         """Handle the button press.
@@ -635,6 +731,32 @@ class RebootAPButton(ButtonEntity):
             "identifiers": {(DOMAIN, "ap")},
         }
 
+    @property
+    def available(self) -> bool:
+        """Return if entity is available.
+
+        The AP reboot button is available when the AP is online.
+
+        Returns:
+            bool: True if the AP is online, False otherwise
+        """
+        return self._hub.online
+
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks when entity is added to Home Assistant."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{DOMAIN}_connection_status",
+                self._handle_connection_status
+            )
+        )
+
+    @callback
+    def _handle_connection_status(self, is_online: bool) -> None:
+        """Handle connection status updates."""
+        self.async_write_ha_state()
+
     async def async_press(self) -> None:
         """Handle the button press.
 
@@ -656,7 +778,7 @@ class RefreshTagTypesButton(ButtonEntity):
     to inform the user of the result.
     """
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    def __init__(self, hass: HomeAssistant, hub) -> None:
         """Initialize the button entity.
 
         Sets up the button with appropriate name, icon, and device association.
@@ -665,6 +787,7 @@ class RefreshTagTypesButton(ButtonEntity):
             hass: Home Assistant instance
         """
         self._hass = hass
+        self._hub = hub
         self._attr_unique_id = "refresh_tag_types"
         # self._attr_name = "Refresh Tag Types"
         self._attr_has_entity_name = True
@@ -688,6 +811,32 @@ class RefreshTagTypesButton(ButtonEntity):
             # "model": self._hub.ap_model,
             "manufacturer": "OpenEPaperLink",
         }
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available.
+
+        The refresh button is available when the AP is online.
+
+        Returns:
+            bool: True if the AP is online, False otherwise
+        """
+        return self._hub.online
+
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks when entity is added to Home Assistant."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{DOMAIN}_connection_status",
+                self._handle_connection_status
+            )
+        )
+
+    @callback
+    def _handle_connection_status(self, is_online: bool) -> None:
+        """Handle connection status updates."""
+        self.async_write_ha_state()
 
     async def async_press(self) -> None:
         """Handle the button press.
@@ -767,6 +916,11 @@ class RefreshConfigButton(ButtonEntity):
             "sw_version": metadata.formatted_fw_version(),
             "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
         }
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return bluetooth.async_address_present(self.hass, self._mac_address)
 
     async def async_press(self) -> None:
         """Re-interrogate device and update configuration."""

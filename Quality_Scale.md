@@ -17,26 +17,26 @@
 - [x] `has-entity-name` - Entities use has_entity_name = True
 - [x] `runtime-data` - Use ConfigEntry.runtime_data to store runtime data
 - [x] `test-before-configure` - Test a connection in the config flow
-- [ ] `test-before-setup` - Check during integration initialization if we are able to set it up correctly
+- [x] `test-before-setup` - Check during integration initialization if we are able to set it up correctly
 - [x] `unique-config-entry` - Don't allow the same device or service to be able to be set up twice
 
 ## Silver
 - [ ] `action-exceptions` - Service actions raise exceptions when encountering failures
-- [ ] `config-entry-unloading` - Support config entry unloading
+- [x] `config-entry-unloading` - Support config entry unloading
 - [ ] `docs-configuration-parameters` - The documentation describes all integration configuration options
 - [ ] `docs-installation-parameters` - The documentation describes all integration installation parameters
 - [ ] `entity-unavailable` - Mark entity unavailable if appropriate
-- [ ] `integration-owner` - Has an integration owner
+- [x] `integration-owner` - Has an integration owner
 - [ ] `log-when-unavailable` - If internet/device/service is unavailable, log once when unavailable and once when back connected
 - [ ] `parallel-updates` - Number of parallel updates is specified
 - [ ] `reauthentication-flow` - Reauthentication needs to be available via the UI
 - [ ] `test-coverage` - Above 95% test coverage for all integration modules
 
 ## Gold
-- [ ] `devices` - The integration creates devices
+- [x] `devices` - The integration creates devices
 - [ ] `diagnostics` - Implements diagnostics
 - [ ] `discovery-update-info` - Integration uses discovery info to update network information
-- [ ] `discovery` - Devices can be discovered
+- [x] `discovery` - Devices can be discovered
 - [ ] `docs-data-update` - The documentation describes how data is updated
 - [ ] `docs-examples` - The documentation provides automation examples the user can use.
 - [ ] `docs-known-limitations` - The documentation describes known limitations of the integration (not to be confused with bugs)
@@ -44,11 +44,11 @@
 - [ ] `docs-supported-functions` - The documentation describes the supported functionality, including entities, and platforms
 - [ ] `docs-troubleshooting` - The documentation provides troubleshooting information
 - [ ] `docs-use-cases` - The documentation describes use cases to illustrate how this integration can be used
-- [ ] `dynamic-devices` - Devices added after integration setup
-- [ ] `entity-category` - Entities are assigned an appropriate EntityCategory
+- [x] `dynamic-devices` - Devices added after integration setup
+- [x] `entity-category` - Entities are assigned an appropriate EntityCategory
 - [ ] `entity-device-class` - Entities use device classes where possible
 - [ ] `entity-disabled-by-default` - Integration disables less popular (or noisy) entities
-- [ ] `entity-translations` - Entities have translated names
+- [x] `entity-translations` - Entities have translated names
 - [ ] `exception-translations` - Exception messages are translatable
 - [ ] `icon-translations` - Entities implement icon translations
 - [ ] `reconfiguration-flow` - Integrations should have a reconfigure flow

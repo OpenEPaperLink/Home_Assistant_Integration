@@ -5,6 +5,7 @@ import asyncio
 import logging
 from typing import Any
 
+from homeassistant.components import bluetooth
 from homeassistant.components.light import (
     ColorMode,
     LightEntity,
@@ -42,6 +43,7 @@ async def async_setup_entry(
         return
 
     light = OpenEPaperLinkBLELight(
+        hass=hass,
         mac_address=mac_address,
         name=name,
         device_metadata=device_metadata,
@@ -61,6 +63,7 @@ class OpenEPaperLinkBLELight(LightEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         mac_address: str,
         name: str,
         device_metadata: dict,
@@ -68,6 +71,7 @@ class OpenEPaperLinkBLELight(LightEntity):
         entry: OpenEPaperLinkConfigEntry,
     ) -> None:
         """Initialize the BLE light entity."""
+        self._hass = hass
         self._mac_address = mac_address
         self._name = name
         self._device_metadata = device_metadata
@@ -117,7 +121,7 @@ class OpenEPaperLinkBLELight(LightEntity):
     @property
     def available(self) -> bool:
         """Return true if light is available."""
-        return self._available
+        return bluetooth.async_address_present(self.hass, self._mac_address)
 
     @property
     def supported_color_modes(self) -> set[ColorMode]:
@@ -140,7 +144,6 @@ class OpenEPaperLinkBLELight(LightEntity):
             success = await turn_led_on(self.hass, self._mac_address, self._service_uuid, self._protocol)
             if success:
                 self._is_on = True
-                self._available = True
                 self.async_write_ha_state()
 
                 # Cancel any existing auto-off timer
@@ -150,11 +153,9 @@ class OpenEPaperLinkBLELight(LightEntity):
                 # Start auto-off timer since LED turns off when BLE connection closes
                 self._auto_off_task = asyncio.create_task(self._auto_off_timer())
             else:
-                self._available = False
                 self.async_write_ha_state()
                 raise HomeAssistantError("Failed to turn on LED")
         except Exception as e:
-            self._available = False
             self.async_write_ha_state()
             raise HomeAssistantError(f"Error turning on LED: {e}") from e
 
@@ -168,14 +169,11 @@ class OpenEPaperLinkBLELight(LightEntity):
             success = await turn_led_off(self.hass, self._mac_address, self._service_uuid, self._protocol)
             if success:
                 self._is_on = False
-                self._available = True
                 self.async_write_ha_state()
             else:
-                self._available = False
                 self.async_write_ha_state()
                 raise HomeAssistantError("Failed to turn off LED")
         except Exception as e:
-            self._available = False
             self.async_write_ha_state()
             raise HomeAssistantError(f"Error turning off LED: {e}") from e
 

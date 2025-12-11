@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Final
 import requests
 
+from homeassistant.components import bluetooth
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from . import is_ble_entry, BLEDeviceMetadata
@@ -167,17 +168,19 @@ class ESLImage(ImageEntity):
     def available(self) -> bool:
         """Return if entity is available.
 
-        A camera is available if:
+        An image is available if:
 
         - The AP is online
+        - The tag has not timed out
         - The tag is known to the AP
         - The tag is not blacklisted
 
         Returns:
-            bool: True if the camera is available, False otherwise
+            bool: True if the image is available, False otherwise
         """
         return (
                 self._hub.online and
+                self._hub.is_tag_online(self._tag_mac) and
                 self._tag_mac in self._hub.tags and
                 self._tag_mac not in self._hub.get_blacklisted_tags()
         )
@@ -396,7 +399,7 @@ class OpenEPaperLinkBLEImage(ImageEntity):
     @property
     def available(self) -> bool:
         """Return if entity is available."""
-        return True
+        return bluetooth.async_address_present(self.hass, self._mac_address)
 
     @property
     def image_last_updated(self) -> datetime | None:

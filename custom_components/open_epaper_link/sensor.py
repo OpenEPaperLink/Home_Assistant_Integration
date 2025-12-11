@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Final
 
+from homeassistant.components import bluetooth
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -560,14 +561,20 @@ class OpenEPaperLinkTagSensor(OpenEPaperLinkBaseSensor):
 
     @property
     def available(self) -> bool:
-        """Return if entity is available.
+        """
+        Return if entity is available.
 
-        A tag sensor is available if the tag is known to the hub.
+        A tag sensor is available if the AP is online, the tag has not
+        timed out, and the tag is not blacklisted.
 
         Returns:
             bool: True if the sensor is available, False otherwise
         """
-        return self._tag_mac in self._hub.tags
+        return (
+                self._hub.online and
+                self._hub.is_tag_online(self._tag_mac) and
+                self._tag_mac not in self._hub.get_blacklisted_tags()
+        )
 
     @property
     def native_value(self):
@@ -618,6 +625,14 @@ class OpenEPaperLinkTagSensor(OpenEPaperLinkBaseSensor):
             )
         )
 
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{DOMAIN}_connection_status",
+                self._handle_connection_status
+            )
+        )
+
     @callback
     def _handle_update(self) -> None:
         """Handle updated data from the coordinator.
@@ -625,6 +640,11 @@ class OpenEPaperLinkTagSensor(OpenEPaperLinkBaseSensor):
         Called when the tag's data is updated. Triggers a state update
         to refresh the sensor's value and attributes in the UI.
         """
+        self.async_write_ha_state()
+
+    @callback
+    def _handle_connection_status(self, is_online: bool) -> None:
+        """Handle connection status updates."""
         self.async_write_ha_state()
 
 
@@ -749,6 +769,7 @@ class OpenEPaperLinkBLESensor(SensorEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         mac_address: str,
         name: str,
         device_metadata: dict,
@@ -756,6 +777,7 @@ class OpenEPaperLinkBLESensor(SensorEntity):
         description: OpenEPaperLinkSensorEntityDescription,
     ) -> None:
         """Initialize the BLE sensor entity."""
+        self._hass = hass
         self._mac_address = mac_address
         self._name = name
         self._device_metadata = device_metadata
@@ -806,7 +828,7 @@ class OpenEPaperLinkBLESensor(SensorEntity):
     @property
     def available(self) -> bool:
         """Return true if sensor is available."""
-        return self._available
+        return bluetooth.async_address_present(self.hass, self._mac_address)
 
     @property
     def native_unit_of_measurement(self) -> str | None:
@@ -836,7 +858,6 @@ class OpenEPaperLinkBLESensor(SensorEntity):
     def update_from_advertising_data(self, data: dict) -> None:
         """Update sensor state from BLE advertising data."""
         self._sensor_data = data
-        self._available = True
         
         # Only write state if entity is properly added to Home Assistant
         if self.hass is not None:
@@ -845,7 +866,7 @@ class OpenEPaperLinkBLESensor(SensorEntity):
     async def async_added_to_hass(self) -> None:
         """Called when entity is added to hass."""
         # If advertising data was received before being added to hass, write it now
-        if self._sensor_data and self._available:
+        if self._sensor_data:
             self.async_write_ha_state()
 
     async def async_update(self) -> None:
@@ -894,6 +915,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
                         continue  # Skip battery sensors
 
             sensor = OpenEPaperLinkBLESensor(
+                hass=hass,
                 mac_address=mac_address,
                 name=name,
                 device_metadata=device_metadata,
