@@ -2,7 +2,7 @@
 - [x] `action-setup` - Service actions are registered in async_setup
 - [x] (exempt) `appropriate-polling` - If it's a polling integration, set an appropriate polling interval
 - [x] `brands` - Has branding assets available for the integration
-- [ ] `common-modules` - Place common patterns in common modules
+- [x] `common-modules` - Place common patterns in common modules
 - [ ] `config-flow-test-coverage` - Full test coverage for the config flow
 - [x] `config-flow` - Integration needs to be able to be set up via the UI
     - [x] Uses `data_description` to give context to fields

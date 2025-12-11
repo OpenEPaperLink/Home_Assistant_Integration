@@ -13,7 +13,7 @@ from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.helpers.typing import ConfigType
 from .ble import BLEDeviceMetadata
 from .const import DOMAIN
-from .hub import Hub
+from .coordinator import Hub
 from .runtime_data import OpenEPaperLinkConfigEntry, OpenEPaperLinkBLERuntimeData
 from .services import async_setup_services
 from .tag_types import get_tag_types_manager

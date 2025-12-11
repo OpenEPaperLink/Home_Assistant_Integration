@@ -49,6 +49,10 @@ class Hub:
     The Hub maintains the primary state for all tags and the AP itself,
     serving as the data source for all entities in the integration.
 
+    It serves as a coordinator for all tag related updates,
+     but it does not make sense converting it to a DataUpdateCoordinator,
+     which would be pulling, not pushing.
+
     Attributes:
         hass: Home Assistant instance
         entry: Config entry containing connection details

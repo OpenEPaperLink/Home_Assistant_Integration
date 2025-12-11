@@ -14,6 +14,7 @@ from homeassistant.components.light import (
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from .entity import OpenEPaperLinkBLEEntity
 from .runtime_data import OpenEPaperLinkConfigEntry, OpenEPaperLinkBLERuntimeData
 
 from .const import DOMAIN
@@ -54,74 +55,39 @@ async def async_setup_entry(
     async_add_entities([light])
 
 
-class OpenEPaperLinkBLELight(LightEntity):
-    """BLE Light entity for OpenEPaperLink tags.
-    
-    Provides LED control functionality for BLE tags using the proven
-    LED commands from the POC analysis.
-    """
+class OpenEPaperLinkBLELight(OpenEPaperLinkBLEEntity, LightEntity):
+    """BLE Light entity for OpenEPaperLink tags."""
+
+    _attr_entity_registry_enabled_default = True
 
     def __init__(
-        self,
-        hass: HomeAssistant,
-        mac_address: str,
-        name: str,
-        device_metadata: dict,
-        protocol_type: str,
-        entry: OpenEPaperLinkConfigEntry,
+            self,
+            hass: HomeAssistant,
+            mac_address: str,
+            name: str,
+            device_metadata: dict,
+            protocol_type: str,
+            entry: OpenEPaperLinkConfigEntry,
     ) -> None:
         """Initialize the BLE light entity."""
+        super().__init__(mac_address, name, entry)
         self._hass = hass
-        self._mac_address = mac_address
-        self._name = name
         self._device_metadata = device_metadata
-        self._entry = entry
-        self._entry_id = entry.entry_id
         self._is_on = False
-        self._available = True
         self._auto_off_task = None
-
-        # Get protocol handler for service UUID
         self._protocol = get_protocol_by_name(protocol_type)
         self._service_uuid = self._protocol.service_uuid
-
-        # Set translation key for proper localization
-        self._attr_has_entity_name = True
         self._attr_translation_key = "led"
-
-    @property
-    def device_info(self):
-        """Return device info - dynamically reads from current metadata."""
-        # Get current metadata from hass.data (may have been updated by RefreshConfigButton)
-        from .ble import BLEDeviceMetadata
-
-        current_metadata = self._entry.runtime_data.device_metadata
-        metadata = BLEDeviceMetadata(current_metadata)
-
-        return {
-            "identifiers": {(DOMAIN, f"ble_{self._mac_address}")},
-            "name": self._name,
-            "manufacturer": "OpenEPaperLink",
-            "model": metadata.model_name,
-            "sw_version": metadata.formatted_fw_version(),
-            "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
-        }
 
     @property
     def unique_id(self) -> str:
         """Return unique ID for this entity."""
         return f"oepl_ble_{self._mac_address}_light"
 
-
     @property
     def is_on(self) -> bool:
-        """Return true if light is on."""
+        """Return true if the light is on."""
         return self._is_on
-
-    @property
-    def available(self) -> bool:
-        """Return true if light is available."""
-        return bluetooth.async_address_present(self.hass, self._mac_address)
 
     @property
     def supported_color_modes(self) -> set[ColorMode]:
@@ -136,7 +102,7 @@ class OpenEPaperLinkBLELight(LightEntity):
     @property
     def supported_features(self) -> LightEntityFeature:
         """Return supported features."""
-        return LightEntityFeature(0)  # Basic on/off only
+        return LightEntityFeature(0)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the light on."""
@@ -145,12 +111,8 @@ class OpenEPaperLinkBLELight(LightEntity):
             if success:
                 self._is_on = True
                 self.async_write_ha_state()
-
-                # Cancel any existing auto-off timer
                 if self._auto_off_task and not self._auto_off_task.done():
                     self._auto_off_task.cancel()
-
-                # Start auto-off timer since LED turns off when BLE connection closes
                 self._auto_off_task = asyncio.create_task(self._auto_off_timer())
             else:
                 self.async_write_ha_state()
@@ -162,10 +124,8 @@ class OpenEPaperLinkBLELight(LightEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the light off."""
         try:
-            # Cancel auto-off timer since manual turn-off is requested
             if self._auto_off_task and not self._auto_off_task.done():
                 self._auto_off_task.cancel()
-
             success = await turn_led_off(self.hass, self._mac_address, self._service_uuid, self._protocol)
             if success:
                 self._is_on = False
@@ -179,25 +139,17 @@ class OpenEPaperLinkBLELight(LightEntity):
 
     async def async_update(self) -> None:
         """Update the light state."""
-        # For BLE lights, state is not actively polled since LED status cannot be read
-        # State is maintained based on last successful command
-        # Availability is updated during command execution
         pass
 
     async def _auto_off_timer(self) -> None:
         """Auto-off timer that turns LED off after BLE connection closes."""
         try:
-            # Wait for BLE connection to close and LED to physically turn off
-            await asyncio.sleep(8)  # Allow time for connection to close
-            
-            # Update UI state to reflect that LED is now off
-            if self._is_on:  # Only update if still showing as on
+            await asyncio.sleep(8)
+            if self._is_on:
                 self._is_on = False
                 self.async_write_ha_state()
                 _LOGGER.debug("LED auto-turned off for %s after connection closed", self._mac_address)
-                
         except asyncio.CancelledError:
-            # Timer was cancelled (manual turn off or new turn on)
             _LOGGER.debug("Auto-off timer cancelled for %s", self._mac_address)
         except Exception as e:
             _LOGGER.error("Error in auto-off timer for %s: %s", self._mac_address, e)

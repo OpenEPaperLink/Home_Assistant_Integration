@@ -7,6 +7,7 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from .entity import OpenEPaperLinkAPEntity
 from .runtime_data import OpenEPaperLinkConfigEntry
 from .util import set_ap_config_item
 
@@ -324,7 +325,7 @@ Some common settings include:
 """
 
 
-class APConfigSelect(SelectEntity):
+class APConfigSelect(OpenEPaperLinkAPEntity, SelectEntity):
     """Base select entity for AP configuration.
 
     Provides a dropdown selection entity that controls a specific
@@ -334,6 +335,8 @@ class APConfigSelect(SelectEntity):
     to the AP via HTTP and the local state is updated. The entity
     also responds to configuration changes from other sources.
     """
+
+    _attr_entity_registry_enabled_default = True
 
     def __init__(self, hub, key: str, name: str, icon: str, mapping: OptionMapping) -> None:
         """Initialize the select entity.
@@ -347,10 +350,8 @@ class APConfigSelect(SelectEntity):
             icon: Material Design Icons identifier
             mapping: OptionMapping for value/option conversion
         """
-        self._hub = hub
+        super().__init__(hub)
         self._key = key
-        # self._attr_name = f"AP {name}"
-        self._attr_has_entity_name = True
         self._attr_translation_key = key
         self._attr_unique_id = f"{hub.entry.entry_id}_{key}"
         self._attr_icon = icon
@@ -358,23 +359,6 @@ class APConfigSelect(SelectEntity):
         self._mapping = mapping
         self._attr_options = mapping.options
         self._available = False
-
-    @property
-    def device_info(self):
-        """Return device info for the AP.
-
-        Associates this select entity with the AP device in Home Assistant
-        using the domain and "ap" as the identifier.
-
-        Returns:
-            dict: Device information dictionary
-        """
-        return {
-            "identifiers": {(DOMAIN, "ap")},
-            "name": "OpenEPaperLink AP",
-            "model": self._hub.ap_model,
-            "manufacturer": "OpenEPaperLink",
-        }
 
     @property
     def available(self) -> bool:
@@ -420,44 +404,14 @@ class APConfigSelect(SelectEntity):
         if value is not None:
             await set_ap_config_item(self._hub, self._key, value)
 
-    @callback
-    def _handle_ap_config_update(self):
-        """Handle updated AP configuration.
-
-        Called when the AP configuration changes. Updates the entity state
-        to reflect the new value from the AP.
-        """
-        self.async_write_ha_state()
-
-    @callback
-    def _handle_connection_status(self, is_online: bool):
-        """Handle connection status updates.
-
-        Updates the entity's availability state when the AP connection
-        status changes.
-
-        Args:
-            is_online: Boolean indicating if the AP is online
-        """
-        self.async_write_ha_state()
-
     async def async_added_to_hass(self):
         """Register callbacks."""
-        # Listen for AP config updates
+        await super().async_added_to_hass()
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
                 f"{DOMAIN}_ap_config_update",
-                self._handle_ap_config_update,
-            )
-        )
-
-        # Listen for connection status updates
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                f"{DOMAIN}_connection_status",
-                self._handle_connection_status,
+                self._handle_update,
             )
         )
 
@@ -492,7 +446,8 @@ class APTimeHourSelect(APConfigSelect):
         super().__init__(hub, key, name, icon, time_mapping)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry,
+                            async_add_entities: AddEntitiesCallback) -> None:
     """Set up select entities for AP configuration.
 
     Creates select entities for all defined AP configuration options

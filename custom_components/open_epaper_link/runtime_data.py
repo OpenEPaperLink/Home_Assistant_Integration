@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.config_entries import ConfigEntry
 
 if TYPE_CHECKING:
-    from .hub import Hub
+    from .coordinator import Hub
 
 @dataclass
 class OpenEPaperLinkBLERuntimeData:
