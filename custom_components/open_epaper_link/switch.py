@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
@@ -78,6 +78,7 @@ class APConfigSwitch(OpenEPaperLinkAPEntity, SwitchEntity):
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_translation_key = key
         self._description = description
+        self._attr_device_class = SwitchDeviceClass.SWITCH
 
     @property
     def available(self) -> bool:
