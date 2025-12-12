@@ -21,7 +21,7 @@
 - [x] `unique-config-entry` - Don't allow the same device or service to be able to be set up twice
 
 ## Silver
-- [ ] `action-exceptions` - Service actions raise exceptions when encountering failures
+- [x] `action-exceptions` - Service actions raise exceptions when encountering failures
 - [x] `config-entry-unloading` - Support config entry unloading
 - [ ] `docs-configuration-parameters` - The documentation describes all integration configuration options
 - [ ] `docs-installation-parameters` - The documentation describes all integration installation parameters

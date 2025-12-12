@@ -7,10 +7,11 @@ from typing import Final, Any, Callable
 import requests
 
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import  ServiceValidationError
+from homeassistant.exceptions import ServiceValidationError, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from . import BLEDeviceMetadata
+from .ble import BLEConnectionError, BLETimeoutError, BLEProtocolError
 from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
 from .imagegen import ImageGen
 from .tag_types import get_tag_types_manager
@@ -112,7 +113,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         async def wrapper(service: ServiceCall, *args, **kwargs) -> None:
             hub = get_hub_from_hass(hass)
             if not hub.online:
-                raise ServiceValidationError(
+                raise HomeAssistantError(
                     "OpenEPaperLink AP is offline. Please check your network connection and AP status."
                 )
             return await func(service, *args, **kwargs)
@@ -168,9 +169,22 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     _LOGGER.error(error_msg)
                     errors.append(error_msg)
 
-            # If all devices failed, raise a combined error
-            if errors and len(errors) == len(unique_device_ids):
-                raise ServiceValidationError("\n".join(errors))
+                # Wait for all queued uploads to complete
+                # This is async/await so it doesn't block the HA event loop
+                try:
+                    ble_errors = await ble_upload_queue.wait_for_current_batch()
+                    hub_errors = await hub_upload_queue.wait_for_current_batch()
+                    errors.extend(ble_errors)
+                    errors.extend(hub_errors)
+                except (ServiceValidationError, HomeAssistantError) as err:
+                    # Upload errors - add to error collection
+                    error_msg = f"Upload error: {err}"
+                    _LOGGER.error(error_msg)
+                    errors.append(error_msg)
+
+                    # If ANY errors occurred, raise them
+                if errors:
+                    raise ServiceValidationError("\n".join(errors))
 
         return wrapper
 
@@ -203,7 +217,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             if not is_ble:
                 hub = get_hub_from_hass(hass)
                 if not hub.online:
-                    raise ServiceValidationError(
+                    raise HomeAssistantError(
                         "OpenEPaperLink AP is offline. Please check your network connection and AP status."
                     )
 
@@ -278,26 +292,36 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 )
 
         except ServiceValidationError:
-            raise
+            raise  # User input errors - propagate unchanged
+        except (HomeAssistantError, BLEConnectionError, BLETimeoutError, BLEProtocolError):
+            raise  # Operational errors - propagate unchanged
         except Exception as err:
-            raise ServiceValidationError(f"Error processing device {entity_id}: {str(err)}") from err
+            # Unexpected errors - wrap as operational error
+            raise HomeAssistantError(
+                f"Unexpected error processing device {entity_id}: {str(err)}"
+            ) from err
+
 
 
     @require_hub_online
     @handle_targets
     async def setled_service(service: ServiceCall, entity_id: str) -> None:
-        """Handle LED pattern service calls."""
         hub = get_hub_from_hass(hass)
         mac = get_mac_from_entity_id(entity_id)
         pattern = _build_led_pattern(service.data)
 
         url = f"http://{hub.host}/led_flash?mac={mac}&pattern={pattern}"
-        result = await hass.async_add_executor_job(requests.get, url)
 
-        if result.status_code != 200:
-            raise ServiceValidationError(
-                f"LED pattern update failed with status code: {result.status_code}"
-            )
+        try:
+            result = await hass.async_add_executor_job(requests.get, url)
+            if result.status_code != 200:
+                raise HomeAssistantError(
+                    f"LED pattern update failed with status code: {result.status_code}"
+                )
+        except requests.exceptions.RequestException as err:
+            raise HomeAssistantError(
+                f"Network error updating LED pattern: {str(err)}"
+            ) from err
 
     @require_hub_online
     @handle_targets
@@ -329,30 +353,23 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         await reboot_ap(hass)
 
     async def refresh_tag_types_service(service: ServiceCall) -> None:
-        """Handle tag type refresh service calls.
-
-        Forces a refresh of tag type definitions from the GitHub repository,
-        updating the local cache with the latest hardware support information.
-
-        Creates a persistent notification when complete to inform the user.
-
-        Args:
-            service: Service call object with target devices
-        """
+        """Force refresh tag types from GitHub."""
         manager = await get_tag_types_manager(hass)
-        manager._last_update = None  # Force refresh
+        manager._last_update = None  # Force refresh by invalidating cache
+
+        # Let exceptions propagate - ensure_types_loaded will raise HomeAssistantError if it fails
         await manager.ensure_types_loaded()
 
         tag_types_len = len(manager.get_all_types())
-        message = f"Successfully refreshed {tag_types_len} tag types from GitHub"
+        message = f"Successfully refreshed {tag_types_len} tag type definitions from GitHub"
 
         await hass.services.async_call(
             "persistent_notification",
             "create",
             {
-                "title": "Tag Types Refreshed",
+                "title": "Tag Types Refresh",
                 "message": message,
-                "notification_id": "tag_types_refresh_notification",
+                "notification_id": "oepl_tag_types_refresh",
             },
         )
 

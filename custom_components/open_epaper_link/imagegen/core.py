@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any
 
 from PIL import Image
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from ..const import DOMAIN
 from ..tag_types import TagType, get_tag_types_manager
@@ -116,7 +116,7 @@ class ImageGen:
             try:
                 tag_mac = entity_id.split(".")[1].upper()
             except IndexError:
-                raise HomeAssistantError(f"Invalid entity ID format: {entity_id}")
+                raise ServiceValidationError(f"Invalid entity ID format: {entity_id}")
 
             # First check if tag is known to the hub
             if tag_mac not in hub.tags:
@@ -195,7 +195,7 @@ class ImageGen:
             try:
                 tag_mac = entity_id.split(".")[1].upper()
             except IndexError:
-                raise HomeAssistantError(f"Invalid entity ID format: {entity_id}")
+                raise ServiceValidationError(f"Invalid entity ID format: {entity_id}")
 
             # Get device metadata from config entry runtime_data
             device_metadata = None

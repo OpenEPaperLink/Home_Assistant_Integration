@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, Optional, Tuple
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import storage
 
 _LOGGER = logging.getLogger(__name__)
@@ -278,20 +279,36 @@ class TagTypesManager:
     async def ensure_types_loaded(self) -> None:
         """Ensure tag types are loaded and not too old.
 
-        Checks if tag types are already loaded and sufficiently recent.
+        Checks if tag types are already loaded and recent enough.
         If not loaded or older than CACHE_DURATION, initiates a refresh from GitHub.
 
         This is the primary method that should be called before accessing
         tag type information to ensure data availability.
+
+        Raises:
+            HomeAssistantError: If tag types could not be loaded
         """
         async with self._lock:
-            _LOGGER.debug(f"Last update: {self._last_update}, {datetime.now()}")
             if not self._tag_types:
                 await self.load_stored_data()
 
-            elif (not self._last_update or
-                  datetime.now() - self._last_update > CACHE_DURATION):
-                await self._fetch_tag_types()
+            # If still no types after loading from storage, this is a critical failure
+            if not self._tag_types:
+                raise HomeAssistantError(
+                    "Failed to load tag type definitions. No stored data available. "
+                    "Check network connectivity or GitHub access."
+                )
+
+            # If the cache is expired, attempt refresh
+            if not self._last_update or datetime.now() - self._last_update > CACHE_DURATION:
+                _LOGGER.debug("Tag types cache expired, attempting refresh")
+                fetch_success = await self._fetch_tag_types()
+
+                # If refresh failed and have no valid types, raise an exception
+                if not fetch_success and not self._tag_types:
+                    raise HomeAssistantError(
+                        "Failed to refresh tag type definitions. Check network connectivity or GitHub access."
+                    )
 
     async def _fetch_tag_types(self) -> bool:
         """Fetch tag type definitions from GitHub.
@@ -371,11 +388,9 @@ class TagTypesManager:
 
         except Exception as e:
             _LOGGER.error(f"Error fetching tag types: {str(e)}")
+            return False
 
-        if not self._tag_types:
-            # Load built-in fallback for first-time failures
-            self._load_fallback_types()
-            await self._save_to_store()
+        # Do NOT load fallback types - let caller decide how to handle failure
         return False
 
     def _validate_tag_definition(self, data: Dict) -> bool:

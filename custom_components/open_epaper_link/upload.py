@@ -12,11 +12,12 @@ from requests_toolbelt import MultipartEncoder
 from PIL import Image
 
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import ServiceValidationError, HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from .runtime_data import OpenEPaperLinkBLERuntimeData
 from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
-from .ble import BLEConnection, BLEImageUploader, BLEDeviceMetadata, get_protocol_by_name
+from .ble import BLEConnection, BLEImageUploader, BLEDeviceMetadata, get_protocol_by_name, BLEConnectionError, \
+    BLETimeoutError, BLEProtocolError
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -51,12 +52,14 @@ class UploadQueueHandler:
             cooldown: Cooldown period in seconds between uploads (default: 1.0)
         """
         self._queue = asyncio.Queue()
-        self._processing = False
         self._max_concurrent = max_concurrent
         self._cooldown = cooldown
         self._active_uploads = 0
         self._last_upload = None
         self._lock = asyncio.Lock()
+        self._processing = False
+        self._processor_task = None  # Track the processor task
+        self._errors = []  # Collect errors from failed uploads
 
     def __str__(self):
         """Return queue status string."""
@@ -77,13 +80,34 @@ class UploadQueueHandler:
         entity_id = next((arg for arg in args if isinstance(arg, str) and "." in arg), "unknown")
 
         _LOGGER.debug("Adding upload task to queue for %s. %s", entity_id, self)
-        # Add task to queue
+        # Add a task to the queue
         await self._queue.put((upload_func, args, kwargs))
 
-        # Start processing queue if not already running
+        # Start the processing queue if not already running
         if not self._processing:
             _LOGGER.debug("Starting upload queue processor for %s", entity_id)
-            asyncio.create_task(self._process_queue())
+            self._processor_task = asyncio.create_task(self._process_queue())
+
+    async def wait_for_current_batch(self):
+        """Wait for all currently queued uploads to complete.
+
+        This allows service handlers to wait for uploads without blocking
+        the Home Assistant event loop (uses async/await).
+
+        Returns:
+            list: List of exception messages from failed uploads (empty if all succeeded)
+        """
+        if self._processor_task and not self._processor_task.done():
+            _LOGGER.debug("Waiting for upload queue to complete")
+            await self._processor_task
+
+        # Retrieve any errors that were collected during processing
+        if self._errors:
+            errors = self._errors.copy()
+            self._errors = []  # Clear for next batch
+            return errors
+
+        return []  # No errors
 
     async def _process_queue(self):
         """Process queued upload tasks with true parallelism.
@@ -109,11 +133,22 @@ class UploadQueueHandler:
                     done_tasks = {task for task in running_tasks if task.done()}
                     for task in done_tasks:
                         running_tasks.remove(task)
-                        # Get the result to handle any exceptions
+                        # Get the result to propagate any exceptions
                         try:
                             await task
-                        except Exception as err:
+                        except (ServiceValidationError, HomeAssistantError) as err:
+                            # Collect validation and operational errors
                             _LOGGER.error("Background upload task failed: %s", str(err))
+                            # Don't raise - collect error and continue processing other uploads
+                            if not hasattr(self, '_errors'):
+                                self._errors = []
+                            self._errors.append(str(err))
+                        except Exception as err:
+                            # Unexpected errors - collect and continue
+                            _LOGGER.error("Unexpected background upload error: %s", str(err), exc_info=True)
+                            if not hasattr(self, '_errors'):
+                                self._errors = []
+                            self._errors.append(f"Unexpected upload error: {str(err)}")
 
                 # Check if new uploads can be started
                 async with self._lock:
@@ -144,29 +179,29 @@ class UploadQueueHandler:
                         await asyncio.sleep(0.1)
 
         finally:
-            # Wait for all running tasks to complete
-            if running_tasks:
-                await asyncio.gather(*running_tasks, return_exceptions=True)
             self._processing = False
+            _LOGGER.debug("Upload queue processor finished. %s", self)
+            # Errors are stored in self._errors and will be retrieved by wait_for_current_batch()
+            # Don't raise here - let the caller handle them
 
     async def _execute_upload(self, upload_func, args, kwargs, entity_id):
         """Execute a single upload task in the background."""
         try:
-            # Increment active uploads counter
-            async with self._lock:
-                self._active_uploads += 1
-            _LOGGER.debug("Starting upload for %s. %s", entity_id, self)
-
-            # Perform upload
-            _LOGGER.debug("Starting queued upload task")
-            start_time = datetime.now()
+            # TODO don't we need the incrementation logic here?
+            _LOGGER.debug("Starting upload for %s", entity_id)
             await upload_func(*args, **kwargs)
-            duration = (datetime.now() - start_time).total_seconds()
+            _LOGGER.info("Successfully completed upload for %s", entity_id)
 
-            _LOGGER.debug("Upload completed for %s in %.1f seconds", entity_id, duration)
-
+        except (ServiceValidationError, HomeAssistantError) as err:
+            # Log and re-raise - let service handler collect errors
+            _LOGGER.error("Upload failed for %s: %s", entity_id, str(err))
+            raise
         except Exception as err:
-            _LOGGER.error("Error processing queued upload for %s: %s", entity_id, str(err))
+            # Unexpected error - wrap and raise
+            _LOGGER.error("Unexpected error uploading to %s: %s", entity_id, err, exc_info=True)
+            raise HomeAssistantError(
+                f"Unexpected upload error for {entity_id}: {str(err)}"
+            ) from err
         finally:
             # Decrement active upload counter
             async with self._lock:
@@ -240,7 +275,7 @@ async def upload_to_hub(hub, entity_id: str, img: bytes, dither: int, ttl: int,
                 )
 
             if response.status_code != 200:
-                raise ServiceValidationError(
+                raise HomeAssistantError(
                     f"Image upload failed for {entity_id} with status code: {response.status_code}"
                 )
             break
@@ -252,11 +287,21 @@ async def upload_to_hub(hub, entity_id: str, img: bytes, dither: int, ttl: int,
                     entity_id, attempt, MAX_RETRIES, backoff_delay
                 )
                 await asyncio.sleep(backoff_delay)
-                backoff_delay *= 2  # exponential back-off
+                backoff_delay *= 2
                 continue
-            raise ServiceValidationError(f"Image upload timed out for {entity_id}")
+            raise HomeAssistantError(
+                f"Image upload timed out for {entity_id} after {MAX_RETRIES} attempts"
+            )
+
+        except requests.exceptions.RequestException as err:
+            raise HomeAssistantError(
+                f"Network error uploading image for {entity_id}: {str(err)}"
+            ) from err
+
         except Exception as err:
-            raise ServiceValidationError(f"Failed to upload image for {entity_id}: {str(err)}")
+            raise HomeAssistantError(
+                f"Failed to upload image for {entity_id}: {str(err)}"
+            ) from err
 
 
 async def upload_to_ble_block(hass: HomeAssistant, entity_id: str, img: bytes, dither: int = 2) -> None:
@@ -312,7 +357,7 @@ async def upload_to_ble_block(hass: HomeAssistant, entity_id: str, img: bytes, d
             success, processed_image = await uploader.upload_image_block_based(img, metadata, protocol_type, dither)
 
             if not success:
-                raise ServiceValidationError(f"BLE image upload failed for {entity_id}")
+                raise HomeAssistantError(f"BLE image upload failed for {entity_id}")
 
             if processed_image is not None:
                 # Undo rotation for display (ATC rotation is for device memory, not viewing)
@@ -329,9 +374,16 @@ async def upload_to_ble_block(hass: HomeAssistant, entity_id: str, img: bytes, d
                     jpeg_bytes
                 )
 
+    except ServiceValidationError:
+        raise  # Config/validation errors - propagate unchanged
+    except (BLEConnectionError, BLETimeoutError, BLEProtocolError) as err:
+        # BLE-specific errors already inherit from HomeAssistantError
+        raise  # Propagate with specific type
     except Exception as err:
         _LOGGER.error("BLE upload error for %s: %s", entity_id, err)
-        raise ServiceValidationError(f"Failed to upload image via BLE to {entity_id}: {str(err)}") from err
+        raise HomeAssistantError(
+            f"Unexpected error during BLE upload to {entity_id}: {str(err)}"
+        ) from err
 
 
 async def upload_to_ble_direct(
@@ -395,7 +447,7 @@ async def upload_to_ble_direct(
             success, processed_image = await uploader.upload_direct_write(img, metadata, compressed, dither)
 
             if not success:
-                raise ServiceValidationError(f"BLE direct write upload failed for {entity_id}")
+                raise HomeAssistantError(f"BLE direct write upload failed for {entity_id}")
 
             if processed_image is not None:
                 buffer = BytesIO()
@@ -407,10 +459,14 @@ async def upload_to_ble_direct(
                     jpeg_bytes
                 )
 
+    except ServiceValidationError:
+        raise  # Config/validation errors - propagate unchanged
+    except (BLEConnectionError, BLETimeoutError, BLEProtocolError) as err:
+        raise  # BLE operational errors - propagate unchanged
     except Exception as err:
         _LOGGER.error("BLE direct write error for %s: %s", entity_id, err)
-        raise ServiceValidationError(
-            f"Failed to upload image via BLE direct write to {entity_id}: {str(err)}"
+        raise HomeAssistantError(
+            f"Unexpected error during BLE direct write to {entity_id}: {str(err)}"
         ) from err
 
 

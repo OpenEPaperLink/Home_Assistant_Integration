@@ -4,6 +4,7 @@ import requests
 
 from homeassistant.components.text import TextEntity, TextMode
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -146,9 +147,41 @@ class TagNameText(OpenEPaperLinkTagEntity, TextEntity):
                     lambda: requests.post(url, data=data)
                 )
                 if result.status_code != 200:
-                    _LOGGER.error("Failed to update tag name %s: HTTP %s", self._tag_mac, result.status_code)
+                    _LOGGER.error(
+                        "Failed to update tag name %s: HTTP %s - %s",
+                        self._tag_mac,
+                        result.status_code,
+                        result.text
+                    )
+                    raise HomeAssistantError(
+                        f"Failed to update tag alias for {self._tag_mac}: "
+                        f"AP returned HTTP {result.status_code} - {result.text}"
+                    )
+            except requests.exceptions.Timeout:
+                _LOGGER.error("Timeout updating tag name for %s", self._tag_mac)
+                raise HomeAssistantError(
+                    f"Timeout updating tag alias for {self._tag_mac}. "
+                    "Please check network connectivity to the AP."
+                ) from None
+            except requests.exceptions.RequestException as err:
+                _LOGGER.error(
+                    "Network error updating tag name for %s: %s",
+                    self._tag_mac,
+                    str(err)
+                )
+                raise HomeAssistantError(
+                    f"Network error updating tag alias for {self._tag_mac}: {str(err)}"
+                ) from err
             except Exception as err:
-                _LOGGER.error("Error updating tag name for %s: %s", self._tag_mac, str(err))
+                # Catch any other unexpected errors and wrap them
+                _LOGGER.error(
+                    "Unexpected error updating tag name for %s: %s",
+                    self._tag_mac,
+                    str(err)
+                )
+                raise HomeAssistantError(
+                    f"Unexpected error updating tag alias for {self._tag_mac}: {str(err)}"
+                ) from err
 
 async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up text entities for AP configuration and tag names.
