@@ -243,55 +243,46 @@ SELECT_ENTITIES = [
     {
         "key": "channel",
         "name": "IEEE 802.15.4 channel",
-        "icon": "mdi:wifi",
         "mapping": CHANNEL_MAPPING,
     },
     {
         "key": "led",
         "name": "RGB LED brightness",
-        "icon": "mdi:brightness-5",
         "mapping": BRIGHTNESS_MAPPING,
     },
     {
         "key": "tft",
         "name": "TFT brightness",
-        "icon": "mdi:brightness-5",
         "mapping": TFT_BRIGHTNESS_MAPPING,
     },
     {
         "key": "maxsleep",
         "name": "Maximum Sleep",
-        "icon": "mdi:sleep",
         "mapping": MAX_SLEEP_MAPPING,
     },
     {
         "key": "lock",
         "name": "Lock tag inventory",
-        "icon": "mdi:lock",
         "mapping": LOCK_INVENTORY_MAPPING,
     },
     {
         "key": "wifipower",
         "name": "Wifi power",
-        "icon": "mdi:wifi-strength-4",
         "mapping": WIFI_POWER_MAPPING,
     },
     {
         "key": "language",
         "name": "Language",
-        "icon": "mdi:translate",
         "mapping": LANGUAGE_MAPPING,
     },
     {
         "key": "discovery",
         "name": "Discovery Method",
-        "icon": "mdi:access-point-network",
         "mapping": DISCOVERY_MAPPING
     },
     {
         "key": "subghzchannel",
         "name": "Sub-GHz channel",
-        "icon": "mdi:antenna",
         "mapping": SUB_GHZ_MAPPING
     }
 ]
@@ -338,7 +329,7 @@ class APConfigSelect(OpenEPaperLinkAPEntity, SelectEntity):
 
     _attr_entity_registry_enabled_default = True
 
-    def __init__(self, hub, key: str, name: str, icon: str, mapping: OptionMapping) -> None:
+    def __init__(self, hub, key: str, name: str, mapping: OptionMapping) -> None:
         """Initialize the select entity.
 
         Sets up the select entity with appropriate name, icon, and options.
@@ -347,14 +338,12 @@ class APConfigSelect(OpenEPaperLinkAPEntity, SelectEntity):
             hub: Hub instance for AP communication
             key: Configuration key on the AP
             name: Human-readable name for the UI
-            icon: Material Design Icons identifier
             mapping: OptionMapping for value/option conversion
         """
         super().__init__(hub)
         self._key = key
         self._attr_translation_key = key
         self._attr_unique_id = f"{hub.entry.entry_id}_{key}"
-        self._attr_icon = icon
         self._attr_entity_category = EntityCategory.CONFIG
         self._mapping = mapping
         self._attr_options = mapping.options
@@ -427,7 +416,7 @@ class APTimeHourSelect(APConfigSelect):
     periods when tag updates are disabled.
     """
 
-    def __init__(self, hub, key: str, name: str, icon: str) -> None:
+    def __init__(self, hub, key: str, name: str) -> None:
         """Initialize time select entity.
 
         Creates a specialized select entity for time selection with
@@ -437,13 +426,12 @@ class APTimeHourSelect(APConfigSelect):
             hub: Hub instance for AP communication
             key: Configuration key on the AP
             name: Human-readable name for the UI
-            icon: Material Design Icons identifier
         """
         # Create 24-hour time mapping
         time_mapping = OptionMapping({
             i: f"{i:02d}:00" for i in range(24)
         })
-        super().__init__(hub, key, name, icon, time_mapping)
+        super().__init__(hub, key, name, time_mapping)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry,
@@ -475,14 +463,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
             hub,
             config["key"],
             config["name"],
-            config["icon"],
             config["mapping"]
         ))
 
     # Add time select entities
     entities.extend([
-        APTimeHourSelect(hub, "sleeptime1", "No updates between 1 (from)", "mdi:sleep"),
-        APTimeHourSelect(hub, "sleeptime2", "No updates between 2 (to)", "mdi:sleep"),
+        APTimeHourSelect(hub, "sleeptime1", "No updates between 1 (from)"),
+        APTimeHourSelect(hub, "sleeptime2", "No updates between 2 (to)"),
     ])
 
     async_add_entities(entities)

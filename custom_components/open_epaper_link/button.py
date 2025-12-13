@@ -281,48 +281,46 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
         )
     )
 
+
 @dataclass(frozen=True, kw_only=True)
 class OpenEPaperLinkTagButtonDescription(ButtonEntityDescription):
     """Describes an OpenEPaperLink tag button."""
     command: str
 
+
 TAG_BUTTON_TYPES: tuple[OpenEPaperLinkTagButtonDescription, ...] = (
     OpenEPaperLinkTagButtonDescription(
         key="clear_pending",
         translation_key="clear_pending",
-        icon="mdi:broom",
         entity_category=EntityCategory.DIAGNOSTIC,
         command="clear",
     ),
     OpenEPaperLinkTagButtonDescription(
         key="force_refresh",
         translation_key="force_refresh",
-        icon="mdi:refresh",
         entity_category=EntityCategory.DIAGNOSTIC,
         command="refresh",
     ),
     OpenEPaperLinkTagButtonDescription(
         key="reboot_tag",
         translation_key="reboot_tag",
-        icon="mdi:restart",
         entity_category=EntityCategory.DIAGNOSTIC,
         command="reboot",
     ),
     OpenEPaperLinkTagButtonDescription(
         key="scan_channels",
         translation_key="scan_channels",
-        icon="mdi:wifi",
         entity_category=EntityCategory.DIAGNOSTIC,
         command="scan",
     ),
     OpenEPaperLinkTagButtonDescription(
         key="deep_sleep",
         translation_key="deep_sleep",
-        icon="mdi:sleep",
         entity_category=EntityCategory.DIAGNOSTIC,
         command="deepsleep",
     ),
 )
+
 
 class OpenEPaperLinkTagButton(OpenEPaperLinkTagEntity, ButtonEntity):
     """Generic tag button entity."""
@@ -354,7 +352,6 @@ class RebootAPButton(OpenEPaperLinkAPEntity, ButtonEntity):
         self.hass = hass
         self._attr_translation_key = "reboot_ap"
         self._attr_unique_id = "reboot_ap"
-        self._attr_icon = "mdi:restart"
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -371,7 +368,6 @@ class RefreshTagTypesButton(OpenEPaperLinkAPEntity, ButtonEntity):
         self._attr_translation_key = "refresh_tag_types"
         self._attr_unique_id = "refresh_tag_types"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        self._attr_icon = "mdi:refresh"
 
     async def async_press(self) -> None:
         """Handle the button press.
@@ -419,7 +415,7 @@ class RefreshConfigButton(OpenEPaperLinkBLEEntity, ButtonEntity):
                  device_metadata: dict,
                  protocol_type: str,
                  entry: OpenEPaperLinkConfigEntry
-    ) -> None:
+                 ) -> None:
         """Initialize the button entity.
 
         Args:
@@ -436,13 +432,11 @@ class RefreshConfigButton(OpenEPaperLinkBLEEntity, ButtonEntity):
         self._protocol_type = protocol_type
         self._attr_translation_key = "refresh_config"
         self._attr_unique_id = f"ble_{mac_address}_refresh_config"
-        self._attr_icon = "mdi:refresh"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
         # Get protocol handler for service UUID
         self._protocol = get_protocol_by_name(protocol_type)
         self._service_uuid = self._protocol.service_uuid
-
 
     async def async_press(self) -> None:
         """Re-interrogate device and update configuration."""

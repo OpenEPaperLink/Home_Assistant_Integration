@@ -23,13 +23,11 @@ AP_TEXT_ENTITIES = [
     {
         "key": "alias",
         "name": "Alias",
-        "icon": "mdi:rename-box",
         "description": "AP display name"
     },
     {
         "key": "repo",
         "name": "Repository",
-        "icon": "mdi:source-repository",
         "description": "GitHub repository for tag type definitions"
     }
 ]
@@ -47,7 +45,6 @@ TAG_TEXT_ENTITIES = [
     {
         "key": "alias",
         "name": "Alias",
-        "icon": "mdi:rename-box",
         "description": "Tag display name"
     }
 ]
@@ -63,12 +60,11 @@ class APConfigText(OpenEPaperLinkAPEntity, TextEntity):
 
     _attr_entity_registry_enabled_default = True
 
-    def __init__(self, hub, key: str, name: str, icon: str, description: str) -> None:
+    def __init__(self, hub, key: str, name: str,description: str) -> None:
         """Initialize the text entity."""
         super().__init__(hub)
         self._key = key
         self._attr_unique_id = f"{hub.entry.entry_id}_{key}"
-        self._attr_icon = icon
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_translation_key = key
         self._attr_native_max = 32
@@ -117,7 +113,6 @@ class TagNameText(OpenEPaperLinkTagEntity, TextEntity):
         self._attr_translation_key = "tag_alias"
         self._attr_native_min = 0
         self._attr_mode = TextMode.TEXT
-        self._attr_icon = "mdi:rename"
 
     @property
     def available(self) -> bool:
@@ -215,7 +210,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
                 hub,
                 config["key"],
                 config["name"],
-                config["icon"],
                 config["description"]
             )
         )

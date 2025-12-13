@@ -72,7 +72,6 @@ class OpenEPaperLinkSensorEntityDescription(SensorEntityDescription):
     entity_registry_enabled_default: bool = True
     value_fn: Callable[[dict], Any]
     attr_fn: Callable[[dict], Any] = None
-    icon: str
 
 
 AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
@@ -80,20 +79,17 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         key="ip",
         name="IP Address",
         value_fn=lambda data: data.get("ip"),
-        icon="mdi:ip",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="wifi_ssid",
         name="WiFi SSID",
         value_fn=lambda data: data.get("wifi_ssid"),
-        icon="mdi:wifi-settings",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="record_count",
         name="Tag count",
         state_class=SensorStateClass.TOTAL,
         value_fn=lambda data: data.get("record_count"),
-        icon="mdi:tag-multiple",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="db_size",
@@ -105,7 +101,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         suggested_display_precision=3,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: int(data.get("db_size", 0)),
-        icon="mdi:database-settings",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="little_fs_free",
@@ -117,19 +112,16 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         suggested_display_precision=3,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: int(data.get("little_fs_free", 0)),
-        icon="mdi:database-outline",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="ap_state",
         name="State",
         value_fn=lambda data: data.get("ap_state"),
-        icon="mdi:access-point",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="run_state",
         name="Run State",
         value_fn=lambda data: data.get("run_state"),
-        icon="mdi:cog",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="wifi_rssi",
@@ -139,7 +131,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("rssi"),
-        icon="mdi:wifi-strength-4",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="heap",
@@ -151,7 +142,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         suggested_display_precision=3,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: int(data.get("heap", 0)),
-        icon="mdi:chip",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="sys_time",
@@ -160,7 +150,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda data: datetime.fromtimestamp(data.get("sys_time", 0), tz=timezone.utc),
-        icon="mdi:clock-outline",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="uptime",
@@ -170,14 +159,12 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.SECONDS,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("uptime"),
-        icon="mdi:timer",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="low_battery_tag_count",
         name="Low Battery Tags",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: data.get("low_battery_count"),
-        icon="mdi:battery-alert",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="timeout_tag_count",
@@ -185,7 +172,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=None,
         value_fn=lambda data: data.get("timeout_count"),
-        icon="mdi:tag-off",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="ps_ram_free",
@@ -197,7 +183,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         suggested_display_precision=3,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: int(data.get("ps_ram_free", 0)),
-        icon="mdi:memory",
     )
 )
 """Definitions for all AP-related sensor entities.
@@ -224,7 +209,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         value_fn=lambda data: data.get("temperature"),
-        icon="mdi:thermometer",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="battery_voltage",
@@ -234,7 +218,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.MILLIVOLT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("battery_mv"),
-        icon="mdi:battery",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="battery_percentage",
@@ -243,28 +226,24 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         value_fn=lambda data: _calculate_battery_percentage(data.get("battery_mv", 0)),
-        icon="mdi:battery",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="last_seen",
         name="Last Seen",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: datetime.fromtimestamp(data.get("last_seen", 0), tz=timezone.utc),
-        icon="mdi:history",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="next_update",
         name="Next Update",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: datetime.fromtimestamp(data.get("next_update", 0), tz=timezone.utc),
-        icon="mdi:update",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="next_checkin",
         name="Next Checkin",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: datetime.fromtimestamp(data.get("next_checkin", 0), tz=timezone.utc),
-        icon="mdi:clock-check",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="lqi",
@@ -272,7 +251,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("lqi"),
-        icon="mdi:signal-cellular-outline",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="rssi",
@@ -282,7 +260,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("rssi"),
-        icon="mdi:signal-distance-variant",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="pending_updates",
@@ -290,20 +267,17 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("pending"),
-        icon="mdi:sync-circle",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="content_mode",
         name="Content Mode",
         value_fn=lambda data: data.get("content_mode"),
-        icon="mdi:view-grid-outline",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="wakeup_reason",
         name="Wakeup Reason",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("wakeup_reason"),
-        icon="mdi:power",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="capabilities",
@@ -315,7 +289,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
             "binary_value": format(data.get("capabilities", 0), '08b'),
             "capabilities": get_capabilities(data.get("capabilities", 0))
         },
-        icon="mdi:list-box-outline",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="update_count",
@@ -323,7 +296,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("update_count"),
-        icon="mdi:counter",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="width",
@@ -331,7 +303,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("width"),
-        icon="mdi:arrow-expand-horizontal",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="height",
@@ -339,7 +310,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("height"),
-        icon="mdi:arrow-expand-vertical",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="runtime",
@@ -349,7 +319,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.SECONDS,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("runtime", 0),
-        icon="mdi:timer-outline",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="boot_count",
@@ -357,7 +326,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("boot_count", 0),
-        icon="mdi:restart",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="checkin_count",
@@ -365,7 +333,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("checkin_count", 0),
-        icon="mdi:clock-check",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="block_requests",
@@ -373,7 +340,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("block_requests", 0),
-        icon="mdi:transfer",
     ),
 
 )
@@ -387,7 +353,6 @@ BLE_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         value_fn=lambda data: data.get("temperature"),
-        icon="mdi:thermometer",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="battery_percentage",
@@ -396,7 +361,6 @@ BLE_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         value_fn=lambda data: data.get("battery_percentage"),
-        icon="mdi:battery",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="battery_voltage",
@@ -407,7 +371,6 @@ BLE_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda data: data.get("battery_voltage"),
-        icon="mdi:battery",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="rssi",
@@ -418,7 +381,6 @@ BLE_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda data: data.get("rssi"),
-        icon="mdi:signal-distance-variant",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="last_seen",
@@ -427,7 +389,6 @@ BLE_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda data: data.get("last_seen"),
-        icon="mdi:history",
     ),
 )
 """Definitions for all BLE tag-related sensor entities.
@@ -595,10 +556,6 @@ class OpenEPaperLinkBLESensor(OpenEPaperLinkBLEEntity, SensorEntity):
         """Return the entity category."""
         return self._description.entity_category
 
-    @property
-    def icon(self) -> str | None:
-        """Return the icon."""
-        return self._description.icon
 
     def update_from_advertising_data(self, data: dict) -> None:
         """Update sensor state from BLE advertising data."""

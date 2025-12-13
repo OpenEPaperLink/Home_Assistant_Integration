@@ -20,25 +20,21 @@ SWITCH_ENTITIES = [
     {
         "key": "preview",
         "name": "Preview Images",
-        "icon": "mdi:eye",
         "description": "Enable/disable preview images on the AP"
     },
     {
         "key": "ble",
         "name": "Bluetooth",
-        "icon": "mdi:bluetooth",
         "description": "Enable/disable Bluetooth"
     },
     {
         "key": "nightlyreboot",
         "name": "Nightly Reboot",
-        "icon": "mdi:restart",
         "description": "Enable/disable automatic nightly reboot of the AP"
     },
     {
         "key": "showtimestamp",
         "name": "Show Timestamp",
-        "icon": "mdi:clock",
         "description": "Enable/disable showing timestamps on ESLs"
     }
 ]
@@ -69,12 +65,11 @@ class APConfigSwitch(OpenEPaperLinkAPEntity, SwitchEntity):
 
     _attr_entity_registry_enabled_default = True
 
-    def __init__(self, hub, key: str, name: str, icon: str, description: str) -> None:
+    def __init__(self, hub, key: str, name: str, description: str) -> None:
         """Initialize the switch entity."""
         super().__init__(hub)
         self._key = key
         self._attr_unique_id = f"{hub.entry.entry_id}_{key}"
-        self._attr_icon = icon
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_translation_key = key
         self._description = description
@@ -143,7 +138,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
                 hub,
                 config["key"],
                 config["name"],
-                config["icon"],
                 config["description"]
             )
         )
