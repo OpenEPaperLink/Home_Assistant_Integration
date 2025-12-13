@@ -105,7 +105,7 @@ def decode_esl_raw(data: bytes, tag_type: TagType) -> bytes:
                     second_block = second_decompressor.decompress(remaining_data)
 
                     # Extract and combine planes
-                    header = decompressed_data[:header_size]
+                    # header = decompressed_data[:header_size]
                     first_plane = decompressed_data[header_size:header_size + total_size // 2]
                     second_plane = second_block[header_size:header_size + total_size // 2]
                     data = first_plane + second_plane
@@ -210,7 +210,7 @@ def to_image(raw_data: bytes, tag_type: TagType) -> bytes:
 
     else:  # 3-4 bit packed format
         bits_per_pixel = tag_type.bpp
-        pixels_per_byte = 8 // bits_per_pixel
+        # pixels_per_byte = 8 // bits_per_pixel
         bit_mask = (1 << bits_per_pixel) - 1
         bytes_per_row = (native_width * bits_per_pixel + 7) // 8
 

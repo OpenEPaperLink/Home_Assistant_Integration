@@ -4,13 +4,11 @@ import io
 import struct
 import zlib
 import logging
-from dataclasses import dataclass
 from enum import Enum
 
 import numpy as np
 from PIL import Image
 
-from . import ColorScheme
 from .exceptions import BLEError
 from .image_processing import process_image_for_device
 from .metadata import BLEDeviceMetadata
@@ -152,7 +150,7 @@ def _convert_image_to_bytes(
 
     # Exact color matching (image already quantized by dithering)
     black_pixels = (r == 0) & (g == 0) & (b == 0)
-    white_pixels = (r == 255) & (g == 255) & (b == 255)
+    # white_pixels = (r == 255) & (g == 255) & (b == 255)
     red_pixels = (r == 255) & (g == 0) & (b == 0)
     yellow_pixels = (r == 255) & (g == 255) & (b == 0)
 
@@ -410,7 +408,7 @@ def _encode_direct_write_4bpp(image: Image.Image) -> bytes:
             r, g, b = pixel_array[y, x]
             color = _detect_color(int(r), int(g), int(b), 4)
             
-            # Map color to 4-bit value: 0=black, 1=white, 2=yellow, 3=red, 4=blue, 5=green
+            # Firmware expects: black=0, white=1, yellow=2, red=3, blue=5, green=6
             if color == 'black':
                 color_value = 0
             elif color == 'white':
@@ -419,9 +417,9 @@ def _encode_direct_write_4bpp(image: Image.Image) -> bytes:
                 color_value = 2
             elif color == 'red':
                 color_value = 3
-            elif color == 'blue':
-                color_value = 4
             elif color == 'green':
+                color_value = 6
+            elif color == 'blue':
                 color_value = 5
             else:
                 color_value = 0  # Fallback to black
@@ -560,13 +558,13 @@ class BLEImageUploader:
         except ValueError:
             return False  # Unknown response code
 
-    async def upload_image(
+    async def upload_image_block_based(
             self,
             image_data: bytes,
             metadata: BLEDeviceMetadata,
             protocol_type: str = "atc",
             dither: int = 2
-    ) -> bool:
+    ) -> tuple[bool, Image.Image | None]:
         """Upload image using block-based protocol.
 
         Args:
@@ -576,7 +574,7 @@ class BLEImageUploader:
             dither: 0=none, 1=ordered, 2=floyd-steinberg
 
         Returns:
-            bool: True if upload succeeded, False otherwise
+            tuple: (success, processed_image) - processed_image is the dithered PIL Image
         """
         try:
             # Convert JPEG to PIL Image
@@ -591,9 +589,6 @@ class BLEImageUploader:
                 _LOGGER.debug("No client-side rotation (protocol=%s, rotatebuffer=%d): %dx%d",
                              protocol_type, metadata.rotatebuffer, image.width, image.height)
 
-            # DEBUG
-            pre_arr = np.array(image.convert('RGB'))
-            _LOGGER.info("Input yellow-ish: %d", np.sum((pre_arr[:,:,0]>250)&(pre_arr[:,:,1]>250)&(pre_arr[:,:,2]<10)))
 
             processed_image = process_image_for_device(
                 image,
@@ -601,10 +596,6 @@ class BLEImageUploader:
                 dither
             )
 
-            # DEBUG
-            debug_arr = np.array(processed_image)
-            _LOGGER.info("Yellow pixels: %d", np.sum((debug_arr[:,:,0]==255)&(debug_arr[:,:,1]==255)&(debug_arr[:,:,2]==0)))
-            _LOGGER.info("White pixels: %d", np.sum((debug_arr[:,:,0]==255)&(debug_arr[:,:,1]==255)&(debug_arr[:,:,2]==255)))
 
             # Convert image to device format
             data_type, pixel_array = _convert_image_to_bytes(
@@ -638,18 +629,18 @@ class BLEImageUploader:
                 elif response is None:
                     # Timeout - this is a failure
                     _LOGGER.error("Upload failed for %s: timeout waiting for response", self.mac_address)
-                    return False
+                    return False, None
 
             if self._upload_error:
                 raise BLEError(f"Upload failed: {self._upload_error}")
 
             # Only reach here if upload_complete was set by a success response
             _LOGGER.info("BLE image upload completed successfully for %s", self.mac_address)
-            return True
+            return True, processed_image
 
         except Exception as e:
             _LOGGER.error("Image upload failed for %s: %s", self.mac_address, e)
-            return False
+            return False, None
 
     async def _wait_for_response(self, timeout: float = 10.0) -> bytes | None:
         """Wait for next upload response with timeout.
@@ -733,7 +724,7 @@ class BLEImageUploader:
         metadata: BLEDeviceMetadata,
         compressed: bool = False,
         dither: int = 2
-    ) -> bool:
+    ) -> tuple[bool, Image.Image | None]:
         """Upload image using direct write protocol (OEPL only).
         
         Args:
@@ -839,17 +830,17 @@ class BLEImageUploader:
                     continue
                 elif response is None:
                     _LOGGER.error("Direct write failed for %s: timeout", self.mac_address)
-                    return False
+                    return False, None
             
             if self._upload_error:
                 raise BLEError(f"Direct write failed: {self._upload_error}")
             
             _LOGGER.info("Direct write upload completed successfully for %s", self.mac_address)
-            return True
+            return True, processed_image
             
         except Exception as e:
             _LOGGER.error("Direct write upload failed for %s: %s", self.mac_address, e)
-            return False
+            return False, None
 
     async def _handle_direct_write_response(self, data: bytes) -> bool:
         """Handle direct write responses.

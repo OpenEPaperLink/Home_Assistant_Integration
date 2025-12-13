@@ -10,6 +10,7 @@ from typing import Any, ClassVar
 
 from .exceptions import ConfigValidationError
 from .protocol_base import DeviceCapabilities
+from .color_scheme import ColorScheme
 
 
 # TLV packet type constants
@@ -526,6 +527,31 @@ def parse_tlv_config(data: bytes) -> GlobalConfig:
     return config
 
 
+def _color_scheme_from_value(value: int) -> ColorScheme | None:
+    """Return ColorScheme enum for value or None if unknown."""
+    for scheme in ColorScheme:
+        if scheme.value == value:
+            return scheme
+    return None
+
+
+def describe_color_scheme(value: int) -> str:
+    """Convert color scheme int to human-readable description."""
+    scheme = _color_scheme_from_value(value)
+    if scheme is None:
+        return f"Unknown ({value})"
+
+    descriptions = {
+        ColorScheme.MONO: "Monochrome",
+        ColorScheme.BWR: "BWR (black/white/red)",
+        ColorScheme.BWY: "BWY (black/white/yellow)",
+        ColorScheme.BWRY: "BWRY (black/white/red/yellow)",
+        ColorScheme.BWGBRY: "BWGBRY (6-color)",
+        ColorScheme.GRAYSCALE_4: "Grayscale (4-level)",
+    }
+    return descriptions.get(scheme, scheme.name)
+
+
 def extract_display_capabilities(config: GlobalConfig) -> DeviceCapabilities:
     """Extract minimal display info from full config for interrogation.
 
@@ -604,10 +630,13 @@ def generate_model_name(display: DisplayConfig) -> str:
         size_str = f"{display.pixel_width}x{display.pixel_height}"
 
     # Add color capability suffix
-    if display.color_scheme == 1:
-        color_suffix = " BWR"
+    scheme = _color_scheme_from_value(display.color_scheme)
+    if scheme is None:
+        color_suffix = f" color={display.color_scheme}"
+    elif scheme is ColorScheme.MONO:
+        color_suffix = " BW"
     else:
-        color_suffix = ""
+        color_suffix = f" {scheme.name}"
 
     # Build model name: "7.5\" BWR" or "800x480 BWR"
     model_name = f"{size_str}{color_suffix}"

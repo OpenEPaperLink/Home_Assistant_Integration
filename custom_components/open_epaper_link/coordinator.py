@@ -1,6 +1,7 @@
 import asyncio
-from datetime import datetime, timedelta
-from typing import Final, Dict
+import inspect
+from datetime import datetime, timedelta, timezone
+from typing import Final, Dict, Any, Callable, Awaitable
 
 import json
 import requests
@@ -10,6 +11,7 @@ import websockets
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, CALLBACK_TYPE, callback
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
@@ -17,10 +19,11 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 import logging
 
-_LOGGER: Final = logging.getLogger(__name__)
-
 from .const import DOMAIN, SIGNAL_AP_UPDATE, SIGNAL_TAG_UPDATE, SIGNAL_TAG_IMAGE_UPDATE
 from .tag_types import get_tag_types_manager, get_hw_string
+
+_LOGGER: Final = logging.getLogger(__name__)
+
 
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_tags"
@@ -46,6 +49,10 @@ class Hub:
 
     The Hub maintains the primary state for all tags and the AP itself,
     serving as the data source for all entities in the integration.
+
+    It serves as a coordinator for all tag related updates,
+     but it does not make sense converting it to a DataUpdateCoordinator,
+     which would be pulling, not pushing.
 
     Attributes:
         hass: Home Assistant instance
@@ -105,6 +112,8 @@ class Hub:
         self._nfc_last_scan: Dict[str, datetime] = {}
         self._nfc_debounce_interval = timedelta(seconds=1)
         self._update_debounce_interval()
+        self._ap_cmd_sem = asyncio.Semaphore(1)
+        self._ap_cmd_cooldown = 0.5
 
     def _update_debounce_interval(self) -> None:
         """Update event debounce intervals from integration options.
@@ -135,7 +144,7 @@ class Hub:
         await self.async_reload_blacklist()
         self._update_debounce_interval()
 
-    async def async_setup_initial(self) -> bool:
+    async def async_setup_initial(self) -> None:
         """Set up hub without establishing a WebSocket connection.
 
         Performs the initial setup tasks:
@@ -143,49 +152,48 @@ class Hub:
         - Loads stored tag data from persistent storage
         - Initializes the tag type manager
         - Registers the shutdown handler
-        - Attempts to load initial tag data from the AP
+        - Fetches AP info and loads tags from the AP
 
         This is called during integration setup before the platforms
         are loaded, allowing entities to be created with initial state.
 
-        Returns:
-            bool: True if setup completed successfully, False otherwise
+        Raises:
+            ConfigEntryNotReady: If AP is unreachable or tag loading fails
         """
+        # Load stored data
+        stored = await self._store.async_load()
+        if stored:
+            self._data = stored.get("tags", {})
+            self._known_tags = set(self._data.keys())
+            _LOGGER.debug("Restored %d tags from storage", len(self._known_tags))
+
+        # Initialize tag manager
+        self._tag_manager = await get_tag_types_manager(self.hass)
+        self._tag_manager_ready.set()
+
+        # Register shutdown handler only once
+        if self._shutdown_handler is None:
+            self._shutdown_handler = self.hass.bus.async_listen_once(
+                EVENT_HOMEASSISTANT_STOP,
+                self._handle_shutdown
+            )
+
+        # Fetch AP info - raises on failure (timeout, connection error, HTTP error)
         try:
-            # Load stored data
-            stored = await self._store.async_load()
-            if stored:
-                self._data = stored.get("tags", {})
-                self._known_tags = set(self._data.keys())
-                _LOGGER.debug("Restored %d tags from storage", len(self._known_tags))
+            await self.async_update_ap_info()
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            raise ConfigEntryNotReady(
+                f"Cannot connect to AP at {self.host}: {err}"
+            ) from err
 
-            # Initialize tag manager
-            self._tag_manager = await get_tag_types_manager(self.hass)
-            self._tag_manager_ready.set()
-
-            # Register shutdown handler only once
-            if self._shutdown_handler is None:
-                self._shutdown_handler = self.hass.bus.async_listen_once(
-                    EVENT_HOMEASSISTANT_STOP,
-                    self._handle_shutdown
-                )
-
-            # Fetch AP env
-            try:
-                await self.async_update_ap_info()
-            except Exception as err:
-                _LOGGER.warning("Could not load initial AP info: %s", str(err))
-
-            # Load all tags from AP
-            try:
-                await self.async_load_all_tags()
-            except Exception as err:
-                _LOGGER.warning("Could not load initial tags from AP: %s", str(err))
-            return True
-
+        # Load tags from AP - already has 10 retries built-in
+        # If this fails after retries, something is wrong with the AP
+        try:
+            await self.async_load_all_tags()
         except Exception as err:
-            _LOGGER.error("Failed to set up hub: %s", err)
-            return False
+            raise ConfigEntryNotReady(
+                f"Failed to load tags from AP at {self.host}: {err}"
+            ) from err
 
     async def async_start_websocket(self) -> bool:
         """Start WebSocket connection to the AP.
@@ -728,6 +736,51 @@ class Hub:
                     })
 
         return is_new_tag
+
+    async def _run_ap_command(self, func: Callable[[], Any | Awaitable[Any]]) -> Any:
+        async with self._ap_cmd_sem:
+            if self._ap_cmd_cooldown:
+                await asyncio.sleep(self._ap_cmd_cooldown)
+            # If it’s a coroutine function, await it; otherwise run in executor
+            if inspect.iscoroutinefunction(func):
+                return await func()
+            return await self.hass.async_add_executor_job(func)
+
+    async def _ap_request(self, method: str, path: str, *, data=None, timeout=10, action: str) -> requests.Response:
+        url = f"http://{self.host}/{path.lstrip('/')}"
+        def call():
+            return requests.request(method, url, data=data, timeout=timeout)
+        try:
+            resp = await self._run_ap_command(call)
+        except requests.exceptions.Timeout:
+            raise HomeAssistantError(f"Timeout {action}") from None
+        except requests.exceptions.RequestException as err:
+            raise HomeAssistantError(f"Network error {action}: {err}") from err
+        if resp.status_code != 200:
+            raise HomeAssistantError(f"Failed to {action}: HTTP {resp.status_code} - {resp.text}")
+        return resp
+
+    async def set_led_pattern(self, entity_id: str, pattern: str) -> None:
+        mac = entity_id.split(".")[1].upper()
+        await self._ap_request("get", f"led_flash?mac={mac}&pattern={pattern}", action=f"update LED for {entity_id}")
+        _LOGGER.info("Updated LED pattern for %s", entity_id)
+
+    async def send_tag_cmd(self, entity_id: str, cmd: str) -> bool:
+        mac = entity_id.split(".")[1].upper()
+        await self._ap_request("post", "tag_cmd", data={"mac": mac, "cmd": cmd}, action=f"send {cmd} to {entity_id}")
+        _LOGGER.info("Sent %s command to %s", cmd, entity_id)
+        return True
+
+    async def reboot_ap(self) -> bool:
+        await self._ap_request("post", "reboot", action="reboot OEPL AP")
+        _LOGGER.info("Rebooted OEPL AP")
+        return True
+
+    async def set_ap_config_item(self, key: str, value: str | int) -> bool:
+        await self._ap_request("post", "save_apcfg", data={"key": key, "value": str(value)}, action=f"set AP config {key}")
+        self.apconfig[key] = value
+        _LOGGER.info("Set AP config %s = %s", key, value)
+        return True
 
     async def _fetch_all_tags_from_ap(self) -> dict:
         """Fetch complete list of tags from the AP database.
@@ -1306,20 +1359,18 @@ class Hub:
         This can be called manually to refresh configuration or
         is triggered automatically when the AP sends a configuration
         change notification.
+
+        Raises:
+            aiohttp.ClientError: If connection fails or HTTP error occurs
+            asyncio.TimeoutError: If request times out
         """
-        try:
-            async with async_timeout.timeout(10):
-                async with self._session.get(f"http://{self.host}/sysinfo") as response:
-                    if response.status != 200:
-                        _LOGGER.error("Failed to fetch AP sys info: HTTP %s", response.status)
-                        return
+        async with async_timeout.timeout(10):
+            async with self._session.get(f"http://{self.host}/sysinfo") as response:
+                response.raise_for_status()  # Raises ClientResponseError on non-2xx
 
-                    data = await response.json()
-                    self.ap_env = data.get("env")
-                    self.ap_model = self._format_ap_model(self.ap_env)
-
-        except Exception as err:
-            _LOGGER.error(f"Error updating AP info: {err}")
+                data = await response.json()
+                self.ap_env = data.get("env")
+                self.ap_model = self._format_ap_model(self.ap_env)
 
     @staticmethod
     def _format_ap_model(ap_env: str) -> str:
@@ -1359,3 +1410,34 @@ class Hub:
             return model_mapping[ap_env]
 
         return ap_env
+
+    def is_tag_online(self, tag_mac: str) -> bool:
+        """Check if a tag is online based on AP's timeout logic.
+
+        Uses AP timeout formula: maxsleep * 60 + 300 seconds.
+
+        Args:
+            tag_mac: MAC address of the tag.
+
+        Returns:
+            True if the tag is online, False if timed out or not found.
+        """
+        if tag_mac not in self.tags:
+            return False
+
+        tag_data = self.get_tag_data(tag_mac)
+        last_seen = tag_data.get("last_seen", 0)
+
+        if last_seen == 0:
+            return False
+
+        modecfgjson = tag_data.get("modecfgjson")
+        maxsleep = 60  # Default
+
+        if modecfgjson and isinstance(modecfgjson, dict):
+            maxsleep = modecfgjson.get("maxsleep", 60)
+
+        timeout_threshold = (maxsleep * 60) + 300
+        current_time = datetime.now(timezone.utc).timestamp()
+
+        return (current_time - last_seen) < timeout_threshold

@@ -1,17 +1,19 @@
-"""Sensor implementation for OpenEPaperLink integration."""
 from __future__ import annotations
 
+PARALLEL_UPDATES = 0
+
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
+from decimal import Decimal
 from typing import Any, Callable, Final
 
+from homeassistant.components import bluetooth
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     SIGNAL_STRENGTH_DECIBELS,
     PERCENTAGE,
@@ -25,6 +27,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 import logging
 
+from . import Hub
+from .entity import OpenEPaperLinkTagEntity, OpenEPaperLinkAPEntity, OpenEPaperLinkBLEEntity
+from .runtime_data import OpenEPaperLinkConfigEntry
 from .const import DOMAIN
 from .util import is_ble_entry
 from .tag_types import get_hw_string, get_hw_dimensions
@@ -68,7 +73,6 @@ class OpenEPaperLinkSensorEntityDescription(SensorEntityDescription):
     entity_registry_enabled_default: bool = True
     value_fn: Callable[[dict], Any]
     attr_fn: Callable[[dict], Any] = None
-    icon: str
 
 
 AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
@@ -76,20 +80,17 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         key="ip",
         name="IP Address",
         value_fn=lambda data: data.get("ip"),
-        icon="mdi:ip",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="wifi_ssid",
         name="WiFi SSID",
         value_fn=lambda data: data.get("wifi_ssid"),
-        icon="mdi:wifi-settings",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="record_count",
         name="Tag count",
         state_class=SensorStateClass.TOTAL,
         value_fn=lambda data: data.get("record_count"),
-        icon="mdi:tag-multiple",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="db_size",
@@ -101,7 +102,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         suggested_display_precision=3,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: int(data.get("db_size", 0)),
-        icon="mdi:database-settings",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="little_fs_free",
@@ -113,19 +113,16 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         suggested_display_precision=3,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: int(data.get("little_fs_free", 0)),
-        icon="mdi:database-outline",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="ap_state",
         name="State",
         value_fn=lambda data: data.get("ap_state"),
-        icon="mdi:access-point",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="run_state",
         name="Run State",
         value_fn=lambda data: data.get("run_state"),
-        icon="mdi:cog",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="wifi_rssi",
@@ -135,7 +132,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("rssi"),
-        icon="mdi:wifi-strength-4",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="heap",
@@ -147,7 +143,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         suggested_display_precision=3,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: int(data.get("heap", 0)),
-        icon="mdi:chip",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="sys_time",
@@ -156,7 +151,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda data: datetime.fromtimestamp(data.get("sys_time", 0), tz=timezone.utc),
-        icon="mdi:clock-outline",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="uptime",
@@ -166,14 +160,12 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.SECONDS,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("uptime"),
-        icon="mdi:timer",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="low_battery_tag_count",
         name="Low Battery Tags",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: data.get("low_battery_count"),
-        icon="mdi:battery-alert",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="timeout_tag_count",
@@ -181,7 +173,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=None,
         value_fn=lambda data: data.get("timeout_count"),
-        icon="mdi:tag-off",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="ps_ram_free",
@@ -193,7 +184,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         suggested_display_precision=3,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: int(data.get("ps_ram_free", 0)),
-        icon="mdi:memory",
     )
 )
 """Definitions for all AP-related sensor entities.
@@ -220,7 +210,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         value_fn=lambda data: data.get("temperature"),
-        icon="mdi:thermometer",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="battery_voltage",
@@ -230,7 +219,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.MILLIVOLT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("battery_mv"),
-        icon="mdi:battery",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="battery_percentage",
@@ -239,28 +227,24 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         value_fn=lambda data: _calculate_battery_percentage(data.get("battery_mv", 0)),
-        icon="mdi:battery",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="last_seen",
         name="Last Seen",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: datetime.fromtimestamp(data.get("last_seen", 0), tz=timezone.utc),
-        icon="mdi:history",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="next_update",
         name="Next Update",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: datetime.fromtimestamp(data.get("next_update", 0), tz=timezone.utc),
-        icon="mdi:update",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="next_checkin",
         name="Next Checkin",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: datetime.fromtimestamp(data.get("next_checkin", 0), tz=timezone.utc),
-        icon="mdi:clock-check",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="lqi",
@@ -268,7 +252,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("lqi"),
-        icon="mdi:signal-cellular-outline",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="rssi",
@@ -278,7 +261,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("rssi"),
-        icon="mdi:signal-distance-variant",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="pending_updates",
@@ -286,20 +268,17 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("pending"),
-        icon="mdi:sync-circle",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="content_mode",
         name="Content Mode",
         value_fn=lambda data: data.get("content_mode"),
-        icon="mdi:view-grid-outline",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="wakeup_reason",
         name="Wakeup Reason",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("wakeup_reason"),
-        icon="mdi:power",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="capabilities",
@@ -311,7 +290,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
             "binary_value": format(data.get("capabilities", 0), '08b'),
             "capabilities": get_capabilities(data.get("capabilities", 0))
         },
-        icon="mdi:list-box-outline",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="update_count",
@@ -319,7 +297,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("update_count"),
-        icon="mdi:counter",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="width",
@@ -327,7 +304,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("width"),
-        icon="mdi:arrow-expand-horizontal",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="height",
@@ -335,7 +311,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("height"),
-        icon="mdi:arrow-expand-vertical",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="runtime",
@@ -345,7 +320,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.SECONDS,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("runtime", 0),
-        icon="mdi:timer-outline",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="boot_count",
@@ -353,7 +327,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("boot_count", 0),
-        icon="mdi:restart",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="checkin_count",
@@ -361,7 +334,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("checkin_count", 0),
-        icon="mdi:clock-check",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="block_requests",
@@ -369,7 +341,6 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("block_requests", 0),
-        icon="mdi:transfer",
     ),
 
 )
@@ -383,7 +354,6 @@ BLE_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         value_fn=lambda data: data.get("temperature"),
-        icon="mdi:thermometer",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="battery_percentage",
@@ -392,7 +362,6 @@ BLE_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         value_fn=lambda data: data.get("battery_percentage"),
-        icon="mdi:battery",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="battery_voltage",
@@ -403,7 +372,6 @@ BLE_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda data: data.get("battery_voltage"),
-        icon="mdi:battery",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="rssi",
@@ -414,7 +382,6 @@ BLE_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda data: data.get("rssi"),
-        icon="mdi:signal-distance-variant",
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="last_seen",
@@ -423,7 +390,6 @@ BLE_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda data: data.get("last_seen"),
-        icon="mdi:history",
     ),
 )
 """Definitions for all BLE tag-related sensor entities.
@@ -476,233 +442,49 @@ def _calculate_battery_percentage(voltage: int) -> int:
     return max(0, min(100, int(percentage)))
 
 
-class OpenEPaperLinkBaseSensor(SensorEntity):
-    """Base class for all OpenEPaperLink sensors.
-
-    Provides common functionality and attributes for all sensor entities
-    in the integration, whether they're associated with the AP or with
-    individual tags.
-
-    This base class handles the interaction with the entity description
-    system to ensure consistent behavior across all sensor types.
-    """
-
+class OpenEPaperLinkTagSensor(OpenEPaperLinkTagEntity, SensorEntity):
+    """Sensor class for OpenEPaperLink tag data."""
     entity_description: OpenEPaperLinkSensorEntityDescription
 
-    def __init__(self, hub, description: OpenEPaperLinkSensorEntityDescription) -> None:
-        """Initialize the sensor.
-
-        Sets up the sensor with the hub connection and entity description.
-        The description contains all the information needed to extract
-        values and format the sensor's display.
-
-        Args:
-            hub: Hub instance for data access
-            description: Sensor entity description
-        """
-        self._hub = hub
+    def __init__(self, hub: Hub, tag_mac: str, description: OpenEPaperLinkSensorEntityDescription) -> None:
+        """Initialize the tag sensor."""
+        super().__init__(hub, tag_mac)
         self.entity_description = description
-
-
-class OpenEPaperLinkTagSensor(OpenEPaperLinkBaseSensor):
-    """Sensor class for OpenEPaperLink tag data.
-
-    Provides sensor entities that display data from individual ESL tags,
-    such as battery level, temperature, signal strength, and status
-    information.
-
-    Each tag has multiple sensor entities created from the TAG_SENSOR_TYPES
-    definitions, with values extracted from the tag's data in the hub.
-    """
-    def __init__(self, hub, tag_mac: str, description: OpenEPaperLinkSensorEntityDescription) -> None:
-        """Initialize the tag sensor.
-
-    Sets up the sensor with the tag MAC, hub connection, and description.
-    Configures the device info to associate the sensor with the correct
-    tag device in the Home Assistant UI.
-
-    Args:
-        hub: Hub instance for data access
-        tag_mac: MAC address of the tag
-        description: Sensor entity description
-    """
-        super().__init__(hub, description)
-        self._tag_mac = tag_mac
-
-        name_base = self._hub.get_tag_data(tag_mac).get("tag_name", tag_mac)
-        # self._attr_name = f"{name_base} {description.name}"
-        self._attr_has_entity_name = True
         self._attr_translation_key = description.key
-
-        # Set unique ID without domain
         self._attr_unique_id = f"{tag_mac}_{description.key}"
-
-        # Set entity_id with the sensor type included
         self.entity_id = f"{DOMAIN}.{tag_mac.lower()}_{description.key}"
-
-        firmware_version = str(self._hub.get_tag_data(tag_mac).get("version", ""))
-
-        tag_data = self._hub.get_tag_data(self._tag_mac)
-        hw_type = tag_data.get("hw_type", 0)
-        hw_string = get_hw_string(hw_type)
-        width, height = get_hw_dimensions(hw_type)
-
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._tag_mac)},
-            name=name_base,
-            manufacturer="OpenEPaperLink",
-            model=hw_string,
-            via_device=(DOMAIN, "ap"),
-            sw_version=f"0x{int(firmware_version, 16):X}" if firmware_version else "Unknown",
-            serial_number=self._tag_mac,
-            hw_version=f"{width}x{height}",
-        )
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available.
-
-        A tag sensor is available if the tag is known to the hub.
-
-        Returns:
-            bool: True if the sensor is available, False otherwise
-        """
-        return self._tag_mac in self._hub.tags
+        self._attr_entity_registry_enabled_default = description.entity_registry_enabled_default
 
     @property
     def native_value(self):
-        """Return the state of the sensor.
-
-        Uses the value_fn from the entity description to extract the
-        appropriate value from the tag's data dictionary. This allows
-        each sensor type to extract different data using the same method.
-
-        Returns:
-            Any: The sensor state value
-            None: If the sensor is not available
-        """
+        """Return the state of the sensor."""
         if not self.available or self.entity_description.value_fn is None:
             return None
         return self.entity_description.value_fn(self._hub.get_tag_data(self._tag_mac))
 
     @property
     def extra_state_attributes(self):
-        """Return the state attributes.
-
-        If the entity description includes an attr_fn, uses it to extract
-        additional attributes for the sensor from the tag's data dictionary.
-
-        Returns:
-            dict: Additional attributes for the sensor
-            None: If no attr_fn is defined
-        """
+        """Return the state attributes."""
         if self.entity_description.attr_fn is None:
             return None
-
         return self.entity_description.attr_fn(self._hub.get_tag_data(self._tag_mac))
 
-    async def async_added_to_hass(self) -> None:
-        """Run when entity is added to register update signal handler.
+class OpenEPaperLinkAPSensor(OpenEPaperLinkAPEntity, SensorEntity):
+    """Sensor class for OpenEPaperLink AP data."""
 
-        Sets up a dispatcher listener for tag updates to refresh the
-        sensor's value when the tag data changes.
-
-        This ensures the sensor stays in sync with the actual tag data
-        without requiring polling.
-        """
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                f"{DOMAIN}_tag_update_{self._tag_mac}",
-                self._handle_update,
-            )
-        )
-
-    @callback
-    def _handle_update(self) -> None:
-        """Handle updated data from the coordinator.
-
-        Called when the tag's data is updated. Triggers a state update
-        to refresh the sensor's value and attributes in the UI.
-        """
-        self.async_write_ha_state()
-
-
-class OpenEPaperLinkAPSensor(OpenEPaperLinkBaseSensor):
-    """Sensor class for OpenEPaperLink AP data.
-
-    Provides sensor entities that display data from the Access Point,
-    such as connection status, memory usage, tag counts, and system state.
-
-    Each AP has multiple sensor entities created from the AP_SENSOR_TYPES
-    definitions, with values extracted from the AP's status data in the hub.
-    """
+    entity_description: OpenEPaperLinkSensorEntityDescription
+    _attr_entity_registry_enabled_default = True
 
     def __init__(self, hub, description: OpenEPaperLinkSensorEntityDescription) -> None:
-        """Initialize the AP sensor.
-
-        Sets up the sensor with the hub connection and description.
-        Configures the device info to associate the sensor with the
-        AP device in the Home Assistant UI.
-
-        Args:
-            hub: Hub instance for data access
-            description: Sensor entity description
-        """
-        super().__init__(hub, description)
-
-        # Set name and unique_id
-        # self._attr_name = f"AP {description.name}"
-        self._attr_has_entity_name = True
+        """Initialize the AP sensor."""
+        super().__init__(hub)
+        self.entity_description = description
         self._attr_translation_key = description.key
         self._attr_unique_id = f"{self._hub.entry.entry_id}_{description.key}"
 
-        # Set device info
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, "ap")},
-            name="OpenEPaperLink AP",
-            model=self._hub.ap_model,
-            manufacturer="OpenEPaperLink",
-        )
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available.
-
-        An AP sensor is available if the AP is online.
-
-        Returns:
-            bool: True if the sensor is available, False otherwise
-        """
-        return self._hub.online
-
-    @property
-    def native_value(self):
-        """Return the state of the sensor.
-
-        Uses the value_fn from the entity description to extract the
-        appropriate value from the AP's status dictionary. This allows
-        each sensor type to extract different data using the same method.
-
-        Returns:
-            Any: The sensor state value
-            None: If the sensor is not available
-        """
-        if not self.available or self.entity_description.value_fn is None:
-            return None
-        return self.entity_description.value_fn(self._hub.ap_status)
-
     async def async_added_to_hass(self) -> None:
-        """Run when entity is added to register update signal handlers.
-
-        Sets up two dispatcher listeners:
-
-        1. AP updates - to refresh the sensor when AP status changes
-        2. Connection status updates - to update availability when AP connects/disconnects
-
-        This ensures the sensor stays in sync with the actual AP status
-        without requiring polling.
-        """
+        """Register update signal handlers."""
+        await super().async_added_to_hass()
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
@@ -710,89 +492,43 @@ class OpenEPaperLinkAPSensor(OpenEPaperLinkBaseSensor):
                 self._handle_update,
             )
         )
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                f"{DOMAIN}_connection_status",
-                self._handle_connection_status,
-            )
-        )
-
-    @callback
-    def _handle_update(self) -> None:
-        """Handle updated data from the coordinator.
-
-        Called when the AP's status is updated. Triggers a state update
-        to refresh the sensor's value in the UI.
-        """
-        self.async_write_ha_state()
-
-    @callback
-    def _handle_connection_status(self, is_online: bool) -> None:
-        """Handle connection status updates.
-
-        Updates the sensor's availability state when the AP connection
-        status changes.
-
-        Args:
-            is_online: Boolean indicating if the AP is online
-        """
-        self.async_write_ha_state()
-
-
-class OpenEPaperLinkBLESensor(SensorEntity):
-    """BLE sensor entity for OpenEPaperLink tags.
-    
-    Simple sensor entity that gets updates from BLE advertising data
-    via the bluetooth.async_register_callback mechanism.
-    """
-
-    def __init__(
-        self,
-        mac_address: str,
-        name: str,
-        device_metadata: dict,
-        entry_id: str,
-        description: OpenEPaperLinkSensorEntityDescription,
-    ) -> None:
-        """Initialize the BLE sensor entity."""
-        self._mac_address = mac_address
-        self._name = name
-        self._device_metadata = device_metadata
-        self._entry_id = entry_id
-        self._description = description
-        self._available = True
-        self._sensor_data = {}
-        
-        # Set entity registry enabled default from description
-        self._attr_entity_registry_enabled_default = description.entity_registry_enabled_default
-        
-        # Set translation key for proper localization
-        self._attr_has_entity_name = True
-        self._attr_translation_key = description.key
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info - dynamically reads from current metadata."""
-        # Get current metadata from hass.data (may have been updated by RefreshConfigButton)
-        from .ble import BLEDeviceMetadata
-        current_metadata = self.hass.data[DOMAIN][self._entry_id].get("device_metadata", self._device_metadata)
-        metadata = BLEDeviceMetadata(current_metadata)
+    def native_value(self):
+        """Return the state of the sensor."""
+        if not self.available or self.entity_description.value_fn is None:
+            return None
+        return self.entity_description.value_fn(self._hub.ap_status)
 
-        return {
-            "identifiers": {(DOMAIN, f"ble_{self._mac_address}")},
-            "name": self._name,
-            "manufacturer": "OpenEPaperLink",
-            "model": metadata.model_name,
-            "sw_version": str(metadata.fw_version),
-            "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
-        }
+
+
+class OpenEPaperLinkBLESensor(OpenEPaperLinkBLEEntity, SensorEntity):
+    """BLE sensor entity for OpenEPaperLink tags."""
+
+    _attr_entity_registry_enabled_default = True
+
+    def __init__(
+            self,
+            hass: HomeAssistant,
+            mac_address: str,
+            name: str,
+            device_metadata: dict,
+            entry: OpenEPaperLinkConfigEntry,
+            description: OpenEPaperLinkSensorEntityDescription,
+    ) -> None:
+        """Initialize the BLE sensor entity."""
+        super().__init__(mac_address, name, entry)
+        self._hass = hass
+        self._device_metadata = device_metadata
+        self._description = description
+        self._sensor_data = {}
+        self._attr_entity_registry_enabled_default = description.entity_registry_enabled_default
+        self._attr_translation_key = description.key
 
     @property
     def unique_id(self) -> str:
         """Return unique ID for this entity."""
         return f"oepl_ble_{self._mac_address}_{self._description.key}"
-
 
     @property
     def native_value(self) -> StateType:
@@ -800,11 +536,6 @@ class OpenEPaperLinkBLESensor(SensorEntity):
         if self._description.value_fn:
             return self._description.value_fn(self._sensor_data)
         return self._sensor_data.get(self._description.key)
-
-    @property
-    def available(self) -> bool:
-        """Return true if sensor is available."""
-        return self._available
 
     @property
     def native_unit_of_measurement(self) -> str | None:
@@ -826,34 +557,24 @@ class OpenEPaperLinkBLESensor(SensorEntity):
         """Return the entity category."""
         return self._description.entity_category
 
-    @property
-    def icon(self) -> str | None:
-        """Return the icon."""
-        return self._description.icon
 
     def update_from_advertising_data(self, data: dict) -> None:
         """Update sensor state from BLE advertising data."""
         self._sensor_data = data
-        self._available = True
-        
-        # Only write state if entity is properly added to Home Assistant
         if self.hass is not None:
             self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
         """Called when entity is added to hass."""
-        # If advertising data was received before being added to hass, write it now
-        if self._sensor_data and self._available:
+        if self._sensor_data:
             self.async_write_ha_state()
 
     async def async_update(self) -> None:
         """Update the sensor state."""
-        # For BLE sensors, state is updated via advertising data callback
-        # No active polling needed
         pass
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the OpenEPaperLink sensors.
 
     Creates sensor entities for both AP-based and BLE-based entries:
@@ -866,15 +587,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         entry: Configuration entry
         async_add_entities: Callback to register new entities
     """
-    entry_data = hass.data[DOMAIN][entry.entry_id]
+    entry_data = entry.runtime_data
     
     # Check if this is a BLE device entry
     if is_ble_entry(entry_data):
-        # Set up BLE sensors with simple callback approach
-        mac_address = entry_data["mac_address"]
-        name = entry_data["name"]
-        device_metadata = entry_data.get("device_metadata", {})
-        protocol_type = entry_data.get("protocol_type", "atc")  # Default to ATC for backward compatibility
+        # Set up BLE sensors with a simple callback approach
+        mac_address = entry_data.mac_address
+        name = entry_data.name
+        device_metadata = entry_data.device_metadata
+        protocol_type = entry_data.protocol_type  # Default to ATC for backward compatibility
 
         # Create sensors for each description
         from .ble import BLEDeviceMetadata
@@ -892,16 +613,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                         continue  # Skip battery sensors
 
             sensor = OpenEPaperLinkBLESensor(
+                hass=hass,
                 mac_address=mac_address,
                 name=name,
                 device_metadata=device_metadata,
-                entry_id=entry.entry_id,
+                entry=entry,
                 description=description,
             )
             sensors.append(sensor)
 
-            # Register sensor in the sensors registry so callback can update it
-            entry_data["sensors"][description.key] = sensor
+            # Register the sensor in the sensors registry so callback can update it
+            entry_data.sensors[description.key] = sensor
         
         # Add the sensors
         async_add_entities(sensors)

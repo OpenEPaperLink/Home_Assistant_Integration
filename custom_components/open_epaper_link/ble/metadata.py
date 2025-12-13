@@ -62,15 +62,30 @@ class BLEDeviceMetadata:
         return self._metadata.get("model_name", "Unknown")
 
     @property
-    def fw_version(self) -> int:
+    def fw_version(self) -> int | str:
         """Get firmware version.
 
         Returns:
-            Firmware version number, or 0 if not available
+            Firmware version number or string, or 0/"" if not available
         """
-        # For OEPL, fw_version would be in system config but isn't parsed yet
-        # Fall back to stored value for now
+        if self._is_oepl:
+            # Prefer explicit string/parsed version saved from interrogation
+            if "fw_version" in self._metadata:
+                return self._metadata.get("fw_version", "")
+            major = self._metadata.get("fw_version_major")
+            minor = self._metadata.get("fw_version_minor")
+            if major is not None and minor is not None:
+                return f"{major}.{minor}"
         return self._metadata.get("fw_version", 0)
+
+    def formatted_fw_version(self) -> str | None:
+        """Return firmware version formatted for display."""
+        fw = self.fw_version
+        if fw in (None, ""):
+            return None
+        if isinstance(fw, int):
+            return f"0x{fw:04x}"
+        return str(fw)
 
 
     @property
@@ -175,11 +190,11 @@ class BLEDeviceMetadata:
             return displays[0].get("transmission_modes", 0) if displays else 0
         return 0  # ATC devices don't support direct_write
 
-    def get_best_upload_method(self) -> str:
-        """Determine the best upload method based on device capabilities.
+    def get_best_upload_method(self, image_size: int  = 0) -> str:
+        """Determine the best upload method based on device capabilities and iamge size.
 
         Priority order:
-        1. direct_write_compressed: If direct_write (0x08) AND zip (0x02) are supported
+        1. direct_write_compressed: If direct_write (0x08) AND zip (0x02) are supported and size < 50KB
         2. direct_write: If direct_write (0x08) is supported but zip is not
         3. block: Fallback to block-based upload (always supported)
 
@@ -190,7 +205,7 @@ class BLEDeviceMetadata:
         has_direct_write = (modes & 0x08) != 0
         has_zip = (modes & 0x02) != 0
 
-        if has_direct_write and has_zip:
+        if has_direct_write and has_zip and image_size < 50 * 1024:
             return "direct_write_compressed"
         elif has_direct_write:
             return "direct_write"

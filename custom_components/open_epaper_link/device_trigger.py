@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from typing import Final
+
 import voluptuous as vol
 import logging
 from homeassistant.components.device_automation import DEVICE_TRIGGER_BASE_SCHEMA
@@ -43,8 +46,8 @@ async def async_get_triggers(hass, device_id):
         list: List of trigger dictionaries, each defining a specific
               trigger that can be used in automations
     """
-    device_registry = dr.async_get(hass)
-    device = device_registry.async_get(device_id)
+    # device_registry = dr.async_get(hass)
+    # device = device_registry.async_get(device_id)
     triggers = []
     triggers.append({
         # Required fields of TRIGGER_BASE_SCHEMA
