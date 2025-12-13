@@ -4,19 +4,17 @@ import logging
 from functools import wraps
 from typing import Final, Any, Callable
 
-import requests
-
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ServiceValidationError, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from . import BLEDeviceMetadata
-from .ble import BLEConnectionError, BLETimeoutError, BLEProtocolError
+from .coordinator import Hub
+from .ble import BLEConnectionError, BLETimeoutError, BLEProtocolError, BLEDeviceMetadata
 from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
 from .imagegen import ImageGen
 from .tag_types import get_tag_types_manager
 from .upload import create_upload_queues, DITHER_DEFAULT, upload_to_ble_direct, upload_to_ble_block, upload_to_hub
-from .util import send_tag_cmd, reboot_ap, is_ble_entry, get_hub_from_hass, rgb_to_rgb332, int_to_hex_string, \
+from .util import is_ble_entry, get_hub_from_hass, rgb_to_rgb332, int_to_hex_string, \
     is_ble_device, get_mac_from_entity_id
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -116,7 +114,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 raise HomeAssistantError(
                     "OpenEPaperLink AP is offline. Please check your network connection and AP status."
                 )
-            return await func(service, *args, **kwargs)
+            return await func(service, hub *args, **kwargs)
         return wrapper
 
     def handle_targets(func: Callable) -> Callable:
@@ -305,52 +303,40 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     @require_hub_online
     @handle_targets
-    async def setled_service(service: ServiceCall, entity_id: str) -> None:
-        hub = get_hub_from_hass(hass)
+    async def setled_service(service: ServiceCall, hub: Hub, entity_id: str) -> None:
         mac = get_mac_from_entity_id(entity_id)
         pattern = _build_led_pattern(service.data)
 
-        url = f"http://{hub.host}/led_flash?mac={mac}&pattern={pattern}"
-
-        try:
-            result = await hass.async_add_executor_job(requests.get, url)
-            if result.status_code != 200:
-                raise HomeAssistantError(
-                    f"LED pattern update failed with status code: {result.status_code}"
-                )
-        except requests.exceptions.RequestException as err:
-            raise HomeAssistantError(
-                f"Network error updating LED pattern: {str(err)}"
-            ) from err
+        await hub.set_led_pattern(mac, pattern)
 
     @require_hub_online
     @handle_targets
-    async def clear_pending_service(service: ServiceCall, entity_id: str) -> None:
+    async def clear_pending_service(service: ServiceCall, hub: Hub, entity_id: str) -> None:
         """Clear pending updates for target devices."""
-        await send_tag_cmd(hass, entity_id, "clear")
+        await hub.send_tag_cmd(entity_id, "clear")
 
     @require_hub_online
     @handle_targets
-    async def force_refresh_service(service: ServiceCall, entity_id: str) -> None:
+    async def force_refresh_service(service: ServiceCall, hub: Hub, entity_id: str) -> None:
         """Force refresh target devices."""
-        await send_tag_cmd(hass, entity_id, "refresh")
+        await hub.send_tag_cmd(entity_id, "refresh")
 
     @require_hub_online
     @handle_targets
-    async def reboot_tag_service(service: ServiceCall, entity_id: str) -> None:
+    async def reboot_tag_service(service: ServiceCall, hub: Hub, entity_id: str) -> None:
         """Reboot target devices."""
-        await send_tag_cmd(hass, entity_id, "reboot")
+        await hub.send_tag_cmd(entity_id, "reboot")
 
     @require_hub_online
     @handle_targets
-    async def scan_channels_service(service: ServiceCall, entity_id: str) -> None:
+    async def scan_channels_service(service: ServiceCall, hub: Hub, entity_id: str) -> None:
         """Trigger channel scan on target devices."""
-        await send_tag_cmd(hass, entity_id, "scan")
+        await hub.send_tag_cmd(entity_id, "scan")
 
     @require_hub_online
-    async def reboot_ap_service(service: ServiceCall) -> None:
+    async def reboot_ap_service(service: ServiceCall, hub: Hub) -> None:
         """Reboot the Access Point."""
-        await reboot_ap(hass)
+        await hub.reboot_ap()
 
     async def refresh_tag_types_service(service: ServiceCall) -> None:
         """Force refresh tag types from GitHub."""

@@ -1,5 +1,6 @@
-"""Sensor implementation for OpenEPaperLink integration."""
 from __future__ import annotations
+
+PARALLEL_UPDATES = 0
 
 from dataclasses import dataclass
 from datetime import datetime, timezone, date

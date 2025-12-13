@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+PARALLEL_UPDATES = 1
+
 import requests
 
 from homeassistant.components.text import TextEntity, TextMode
@@ -12,7 +14,6 @@ from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
 from .runtime_data import OpenEPaperLinkConfigEntry
 
 from .const import DOMAIN
-from .util import set_ap_config_item
 
 import logging
 
@@ -87,7 +88,7 @@ class APConfigText(OpenEPaperLinkAPEntity, TextEntity):
     async def async_set_value(self, value: str) -> None:
         """Set the text value."""
         if value != self.native_value:
-            await set_ap_config_item(self._hub, self._key, value)
+            await self._hub.set_ap_config_item(self._key, value)
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks when entity is added to Home Assistant."""

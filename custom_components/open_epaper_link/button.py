@@ -1,3 +1,5 @@
+PARALLEL_UPDATES = 1
+
 from dataclasses import dataclass
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
@@ -14,7 +16,7 @@ from .ble import get_protocol_by_name
 from .entity import OpenEPaperLinkTagEntity, OpenEPaperLinkAPEntity, OpenEPaperLinkBLEEntity
 from .runtime_data import OpenEPaperLinkConfigEntry
 from .tag_types import get_tag_types_manager
-from .util import send_tag_cmd, reboot_ap, is_ble_entry
+from .util import is_ble_entry
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -338,7 +340,7 @@ class OpenEPaperLinkTagButton(OpenEPaperLinkTagEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await send_tag_cmd(self.hass, self._entity_id, self.entity_description.command)
+        await self._hub.send_tag_cmd(self._entity_id, self.entity_description.command)
 
 
 class RebootAPButton(OpenEPaperLinkAPEntity, ButtonEntity):
@@ -355,7 +357,7 @@ class RebootAPButton(OpenEPaperLinkAPEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await reboot_ap(self.hass)
+        await self._hub.reboot_ap()
 
 
 class RefreshTagTypesButton(OpenEPaperLinkAPEntity, ButtonEntity):

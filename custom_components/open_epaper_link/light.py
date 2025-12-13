@@ -1,5 +1,6 @@
-"""BLE Light platform for OpenEPaperLink integration."""
 from __future__ import annotations
+
+PARALLEL_UPDATES = 1
 
 import asyncio
 import logging

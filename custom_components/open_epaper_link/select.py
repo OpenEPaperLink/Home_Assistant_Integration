@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+PARALLEL_UPDATES = 1
+
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -9,7 +11,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .entity import OpenEPaperLinkAPEntity
 from .runtime_data import OpenEPaperLinkConfigEntry
-from .util import set_ap_config_item
 
 import logging
 
@@ -391,7 +392,7 @@ class APConfigSelect(OpenEPaperLinkAPEntity, SelectEntity):
         """
         value = self._mapping.get_value(option)
         if value is not None:
-            await set_ap_config_item(self._hub, self._key, value)
+            await self._hub.set_ap_config_item(self._key, value)
 
     async def async_added_to_hass(self):
         """Register callbacks."""

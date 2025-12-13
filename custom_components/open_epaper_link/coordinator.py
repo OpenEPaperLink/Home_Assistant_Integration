@@ -1,6 +1,7 @@
 import asyncio
+import inspect
 from datetime import datetime, timedelta, timezone
-from typing import Final, Dict
+from typing import Final, Dict, Any, Callable, Awaitable
 
 import json
 import requests
@@ -10,7 +11,7 @@ import websockets
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, CALLBACK_TYPE, callback
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
@@ -111,6 +112,8 @@ class Hub:
         self._nfc_last_scan: Dict[str, datetime] = {}
         self._nfc_debounce_interval = timedelta(seconds=1)
         self._update_debounce_interval()
+        self._ap_cmd_sem = asyncio.Semaphore(1)
+        self._ap_cmd_cooldown = 0.5
 
     def _update_debounce_interval(self) -> None:
         """Update event debounce intervals from integration options.
@@ -733,6 +736,51 @@ class Hub:
                     })
 
         return is_new_tag
+
+    async def _run_ap_command(self, func: Callable[[], Any | Awaitable[Any]]) -> Any:
+        async with self._ap_cmd_sem:
+            if self._ap_cmd_cooldown:
+                await asyncio.sleep(self._ap_cmd_cooldown)
+            # If it’s a coroutine function, await it; otherwise run in executor
+            if inspect.iscoroutinefunction(func):
+                return await func()
+            return await self.hass.async_add_executor_job(func)
+
+    async def _ap_request(self, method: str, path: str, *, data=None, timeout=10, action: str) -> requests.Response:
+        url = f"http://{self.host}/{path.lstrip('/')}"
+        def call():
+            return requests.request(method, url, data=data, timeout=timeout)
+        try:
+            resp = await self._run_ap_command(call)
+        except requests.exceptions.Timeout:
+            raise HomeAssistantError(f"Timeout {action}") from None
+        except requests.exceptions.RequestException as err:
+            raise HomeAssistantError(f"Network error {action}: {err}") from err
+        if resp.status_code != 200:
+            raise HomeAssistantError(f"Failed to {action}: HTTP {resp.status_code} - {resp.text}")
+        return resp
+
+    async def set_led_pattern(self, entity_id: str, pattern: str) -> None:
+        mac = entity_id.split(".")[1].upper()
+        await self._ap_request("get", f"led_flash?mac={mac}&pattern={pattern}", action=f"update LED for {entity_id}")
+        _LOGGER.info("Updated LED pattern for %s", entity_id)
+
+    async def send_tag_cmd(self, entity_id: str, cmd: str) -> bool:
+        mac = entity_id.split(".")[1].upper()
+        await self._ap_request("post", "tag_cmd", data={"mac": mac, "cmd": cmd}, action=f"send {cmd} to {entity_id}")
+        _LOGGER.info("Sent %s command to %s", cmd, entity_id)
+        return True
+
+    async def reboot_ap(self) -> bool:
+        await self._ap_request("post", "reboot", action="reboot OEPL AP")
+        _LOGGER.info("Rebooted OEPL AP")
+        return True
+
+    async def set_ap_config_item(self, key: str, value: str | int) -> bool:
+        await self._ap_request("post", "save_apcfg", data={"key": key, "value": str(value)}, action=f"set AP config {key}")
+        self.apconfig[key] = value
+        _LOGGER.info("Set AP config %s = %s", key, value)
+        return True
 
     async def _fetch_all_tags_from_ap(self) -> dict:
         """Fetch complete list of tags from the AP database.

@@ -28,7 +28,7 @@
 - [x] `entity-unavailable` - Mark entity unavailable if appropriate
 - [x] `integration-owner` - Has an integration owner
 - [ ] `log-when-unavailable` - If internet/device/service is unavailable, log once when unavailable and once when back connected
-- [ ] `parallel-updates` - Number of parallel updates is specified
+- [x] `parallel-updates` - Number of parallel updates is specified
 - [ ] `reauthentication-flow` - Reauthentication needs to be available via the UI
 - [ ] `test-coverage` - Above 95% test coverage for all integration modules
 
@@ -50,7 +50,7 @@
 - [ ] `entity-disabled-by-default` - Integration disables less popular (or noisy) entities
 - [x] `entity-translations` - Entities have translated names
 - [ ] `exception-translations` - Exception messages are translatable
-- [ ] `icon-translations` - Entities implement icon translations
+- [x] `icon-translations` - Entities implement icon translations
 - [ ] `reconfiguration-flow` - Integrations should have a reconfigure flow
 - [ ] `repair-issues` - Repair issues and repair flows are used when user intervention is needed
 - [ ] `stale-devices` - Stale devices are removed

@@ -1,13 +1,14 @@
 from __future__ import annotations
+
+PARALLEL_UPDATES = 0
+
 import logging
 from datetime import datetime
 from typing import Final
 import requests
 
-from homeassistant.components import bluetooth
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from . import is_ble_entry, BLEDeviceMetadata
+from . import is_ble_entry
 from .entity import OpenEPaperLinkTagEntity, OpenEPaperLinkBLEEntity
 from .runtime_data import OpenEPaperLinkConfigEntry
 from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+PARALLEL_UPDATES = 1
+
 from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -8,7 +10,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .entity import OpenEPaperLinkAPEntity
-from .util import set_ap_config_item
 from .runtime_data import OpenEPaperLinkConfigEntry
 
 import logging
@@ -89,11 +90,11 @@ class APConfigSwitch(OpenEPaperLinkAPEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the entity on."""
-        await set_ap_config_item(self._hub, self._key, 1)
+        await self._hub.set_ap_config_item(self._key, 1)
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the entity off."""
-        await set_ap_config_item(self._hub, self._key, 0)
+        await self._hub.set_ap_config_item(self._key, 0)
 
     async def async_added_to_hass(self) -> None:
         """Register callbacks when entity is added to Home Assistant."""
