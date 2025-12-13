@@ -8,7 +8,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from .ble import BLEDeviceMetadata
 
-from .const import DOMAIN
+from .const import DOMAIN, OEPL_CONFIG_URL
 from .tag_types import get_hw_string, get_hw_dimensions
 
 if TYPE_CHECKING:
@@ -44,6 +44,7 @@ class OpenEPaperLinkAPEntity(Entity):
             name="OpenEPaperLink AP",
             model=self._hub.ap_model,
             manufacturer="OpenEPaperLink",
+            configuration_url=f"http://{self._hub.host}"
         )
 
     @property
@@ -184,17 +185,21 @@ class OpenEPaperLinkBLEEntity(Entity):
         current_metadata = self._entry.runtime_data.device_metadata
         metadata = BLEDeviceMetadata(current_metadata)
 
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"ble_{self._mac_address}")},
-            name=self._name,
-            manufacturer="OpenEPaperLink",
-            model=metadata.model_name,
-            sw_version=metadata.formatted_fw_version(),
-            hw_version=f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
-        )
+        device_info = {
+            "identifiers": {(DOMAIN, f"ble_{self._mac_address}")},
+            "name": self._name,
+            "manufacturer": "OpenEPaperLink",
+            "model": metadata.model_name,
+            "sw_version": metadata.formatted_fw_version(),
+            "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
+        }
+
+        if metadata.is_oepl:
+            device_info["configuration_url"] = OEPL_CONFIG_URL
+
+        return DeviceInfo(**device_info)
 
     @property
     def available(self) -> bool:
         """Return if the entity is available."""
         return bluetooth.async_address_present(self.hass, self._mac_address)
-
