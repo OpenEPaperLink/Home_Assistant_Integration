@@ -51,7 +51,7 @@
 - [x] `entity-translations` - Entities have translated names
 - [ ] `exception-translations` - Exception messages are translatable
 - [x] `icon-translations` - Entities implement icon translations
-- [ ] `reconfiguration-flow` - Integrations should have a reconfigure flow
+- [x] `reconfiguration-flow` - Integrations should have a reconfigure flow
 - [x] `repair-issues` - Repair issues and repair flows are used when user intervention is needed
 - [ ] `stale-devices` - Stale devices are removed
 

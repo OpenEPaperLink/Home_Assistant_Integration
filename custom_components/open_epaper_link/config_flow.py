@@ -132,6 +132,42 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle reconfiguration of the AP host."""
+        entry = self._get_reconfigure_entry()
+
+        # BLE entries do not expose reconfiguration
+        if entry.data.get("device_type") == "ble":
+            return self.async_abort(reason="no_reconfigure_ble")
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            info, error = await self._validate_input(user_input[CONF_HOST])
+            if not error:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    unique_id=self._host,
+                    title=info.get("title"),
+                    data_updates={CONF_HOST: self._host},
+                )
+            errors["base"] = error
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_HOST,
+                        default=entry.data.get(CONF_HOST, ""),
+                    ): str
+                }
+            ),
+            errors=errors,
+        )
+
     async def async_step_bluetooth(
             self, discovery_info: BluetoothServiceInfoBleak
     ):
