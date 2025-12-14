@@ -296,12 +296,14 @@ TAG_BUTTON_TYPES: tuple[OpenEPaperLinkTagButtonDescription, ...] = (
         translation_key="clear_pending",
         entity_category=EntityCategory.DIAGNOSTIC,
         command="clear",
+        entity_registry_enabled_default=True
     ),
     OpenEPaperLinkTagButtonDescription(
         key="force_refresh",
         translation_key="force_refresh",
         entity_category=EntityCategory.DIAGNOSTIC,
         command="refresh",
+        entity_registry_enabled_default=True
     ),
     OpenEPaperLinkTagButtonDescription(
         key="reboot_tag",
@@ -328,7 +330,6 @@ class OpenEPaperLinkTagButton(OpenEPaperLinkTagEntity, ButtonEntity):
     """Generic tag button entity."""
 
     entity_description: OpenEPaperLinkTagButtonDescription
-    _attr_entity_registry_enabled_default = True
 
     def __init__(self, hass: HomeAssistant, tag_mac: str, hub, description: OpenEPaperLinkTagButtonDescription) -> None:
         """Initialize the button entity."""

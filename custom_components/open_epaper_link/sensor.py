@@ -3,11 +3,9 @@ from __future__ import annotations
 PARALLEL_UPDATES = 0
 
 from dataclasses import dataclass
-from datetime import datetime, timezone, date
-from decimal import Decimal
+from datetime import datetime, timezone
 from typing import Any, Callable, Final
 
-from homeassistant.components import bluetooth
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -22,7 +20,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import DeviceInfo, EntityCategory
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 import logging
@@ -70,7 +68,7 @@ class OpenEPaperLinkSensorEntityDescription(SensorEntityDescription):
     suggested_unit_of_measurement: UnitOfInformation | None = None
     suggested_display_precision: int | None = None
     entity_category: EntityCategory | None = None
-    entity_registry_enabled_default: bool = True
+    entity_registry_enabled_default: bool = False
     value_fn: Callable[[dict], Any]
     attr_fn: Callable[[dict], Any] = None
 
@@ -91,6 +89,7 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         name="Tag count",
         state_class=SensorStateClass.TOTAL,
         value_fn=lambda data: data.get("record_count"),
+        entity_registry_enabled_default=True,
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="db_size",
@@ -149,7 +148,6 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         name="System Time",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
         value_fn=lambda data: datetime.fromtimestamp(data.get("sys_time", 0), tz=timezone.utc),
     ),
     OpenEPaperLinkSensorEntityDescription(
@@ -166,6 +164,7 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         name="Low Battery Tags",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: data.get("low_battery_count"),
+        entity_registry_enabled_default=True,
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="timeout_tag_count",
@@ -173,6 +172,7 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=None,
         value_fn=lambda data: data.get("timeout_count"),
+        entity_registry_enabled_default=True,
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="ps_ram_free",
@@ -210,6 +210,7 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         value_fn=lambda data: data.get("temperature"),
+        entity_registry_enabled_default=True,
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="battery_voltage",
@@ -227,6 +228,7 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         value_fn=lambda data: _calculate_battery_percentage(data.get("battery_mv", 0)),
+        entity_registry_enabled_default=True,
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="last_seen",
@@ -473,7 +475,6 @@ class OpenEPaperLinkAPSensor(OpenEPaperLinkAPEntity, SensorEntity):
     """Sensor class for OpenEPaperLink AP data."""
 
     entity_description: OpenEPaperLinkSensorEntityDescription
-    _attr_entity_registry_enabled_default = True
 
     def __init__(self, hub, description: OpenEPaperLinkSensorEntityDescription) -> None:
         """Initialize the AP sensor."""

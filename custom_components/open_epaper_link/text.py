@@ -2,9 +2,10 @@ from __future__ import annotations
 
 PARALLEL_UPDATES = 1
 
+from dataclasses import dataclass
 import requests
 
-from homeassistant.components.text import TextEntity, TextMode
+from homeassistant.components.text import TextEntity, TextMode, TextEntityDescription
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -19,29 +20,33 @@ import logging
 
 _LOGGER = logging.getLogger(__name__)
 
+@dataclass(frozen=True, kw_only=True)
+class OpenEPaperLinkTextDescription(TextEntityDescription):
+    """Text entity description with explicit default enable flag."""
+
+    description: str
+    entity_registry_enabled_default: bool = False
+
+
 # Define text field configurations
-AP_TEXT_ENTITIES = [
-    {
-        "key": "alias",
-        "name": "Alias",
-        "description": "AP display name"
-    },
-    {
-        "key": "repo",
-        "name": "Repository",
-        "description": "GitHub repository for tag type definitions"
-    }
-]
-"""Configuration for text entities to create for the AP.
-
-This list defines the text input entities created during setup that 
-control Access Point text-based settings. Each dictionary contains:
-
-- key: Configuration parameter key in the AP's configuration system
-- name: Human-readable name for display in the UI
-- icon: Material Design Icons identifier for the entity
-- description: Detailed explanation of the setting's purpose
-"""
+AP_TEXT_ENTITIES: tuple[OpenEPaperLinkTextDescription, ...] = (
+    OpenEPaperLinkTextDescription(
+        key="alias",
+        translation_key="alias",
+        name="Alias",
+        description="AP display name",
+        entity_registry_enabled_default=True,
+        entity_category=EntityCategory.CONFIG,
+    ),
+    OpenEPaperLinkTextDescription(
+        key="repo",
+        translation_key="repo",
+        name="Repository",
+        description="GitHub repository for tag type definitions",
+        entity_category=EntityCategory.CONFIG,
+    ),
+)
+"""Configuration for text entities to create for the AP."""
 TAG_TEXT_ENTITIES = [
     {
         "key": "alias",
@@ -59,19 +64,21 @@ which allows customizing the display name shown in Home Assistant and which also
 class APConfigText(OpenEPaperLinkAPEntity, TextEntity):
     """Text entity for AP configuration."""
 
-    _attr_entity_registry_enabled_default = True
+    entity_description: OpenEPaperLinkTextDescription
 
-    def __init__(self, hub, key: str, name: str,description: str) -> None:
+    def __init__(self, hub, description: OpenEPaperLinkTextDescription) -> None:
         """Initialize the text entity."""
         super().__init__(hub)
-        self._key = key
-        self._attr_unique_id = f"{hub.entry.entry_id}_{key}"
-        self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_translation_key = key
+        self.entity_description = description
+        self._key = description.key
+        self._attr_unique_id = f"{hub.entry.entry_id}_{description.key}"
+        self._attr_entity_category = description.entity_category
+        self._attr_translation_key = description.translation_key or description.key
         self._attr_native_max = 32
         self._attr_native_min = 0
         self._attr_mode = "text"
-        self._description = description
+        self._description = description.description
+        self._attr_entity_registry_enabled_default = description.entity_registry_enabled_default
 
     @property
     def available(self) -> bool:
@@ -205,15 +212,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
     entities = []
 
     # Create AP text entities from configuration
-    for config in AP_TEXT_ENTITIES:
-        entities.append(
-            APConfigText(
-                hub,
-                config["key"],
-                config["name"],
-                config["description"]
-            )
-        )
+    for description in AP_TEXT_ENTITIES:
+        entities.append(APConfigText(hub, description))
 
     # Add tag name/alias text entities
     for tag_mac in hub.tags:

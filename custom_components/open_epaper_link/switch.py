@@ -2,7 +2,9 @@ from __future__ import annotations
 
 PARALLEL_UPDATES = 1
 
-from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
+from dataclasses import dataclass
+
+from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass, SwitchEntityDescription
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
@@ -16,65 +18,64 @@ import logging
 
 _LOGGER = logging.getLogger(__name__)
 
+@dataclass(frozen=True, kw_only=True)
+class OpenEPaperLinkSwitchDescription(SwitchEntityDescription):
+    """Switch description with explicit default enable flag."""
+
+    description: str
+    entity_registry_enabled_default: bool = False
+
+
 # Define switch configurations
-SWITCH_ENTITIES = [
-    {
-        "key": "preview",
-        "name": "Preview Images",
-        "description": "Enable/disable preview images on the AP"
-    },
-    {
-        "key": "ble",
-        "name": "Bluetooth",
-        "description": "Enable/disable Bluetooth"
-    },
-    {
-        "key": "nightlyreboot",
-        "name": "Nightly Reboot",
-        "description": "Enable/disable automatic nightly reboot of the AP"
-    },
-    {
-        "key": "showtimestamp",
-        "name": "Show Timestamp",
-        "description": "Enable/disable showing timestamps on ESLs"
-    }
-]
-"""Configuration for all switch entities to create for the AP.
+SWITCH_ENTITIES: tuple[OpenEPaperLinkSwitchDescription, ...] = (
+    OpenEPaperLinkSwitchDescription(
+        key="preview",
+        translation_key="preview",
+        name="Preview Images",
+        description="Enable/disable preview images on the AP",
+        entity_registry_enabled_default=True,
+    ),
+    OpenEPaperLinkSwitchDescription(
+        key="ble",
+        translation_key="ble",
+        name="Bluetooth",
+        description="Enable/disable Bluetooth",
+        entity_registry_enabled_default=True,
+    ),
+    OpenEPaperLinkSwitchDescription(
+        key="nightlyreboot",
+        translation_key="nightlyreboot",
+        name="Nightly Reboot",
+        description="Enable/disable automatic nightly reboot of the AP",
+        entity_registry_enabled_default=True,
+    ),
+    OpenEPaperLinkSwitchDescription(
+        key="showtimestamp",
+        translation_key="showtimestamp",
+        name="Show Timestamp",
+        description="Enable/disable showing timestamps on ESLs",
+        entity_registry_enabled_default=True,
+    ),
+)
+"""Configuration for all switch entities to create for the AP."""
 
-This list defines all the switch entities that will be created during
-integration setup. Each dictionary contains:
-
-- key: Configuration parameter key in the AP's configuration system,
-    matching the key used in HTTP API calls.
-- name: Human-readable name for display in the UI. This will be combined
-    with "AP" to form the full entity name.
-- icon: Material Design Icons identifier for the entity.
-    Format is "mdi:icon-name" matching the icon library.
-- description: Detailed explanation of what the switch controls,
-    used for tooltips and documentation.
-
-Common AP features controlled through switches include:
-
-- preview: Whether to show tag images on the AP's display
-- ble: Bluetooth Low Energy functionality
-- nightlyreboot: Automatic nightly AP reboot for stability
-- showtimestamp: Whether to show timestamps on tag displays
-"""
 
 class APConfigSwitch(OpenEPaperLinkAPEntity, SwitchEntity):
     """Switch entity for AP configuration."""
 
-    _attr_entity_registry_enabled_default = True
+    entity_description: OpenEPaperLinkSwitchDescription
 
-    def __init__(self, hub, key: str, name: str, description: str) -> None:
+    def __init__(self, hub, description: OpenEPaperLinkSwitchDescription) -> None:
         """Initialize the switch entity."""
         super().__init__(hub)
-        self._key = key
-        self._attr_unique_id = f"{hub.entry.entry_id}_{key}"
+        self.entity_description = description
+        self._key = description.key
+        self._attr_unique_id = f"{hub.entry.entry_id}_{description.key}"
         self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_translation_key = key
-        self._description = description
+        self._attr_translation_key = description.translation_key or description.key
+        self._description = description.description
         self._attr_device_class = SwitchDeviceClass.SWITCH
+        self._attr_entity_registry_enabled_default = description.entity_registry_enabled_default
 
     @property
     def available(self) -> bool:
@@ -107,7 +108,9 @@ class APConfigSwitch(OpenEPaperLinkAPEntity, SwitchEntity):
             )
         )
 
-async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+
+async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry,
+                            async_add_entities: AddEntitiesCallback) -> None:
     """Set up switch entities for AP configuration.
 
     Creates switch entities for all defined AP configuration options
@@ -133,14 +136,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
     entities = []
 
     # Create switch entities from configuration
-    for config in SWITCH_ENTITIES:
-        entities.append(
-            APConfigSwitch(
-                hub,
-                config["key"],
-                config["name"],
-                config["description"]
-            )
-        )
+    for description in SWITCH_ENTITIES:
+        entities.append(APConfigSwitch(hub, description))
 
     async_add_entities(entities)
