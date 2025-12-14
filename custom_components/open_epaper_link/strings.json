@@ -244,6 +244,17 @@
       "refresh_config": {
         "name": "Refresh Configuration"
       }
+    },
+    "update": {
+      "firmware": {
+        "name": "Firmware"
+      }
+    }
+  },
+  "preview_features": {
+    "oepl_ble_updates": {
+      "name": "OEPL BLE firmware updates",
+      "description": "Shows a firmware update entity for OEPL BLE tags that compares the installed firmware to the latest OEPL_BLE GitHub release. Install is not available yet."
     }
   }
 }

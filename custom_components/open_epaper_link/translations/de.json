@@ -287,6 +287,11 @@
             "refresh_config": {
                 "name": "Konfiguration aktualisieren"
             }
+        },
+        "update": {
+            "firmware": {
+                "name": "Firmware"
+            }
         }
     },
     "services": {
@@ -347,6 +352,12 @@
         "refresh_tag_types": {
             "name": "Tag-Typen aktualisieren",
             "description": "Aktualisiert die Tag-Typen von GitHub"
+        }
+    },
+    "preview_features": {
+        "oepl_ble_updates": {
+            "name": "OEPL BLE Firmware-Updates",
+            "description": "Zeigt ein Firmware-Update-Entity für OEPL BLE Tags im Vergleich zur neuesten OEPL_BLE GitHub-Version. Installation ist noch nicht verfügbar."
         }
     }
 }

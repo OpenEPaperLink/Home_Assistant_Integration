@@ -231,6 +231,11 @@
       "content": {
         "default": "mdi:monitor"
       }
+    },
+    "update": {
+      "firmware": {
+        "default": "mdi:update"
+      }
     }
   }
 }

@@ -36,6 +36,7 @@ BLE_PLATFORMS = [
     Platform.LIGHT,  # LED control
     Platform.BUTTON,  # Clock mode controls
     Platform.IMAGE, # Display content (captured from drawcustom)
+    Platform.UPDATE
 ]
 
 
