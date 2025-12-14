@@ -29,7 +29,7 @@
 - [x] `integration-owner` - Has an integration owner
 - [ ] `log-when-unavailable` - If internet/device/service is unavailable, log once when unavailable and once when back connected
 - [x] `parallel-updates` - Number of parallel updates is specified
-- [ ] `reauthentication-flow` - Reauthentication needs to be available via the UI
+- [x] (exempt) `reauthentication-flow` - Reauthentication needs to be available via the UI
 - [ ] `test-coverage` - Above 95% test coverage for all integration modules
 
 ## Gold

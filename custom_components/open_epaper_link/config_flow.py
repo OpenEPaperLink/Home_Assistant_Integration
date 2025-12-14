@@ -41,7 +41,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for OpenEPaperLink.
 
-    Implements the flow for initial integration setup and reauthorization.
+    Implements the flow for initial integration setup.
     The flow validates that the provided AP host is reachable and responds
     correctly before creating a configuration entry.
 
@@ -384,37 +384,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="bluetooth_confirm",
             description_placeholders=description_placeholders,
-        )
-
-    async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> FlowResult:
-        """Handle reauthorization."""
-        self._host = entry_data[CONF_HOST]
-        return await self.async_step_reauth_confirm()
-
-    async def async_step_reauth_confirm(
-            self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle reauthorization confirmation."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            info, error = await self._validate_input(self._host)
-            if not error:
-                entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
-                if entry:
-                    self.hass.config_entries.async_update_entry(
-                        entry,
-                        data={**entry.data, CONF_HOST: self._host},
-                    )
-                    await self.hass.config_entries.async_reload(entry.entry_id)
-                    return self.async_abort(reason="reauth_successful")
-
-            errors["base"] = error
-
-        return self.async_show_form(
-            step_id="reauth_confirm",
-            description_placeholders={"host": self._host},
-            errors=errors,
         )
 
     @staticmethod

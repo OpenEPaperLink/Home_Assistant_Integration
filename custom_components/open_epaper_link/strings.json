@@ -12,7 +12,7 @@
         "data_description": {
           "host": "Hostname or IP of the OpenEPaperLink access point. Do not include http/https."
         }
-      }
+      },
     },
     "error": {
       "interrogation_failed": "Failed to connect to device and retrieve display information. Error: {error}. Retry or check device connectivity.",
