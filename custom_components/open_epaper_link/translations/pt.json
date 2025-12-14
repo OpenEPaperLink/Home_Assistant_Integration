@@ -251,6 +251,12 @@
       }
     }
   },
+  "issues": {
+    "camera_migration_needed": {
+      "title": "Entidades de câmera migradas",
+      "description": "OpenEPaperLink migrou {count} entidades de câmera para entidades de imagem. Atualize os seus dashboards e automações para usar as novas entidades de imagem. Entidades removidas: {entities}"
+    }
+  },
   "preview_features": {
     "oepl_ble_updates": {
       "name": "Atualizações de firmware OEPL BLE",

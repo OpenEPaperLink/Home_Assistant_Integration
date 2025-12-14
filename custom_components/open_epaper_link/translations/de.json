@@ -354,6 +354,12 @@
             "description": "Aktualisiert die Tag-Typen von GitHub"
         }
     },
+    "issues": {
+        "camera_migration_needed": {
+            "title": "Kamera-Entitäten migriert",
+            "description": "OpenEPaperLink hat {count} Kamera-Entitäten in Bild-Entitäten migriert. Dashboards und Automationen aktualisieren, um die neuen Bild-Entitäten zu verwenden. Entfernte Entitäten: {entities}"
+        }
+    },
     "preview_features": {
         "oepl_ble_updates": {
             "name": "OEPL BLE Firmware-Updates",

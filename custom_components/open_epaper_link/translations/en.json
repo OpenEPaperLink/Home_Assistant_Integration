@@ -47,11 +47,11 @@
             "no_options_ble": "No configurable options are available for BLE devices. BLE devices are managed automatically and do not require additional configuration."
         }
     },
-    "entity": {
-        "switch": {
-            "preview": {
-                "name": "Preview Images on AP"
-            },
+  "entity": {
+    "switch": {
+      "preview": {
+        "name": "Preview Images on AP"
+      },
             "ble": {
                 "name": "Bluetooth LE"
             },
@@ -250,11 +250,17 @@
                 "name": "Firmware"
             }
         }
-    },
-    "preview_features": {
-        "oepl_ble_updates": {
-            "name": "OEPL BLE firmware updates",
-            "description": "Shows a firmware update entity for OEPL BLE tags that compares the installed firmware to the latest OEPL_BLE GitHub release. Install is not available yet."
-        }
+  },
+  "issues": {
+    "camera_migration_needed": {
+      "title": "Camera entities migrated",
+      "description": "OpenEPaperLink migrated {count} camera entities to image entities. Update your dashboards and automations to use the new image entities. Removed entities: {entities}"
+    }
+  },
+  "preview_features": {
+    "oepl_ble_updates": {
+      "name": "OEPL BLE firmware updates",
+      "description": "Shows a firmware update entity for OEPL BLE tags that compares the installed firmware to the latest OEPL_BLE GitHub release. Install is not available yet."
+    }
     }
 }

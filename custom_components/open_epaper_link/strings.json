@@ -251,6 +251,12 @@
       }
     }
   },
+  "issues": {
+    "camera_migration_needed": {
+      "title": "Camera entities migrated",
+      "description": "OpenEPaperLink migrated {count} camera entities to image entities. Update your dashboards and automations to use the new image entities. Removed entities: {entities}"
+    }
+  },
   "preview_features": {
     "oepl_ble_updates": {
       "name": "OEPL BLE firmware updates",

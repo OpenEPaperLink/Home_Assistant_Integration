@@ -3,7 +3,7 @@ import logging
 import os
 from typing import Final
 
-from homeassistant.components import persistent_notification
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform, EVENT_HOMEASSISTANT_STARTED, CONF_HOST
 from homeassistant.core import HomeAssistant
@@ -436,13 +436,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
 
         removed_entities = await async_migrate_camera_entities(hass, entry)
         if removed_entities:
-            persistent_notification.async_create(
+            # Inform users via repairs that camera entities were migrated and dashboards need updates
+            ir.async_create_issue(
                 hass,
-                f"OpenEPaperLink: Migrated {len(removed_entities)} camera entities to image entities.\n\n"
-                f"Please update your dashboards and automations to use the new image entities instead of camera entities.\n\n"
-                f"Removed entities: {', '.join(removed_entities)}",
-                title="OpenEPaperLink Migration",
-                notification_id="open_epaper_link_camera_migration"
+                DOMAIN,
+                f"camera_migration_{entry.entry_id}",
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="camera_migration_needed",
+                translation_placeholders={
+                    "count": str(len(removed_entities)),
+                    "entities": ", ".join(removed_entities),
+                },
             )
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
