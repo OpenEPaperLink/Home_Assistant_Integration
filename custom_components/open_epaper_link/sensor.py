@@ -19,6 +19,7 @@ from homeassistant.const import (
     UnitOfElectricPotential, UnitOfInformation, UnitOfTime,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -444,6 +445,34 @@ def _calculate_battery_percentage(voltage: int) -> int:
     return max(0, min(100, int(percentage)))
 
 
+def _tag_has_battery(tag_data: dict) -> bool:
+    """Check if a tag is battery-powered."""
+    if not tag_data:
+        return True  # Default to creating sensors when data is missing
+
+    if tag_data.get("is_external"):
+        return False
+
+    battery_mv = tag_data.get("battery_mv")
+    return battery_mv is not None and battery_mv > 0
+
+
+def _remove_battery_sensors(
+    hass: HomeAssistant, entry_id: str, tag_mac: str
+) -> None:
+    """Remove battery entities for a non-battery tag."""
+    entity_registry = er.async_get(hass)
+    unique_ids = {
+        f"{tag_mac}_battery_percentage",
+        f"{tag_mac}_battery_voltage",
+    }
+
+    for entity in er.async_entries_for_config_entry(entity_registry, entry_id):
+        if entity.unique_id in unique_ids:
+            _LOGGER.info("Removing battery sensor for external-power tag: %s", entity.entity_id)
+            entity_registry.async_remove(entity.entity_id)
+
+
 class OpenEPaperLinkTagSensor(OpenEPaperLinkTagEntity, SensorEntity):
     """Sensor class for OpenEPaperLink tag data."""
     entity_description: OpenEPaperLinkSensorEntityDescription
@@ -650,9 +679,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
         """
         entities = []
 
+        tag_data = hub.get_tag_data(tag_mac)
+        has_battery = _tag_has_battery(tag_data)
+
         for description in TAG_SENSOR_TYPES:
+            if description.key in ("battery_percentage", "battery_voltage") and not has_battery:
+                continue
             sensor = OpenEPaperLinkTagSensor(hub, tag_mac, description)
             entities.append(sensor)
+
+        if not has_battery:
+            _remove_battery_sensors(hass, entry.entry_id, tag_mac)
 
         async_add_entities(entities)
 

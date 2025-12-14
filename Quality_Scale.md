@@ -47,7 +47,7 @@
 - [x] `dynamic-devices` - Devices added after integration setup
 - [x] `entity-category` - Entities are assigned an appropriate EntityCategory
 - [x] `entity-device-class` - Entities use device classes where possible
-- [ ] `entity-disabled-by-default` - Integration disables less popular (or noisy) entities
+- [x] `entity-disabled-by-default` - Integration disables less popular (or noisy) entities
 - [x] `entity-translations` - Entities have translated names
 - [ ] `exception-translations` - Exception messages are translatable
 - [x] `icon-translations` - Entities implement icon translations
