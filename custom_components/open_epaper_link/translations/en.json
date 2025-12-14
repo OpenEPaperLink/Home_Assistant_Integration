@@ -5,9 +5,22 @@
             "title": "Set up BLE Tag",
             "description": "Set up **{name}**?\n\n**Details:**\n- Address: {address}\n- Signal: {rssi} dBm\n- Battery: {battery}\n- Firmware: {fw_version}\n- Config Version: {config_version}"
           },
+          "reconfigure": {
+            "title": "Update Access Point",
+            "description": "Update the OpenEPaperLink access point address.",
+            "data": {
+              "host": "Host or IP"
+            },
+            "data_description": {
+              "host": "Hostname or IP of the OpenEPaperLink access point."
+            }
+          },
             "user": {
                 "data": {
                     "host": "Host or IP"
+                },
+                "data_description": {
+                    "host": "Hostname or IP of the OpenEPaperLink access point."
                 }
             }
         },
@@ -18,7 +31,8 @@
         "abort": {
             "single_instance_allowed": "Only one OpenEPaperLink hub can be configured. Multiple BLE devices are supported, but only one AP hub is allowed.",
             "unsupported_protocol": "Unsupported BLE firmware protocol. Only ATC and OEPL firmware are supported.",
-            "invalid_advertising_data": "Could not parse device advertising data. Please ensure the device is using compatible firmware."
+            "invalid_advertising_data": "Could not parse device advertising data. Please ensure the device is using compatible firmware.",
+            "no_reconfigure_ble": "BLE devices do not support reconfiguration. Remove and re-add the device if you need to change its settings."
         }
     },
     "options": {
@@ -31,6 +45,12 @@
                     "button_debounce": "Button Debounce Time (seconds)",
                     "nfc_debounce": "NFC Debounce Time (seconds)",
                     "custom_font_dirs": "Custom Font Directories"
+                },
+                "data_description": {
+                    "blacklisted_tags": "Tags to hide; blacklisted tags will not update or trigger services.",
+                    "button_debounce": "Delay before another button press is accepted (seconds).",
+                    "nfc_debounce": "Delay before another NFC tap is accepted (seconds).",
+                    "custom_font_dirs": "Comma-separated directories containing additional fonts for generated images."
                 }
             }
         },
@@ -38,11 +58,11 @@
             "no_options_ble": "No configurable options are available for BLE devices. BLE devices are managed automatically and do not require additional configuration."
         }
     },
-    "entity": {
-        "switch": {
-            "preview": {
-                "name": "Preview Images on AP"
-            },
+  "entity": {
+    "switch": {
+      "preview": {
+        "name": "Preview Images on AP"
+      },
             "ble": {
                 "name": "Bluetooth LE"
             },
@@ -235,6 +255,23 @@
             "refresh_config": {
                 "name": "Refresh Configuration"
             }
+        },
+        "update": {
+            "firmware": {
+                "name": "Firmware"
+            }
         }
+  },
+  "issues": {
+    "camera_migration_needed": {
+      "title": "Camera entities migrated",
+      "description": "OpenEPaperLink migrated {count} camera entities to image entities. Update your dashboards and automations to use the new image entities. Removed entities: {entities}"
+    }
+  },
+  "preview_features": {
+    "oepl_ble_updates": {
+      "name": "OEPL BLE firmware updates",
+      "description": "Shows a firmware update entity for OEPL BLE tags that compares the installed firmware to the latest OEPL_BLE GitHub release. Install is not available yet."
+    }
     }
 }

@@ -36,5 +36,206 @@
     "set_content_mode": {
       "service": "mdi:format-text"
     }
+  },
+  "entity": {
+    "sensor": {
+      "ip": {
+        "default": "mdi:ip"
+      },
+      "wifi_ssid": {
+        "default": "mdi:wifi-settings"
+      },
+      "record_count": {
+        "default": "mdi:tag-multiple"
+      },
+      "db_size": {
+        "default": "mdi:database-settings"
+      },
+      "little_fs_free": {
+        "default": "mdi:database-outline"
+      },
+      "ap_state": {
+        "default": "mdi:access-point"
+      },
+      "run_state": {
+        "default": "mdi:cog"
+      },
+      "wifi_rssi": {
+        "default": "mdi:wifi-strength-4"
+      },
+      "heap": {
+        "default": "mdi:chip"
+      },
+      "sys_time": {
+        "default": "mdi:clock-outline"
+      },
+      "uptime": {
+        "default": "mdi:timer"
+      },
+      "low_battery_tag_count": {
+        "default": "mdi:battery-alert"
+      },
+      "timeout_tag_count": {
+        "default": "mdi:tag-off"
+      },
+      "ps_ram_free": {
+        "default": "mdi:memory"
+      },
+      "temperature": {
+        "default": "mdi:thermometer"
+      },
+      "battery_voltage": {
+        "default": "mdi:battery"
+      },
+      "battery_percentage": {
+        "default": "mdi:battery"
+      },
+      "last_seen": {
+        "default": "mdi:history"
+      },
+      "next_update": {
+        "default": "mdi:update"
+      },
+      "next_checkin": {
+        "default": "mdi:clock-check"
+      },
+      "lqi": {
+        "default": "mdi:signal-cellular-outline"
+      },
+      "rssi": {
+        "default": "mdi:signal-distance-variant"
+      },
+      "pending_updates": {
+        "default": "mdi:sync-circle"
+      },
+      "content_mode": {
+        "default": "mdi:view-grid-outline"
+      },
+      "wakeup_reason": {
+        "default": "mdi:power"
+      },
+      "capabilities": {
+        "default": "mdi:list-box-outline"
+      },
+      "update_count": {
+        "default": "mdi:counter"
+      },
+      "width": {
+        "default": "mdi:arrow-expand-horizontal"
+      },
+      "height": {
+        "default": "mdi:arrow-expand-vertical"
+      },
+      "runtime": {
+        "default": "mdi:timer-outline"
+      },
+      "boot_count": {
+        "default": "mdi:restart"
+      },
+      "checkin_count": {
+        "default": "mdi:clock-check"
+      },
+      "block_requests": {
+        "default": "mdi:transfer"
+      }
+    },
+    "button": {
+      "clear_pending": {
+        "default": "mdi:broom"
+      },
+      "force_refresh": {
+        "default": "mdi:refresh"
+      },
+      "reboot_tag": {
+        "default": "mdi:restart"
+      },
+      "scan_channels": {
+        "default": "mdi:wifi"
+      },
+      "deep_sleep": {
+        "default": "mdi:sleep"
+      },
+      "reboot_ap": {
+        "default": "mdi:restart"
+      },
+      "refresh_tag_types": {
+        "default": "mdi:refresh"
+      },
+      "refresh_config": {
+        "default": "mdi:refresh"
+      }
+    },
+    "switch": {
+      "preview": {
+        "default": "mdi:eye"
+      },
+      "ble": {
+        "default": "mdi:bluetooth"
+      },
+      "nightlyreboot": {
+        "default": "mdi:restart"
+      },
+      "showtimestamp": {
+        "default": "mdi:clock"
+      }
+    },
+    "select": {
+      "channel": {
+        "default": "mdi:wifi"
+      },
+      "led": {
+        "default": "mdi:brightness-5"
+      },
+      "tft": {
+        "default": "mdi:brightness-5"
+      },
+      "maxsleep": {
+        "default": "mdi:sleep"
+      },
+      "lock": {
+        "default": "mdi:lock"
+      },
+      "wifipower": {
+        "default": "mdi:wifi-strength-4"
+      },
+      "language": {
+        "default": "mdi:translate"
+      },
+      "discovery": {
+        "default": "mdi:access-point-network"
+      },
+      "subghzchannel": {
+        "default": "mdi:antenna"
+      },
+      "sleeptime1": {
+        "default": "mdi:sleep"
+      },
+      "sleeptime2": {
+        "default": "mdi:sleep"
+      }
+    },
+    "text": {
+      "alias": {
+        "default": "mdi:rename-box"
+      },
+      "repo": {
+        "default": "mdi:source-repository"
+      }
+    },
+    "light": {
+      "led": {
+        "default": "mdi:lightbulb"
+      }
+    },
+    "image": {
+      "content": {
+        "default": "mdi:monitor"
+      }
+    },
+    "update": {
+      "firmware": {
+        "default": "mdi:update"
+      }
+    }
   }
 }

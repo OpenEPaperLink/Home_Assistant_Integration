@@ -6,7 +6,7 @@ from datetime import timedelta, datetime
 from functools import partial
 
 from PIL import ImageDraw
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.history import get_significant_states
 from homeassistant.util import dt
@@ -46,7 +46,10 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
         height = y_end - y_start + 1
 
         # Get time range
-        duration = timedelta(seconds=element.get("duration", 60 * 60 * 24))
+        duration_seconds = float(element.get("duration", 60 * 60 * 24))
+        if duration_seconds <= 0:
+            raise ServiceValidationError("duration must be greater than 0 seconds")
+        duration = timedelta(seconds=duration_seconds)
         end = dt.now()
         start = end - duration
 
@@ -73,7 +76,7 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
         raw_data = []
         for plot in element["data"]:
             if plot["entity"] not in all_states:
-                raise HomeAssistantError(f"No recorded data found for {plot['entity']}")
+                raise ServiceValidationError(f"No recorded data found for {plot['entity']}")
 
             states = all_states[plot["entity"]]
             state_obj = states[0]
@@ -111,7 +114,7 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
             raw_data.append(points)
 
         if not raw_data:
-            raise HomeAssistantError("No valid data points found")
+            raise ServiceValidationError("No valid data points found")
 
         # Apply rounding if requested
         if element.get("round_values", False):
@@ -163,6 +166,8 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
             y_axis_tick_length = y_axis.get("tick_length", 4)
             y_axis_tick_width = y_axis.get("tick_width", 2)
             y_axis_tick_every = float(y_axis.get("tick_every", 1))
+            if y_axis_tick_every <= 0:
+                raise ServiceValidationError("yaxis.tick_every must be greater than 0")
             y_axis_grid = y_axis.get("grid", True)
             y_axis_grid_color = ctx.colors.resolve(y_axis.get("grid_color", "black"))
             y_axis_grid_style = y_axis.get("grid_style", "dotted")
@@ -178,7 +183,9 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
 
         if x_legend:
             time_format = x_legend.get("format", "%H:%M")
-            time_interval = x_legend.get("interval", time_interval)
+            interval = x_legend.get("interval")
+            if interval is not None:
+                time_interval = float(interval)
             time_size = x_legend.get("size", 10)
             time_font = ctx.fonts.get_font(font_name, time_size)
             time_color = ctx.colors.resolve(x_legend.get("color", "black"))
@@ -186,6 +193,8 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
             x_legend_height = x_legend.get("height", -1)
             if time_position not in ("top", "bottom", None):
                 time_position = "bottom"
+        if time_interval <= 0:
+            raise ServiceValidationError("xlegend.interval must be greater than 0")
 
         # Configure x axis
         x_axis = element.get("xaxis", {})
@@ -857,7 +866,6 @@ async def draw_diagram(ctx: DrawingContext, element: dict) -> None:
                 )
 
             except (ValueError, IndexError, KeyError) as e:
-                _LOGGER.warning("Error processing bar data: %s", str(e))
-                continue
+                raise ServiceValidationError(f"Invalid bar data for diagram: {str(e)}") from e
 
     ctx.pos_y = ctx.pos_y + height

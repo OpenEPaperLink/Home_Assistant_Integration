@@ -44,7 +44,7 @@ drawcustom:
           options:
             - label: "No dithering"
               value: "0"
-            - label: "Floyd-Steinberg (best for photos)"
+            - label: "Burkes (best for photos)"
               value: "1"
             - label: "Ordered (best for halftone colors)"
               value: "2"
@@ -65,7 +65,7 @@ drawcustom:
           unit_of_measurement: seconds
     dry-run:
       name: Dry run
-      description: Generate image but don't send to AP
+      description: Generate image but don't send to device
       required: true
       default: false
       selector:

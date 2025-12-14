@@ -11,6 +11,7 @@ from .registry import element_handler
 from .types import ElementType, DrawingContext
 
 _LOGGER = logging.getLogger(__name__)
+_ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
 
 @element_handler(ElementType.ICON, requires=["x", "y", "value", "size"])
@@ -35,9 +36,9 @@ async def draw_icon(ctx: DrawingContext, element: dict) -> None:
     x = ctx.coords.parse_x(element['x'])
     y = ctx.coords.parse_y(element['y'])
 
-    # Load MDI font and metadata # TODO add handler here as well maybe? also move fonts to fonts direcotory? (applies to text as well)
-    font_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'materialdesignicons-webfont.ttf')
-    meta_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "materialdesignicons-webfont_meta.json")
+    # Load MDI font and metadata
+    font_file = os.path.join(_ASSETS_DIR, "materialdesignicons-webfont.ttf")
+    meta_file = os.path.join(_ASSETS_DIR, "materialdesignicons-webfont_meta.json")
 
     try:
         def load_meta():
@@ -137,8 +138,8 @@ async def draw_icon_sequence(ctx: DrawingContext, element: dict) -> None:
     direction = element.get('direction', 'right')  # right, down, up, left
 
     # Load MDI font and metadata
-    font_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'materialdesignicons-webfont.ttf')
-    meta_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "materialdesignicons-webfont_meta.json")
+    font_file = os.path.join(_ASSETS_DIR, "materialdesignicons-webfont.ttf")
+    meta_file = os.path.join(_ASSETS_DIR, "materialdesignicons-webfont_meta.json")
 
     try:
         def load_meta():

@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+PARALLEL_UPDATES = 1
+
 from homeassistant.components.select import SelectEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .util import set_ap_config_item
+from .entity import OpenEPaperLinkAPEntity
+from .runtime_data import OpenEPaperLinkConfigEntry
 
 import logging
 
@@ -242,55 +244,46 @@ SELECT_ENTITIES = [
     {
         "key": "channel",
         "name": "IEEE 802.15.4 channel",
-        "icon": "mdi:wifi",
         "mapping": CHANNEL_MAPPING,
     },
     {
         "key": "led",
         "name": "RGB LED brightness",
-        "icon": "mdi:brightness-5",
         "mapping": BRIGHTNESS_MAPPING,
     },
     {
         "key": "tft",
         "name": "TFT brightness",
-        "icon": "mdi:brightness-5",
         "mapping": TFT_BRIGHTNESS_MAPPING,
     },
     {
         "key": "maxsleep",
         "name": "Maximum Sleep",
-        "icon": "mdi:sleep",
         "mapping": MAX_SLEEP_MAPPING,
     },
     {
         "key": "lock",
         "name": "Lock tag inventory",
-        "icon": "mdi:lock",
         "mapping": LOCK_INVENTORY_MAPPING,
     },
     {
         "key": "wifipower",
         "name": "Wifi power",
-        "icon": "mdi:wifi-strength-4",
         "mapping": WIFI_POWER_MAPPING,
     },
     {
         "key": "language",
         "name": "Language",
-        "icon": "mdi:translate",
         "mapping": LANGUAGE_MAPPING,
     },
     {
         "key": "discovery",
         "name": "Discovery Method",
-        "icon": "mdi:access-point-network",
         "mapping": DISCOVERY_MAPPING
     },
     {
         "key": "subghzchannel",
         "name": "Sub-GHz channel",
-        "icon": "mdi:antenna",
         "mapping": SUB_GHZ_MAPPING
     }
 ]
@@ -324,7 +317,7 @@ Some common settings include:
 """
 
 
-class APConfigSelect(SelectEntity):
+class APConfigSelect(OpenEPaperLinkAPEntity, SelectEntity):
     """Base select entity for AP configuration.
 
     Provides a dropdown selection entity that controls a specific
@@ -335,7 +328,9 @@ class APConfigSelect(SelectEntity):
     also responds to configuration changes from other sources.
     """
 
-    def __init__(self, hub, key: str, name: str, icon: str, mapping: OptionMapping) -> None:
+    _attr_entity_registry_enabled_default = True
+
+    def __init__(self, hub, key: str, name: str, mapping: OptionMapping) -> None:
         """Initialize the select entity.
 
         Sets up the select entity with appropriate name, icon, and options.
@@ -344,37 +339,16 @@ class APConfigSelect(SelectEntity):
             hub: Hub instance for AP communication
             key: Configuration key on the AP
             name: Human-readable name for the UI
-            icon: Material Design Icons identifier
             mapping: OptionMapping for value/option conversion
         """
-        self._hub = hub
+        super().__init__(hub)
         self._key = key
-        # self._attr_name = f"AP {name}"
-        self._attr_has_entity_name = True
         self._attr_translation_key = key
         self._attr_unique_id = f"{hub.entry.entry_id}_{key}"
-        self._attr_icon = icon
         self._attr_entity_category = EntityCategory.CONFIG
         self._mapping = mapping
         self._attr_options = mapping.options
         self._available = False
-
-    @property
-    def device_info(self):
-        """Return device info for the AP.
-
-        Associates this select entity with the AP device in Home Assistant
-        using the domain and "ap" as the identifier.
-
-        Returns:
-            dict: Device information dictionary
-        """
-        return {
-            "identifiers": {(DOMAIN, "ap")},
-            "name": "OpenEPaperLink AP",
-            "model": self._hub.ap_model,
-            "manufacturer": "OpenEPaperLink",
-        }
 
     @property
     def available(self) -> bool:
@@ -418,46 +392,16 @@ class APConfigSelect(SelectEntity):
         """
         value = self._mapping.get_value(option)
         if value is not None:
-            await set_ap_config_item(self._hub, self._key, value)
-
-    @callback
-    def _handle_ap_config_update(self):
-        """Handle updated AP configuration.
-
-        Called when the AP configuration changes. Updates the entity state
-        to reflect the new value from the AP.
-        """
-        self.async_write_ha_state()
-
-    @callback
-    def _handle_connection_status(self, is_online: bool):
-        """Handle connection status updates.
-
-        Updates the entity's availability state when the AP connection
-        status changes.
-
-        Args:
-            is_online: Boolean indicating if the AP is online
-        """
-        self.async_write_ha_state()
+            await self._hub.set_ap_config_item(self._key, value)
 
     async def async_added_to_hass(self):
         """Register callbacks."""
-        # Listen for AP config updates
+        await super().async_added_to_hass()
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
                 f"{DOMAIN}_ap_config_update",
-                self._handle_ap_config_update,
-            )
-        )
-
-        # Listen for connection status updates
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                f"{DOMAIN}_connection_status",
-                self._handle_connection_status,
+                self._handle_update,
             )
         )
 
@@ -473,7 +417,7 @@ class APTimeHourSelect(APConfigSelect):
     periods when tag updates are disabled.
     """
 
-    def __init__(self, hub, key: str, name: str, icon: str) -> None:
+    def __init__(self, hub, key: str, name: str) -> None:
         """Initialize time select entity.
 
         Creates a specialized select entity for time selection with
@@ -483,16 +427,16 @@ class APTimeHourSelect(APConfigSelect):
             hub: Hub instance for AP communication
             key: Configuration key on the AP
             name: Human-readable name for the UI
-            icon: Material Design Icons identifier
         """
         # Create 24-hour time mapping
         time_mapping = OptionMapping({
             i: f"{i:02d}:00" for i in range(24)
         })
-        super().__init__(hub, key, name, icon, time_mapping)
+        super().__init__(hub, key, name, time_mapping)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry,
+                            async_add_entities: AddEntitiesCallback) -> None:
     """Set up select entities for AP configuration.
 
     Creates select entities for all defined AP configuration options
@@ -506,7 +450,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         entry: Configuration entry
         async_add_entities: Callback to register new entities
     """
-    hub = hass.data[DOMAIN][entry.entry_id]
+    hub = entry.runtime_data
 
     # Wait for initial AP config to be loaded
     if not hub.ap_config:
@@ -520,14 +464,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             hub,
             config["key"],
             config["name"],
-            config["icon"],
             config["mapping"]
         ))
 
     # Add time select entities
     entities.extend([
-        APTimeHourSelect(hub, "sleeptime1", "No updates between 1 (from)", "mdi:sleep"),
-        APTimeHourSelect(hub, "sleeptime2", "No updates between 2 (to)", "mdi:sleep"),
+        APTimeHourSelect(hub, "sleeptime1", "No updates between 1 (from)"),
+        APTimeHourSelect(hub, "sleeptime2", "No updates between 2 (to)"),
     ])
 
     async_add_entities(entities)

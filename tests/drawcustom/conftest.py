@@ -86,17 +86,22 @@ def image_gen(mock_hass):
             component_dir = dir_path
             break
 
+    assets_dir = os.path.join(component_dir, "imagegen", "assets")
+
     # Define font paths
     font_paths = {
-        "ppb.ttf": os.path.join(component_dir, "ppb.ttf"),
-        "rbm.ttf": os.path.join(component_dir, "rbm.ttf")
+        "ppb.ttf": os.path.join(assets_dir, "ppb.ttf"),
+        "rbm.ttf": os.path.join(assets_dir, "rbm.ttf")
     }
 
     # Check if fonts exist
     fonts_exist = all(os.path.exists(path) for path in font_paths.values())
     if not fonts_exist:
-        print(f"WARNING: Some font files not found in {component_dir}")
-        print(f"Available files in directory: {os.listdir(component_dir) if os.path.exists(component_dir) else 'Directory not found'}")
+        print(f"WARNING: Some font files not found in {assets_dir}")
+        if os.path.exists(assets_dir):
+            print(f"Available files in directory: {os.listdir(assets_dir)}")
+        else:
+            print("Assets directory not found")
 
     # Create a patch for FontManager to avoid filesystem operations
     with patch('custom_components.open_epaper_link.imagegen.FontManager', autospec=True) as MockFontManager:

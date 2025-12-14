@@ -3,16 +3,19 @@ import logging
 import os
 from typing import Final
 
-from homeassistant.components import persistent_notification
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform, EVENT_HOMEASSISTANT_STARTED, CONF_HOST
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er, device_registry as dr
+from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import entity_registry as er, device_registry as dr, storage
 from homeassistant.const import __version__ as HA_VERSION
+from homeassistant.helpers.typing import ConfigType
 from .ble import BLEDeviceMetadata
 from .const import DOMAIN
-from .hub import Hub
-from .services import async_setup_services, async_unload_services
+from .coordinator import Hub
+from .runtime_data import OpenEPaperLinkConfigEntry, OpenEPaperLinkBLERuntimeData
+from .services import async_setup_services
 from .tag_types import get_tag_types_manager
 from .util import is_ble_entry
 
@@ -32,52 +35,16 @@ BLE_PLATFORMS = [
     Platform.SENSOR,  # Battery, RSSI, last seen
     Platform.LIGHT,  # LED control
     Platform.BUTTON,  # Clock mode controls
+    Platform.IMAGE, # Display content (captured from drawcustom)
+    Platform.UPDATE
 ]
-
-
-async def _setup_services_for_configured_devices(hass: HomeAssistant) -> None:
-    """Set up services based on configured device types.
-
-    Detects what types of devices are configured and registers appropriate services:
-    - If only BLE devices: Register only BLE-compatible services
-    - If only AP devices: Register all services
-    - If mixed: Register all services (AP services work for AP devices, drawcustom works for both)
-
-    Args:
-        hass: Home Assistant instance
-    """
-    if DOMAIN not in hass.data:
-        return
-
-    has_ble_devices = False
-    has_ap_devices = False
-
-    # Check what types of devices are configured
-    for entry_data in hass.data[DOMAIN].values():
-        if is_ble_entry(entry_data):
-            has_ble_devices = True
-        else:
-            has_ap_devices = True
-
-    # Determine what services to register
-    if has_ap_devices:
-        # If AP devices are configured, register all services
-        service_type = "all"
-    elif has_ble_devices:
-        # If only BLE devices are configured, register only BLE-compatible services
-        service_type = "ble"
-    else:
-        # No devices configured yet, register all services (shouldn't happen)
-        service_type = "all"
-
-    await async_setup_services(hass, service_type)
 
 
 async def async_migrate_camera_entities(hass: HomeAssistant, entry: ConfigEntry) -> list[str]:
     """Migrate old camera entities to image entities.
 
           Finds and removes camera entities that match our unique ID pattern,
-          returns list of removed entity IDs for notification.
+          returns a list of removed entity IDs for notification.
 
           Returns:
               list[str]: List of removed camera entity IDs
@@ -295,7 +262,14 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the OpenEPaperLink integration."""
+
+    # Services should be set up unconditionally
+    await async_setup_services(hass)
+    return True
+
+async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry) -> bool:
     """Set up OpenEPaperLink integration from a config entry.
 
     This is the main entry point for integration initialization, which handles both:
@@ -330,16 +304,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.debug("Setting up BLE device with protocol: %s (manufacturer ID: 0x%04X)",
                       protocol_type, protocol.manufacturer_id)
 
-        # Store BLE device config in hass.data for entity access
-        ble_data = {
-            "type": "ble",
-            "mac_address": mac_address,
-            "name": name,
-            "device_metadata": device_metadata,
-            "protocol_type": protocol_type,
-            "sensors": {},  # Registry of sensor entities
-        }
-        hass.data.setdefault(DOMAIN, {})[entry.entry_id] = ble_data
+        # Store BLE device config in runtime_data for entity access
+        ble_data = OpenEPaperLinkBLERuntimeData(
+            mac_address=mac_address,
+            name=name,
+            device_metadata=device_metadata,
+            protocol_type=protocol_type,
+            sensors={},
+        )
+        entry.runtime_data = ble_data
+
+        # Lightweight presence check - only checks cached advertisement data
+        if not bluetooth.async_address_present(hass, mac_address, connectable=False):
+            raise ConfigEntryNotReady(
+                f"BLE device {name} ({mac_address}) not detected in Bluetooth range"
+            )
 
         if entry.data.get("send_welcome_image", False):
             new_data = dict(entry.data)
@@ -360,7 +339,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ) -> None:
             """Handle BLE advertising data updates.
 
-            Uses protocol-specific parsing based on device firmware type.
+            Uses protocol-specific parsing based on the device firmware type.
             """
             # Only process the specific device
             if service_info.address != mac_address:
@@ -386,8 +365,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 _LOGGER.debug("Failed to parse advertising data for %s: %s", mac_address, err, exc_info=True)
                 return
 
-            # Dynamically update device attributes
-            if advertising_data.fw_version:
+            # Dynamically update device attributes (skip OEPL fw to avoid incorrect value)
+            if advertising_data.fw_version and protocol_type != "oepl":
                 device_registry = dr.async_get(hass)
                 device_entry = device_registry.async_get_device(
                     identifiers={(DOMAIN, f"ble_{mac_address}")}
@@ -415,7 +394,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             }
 
             # Update all registered sensors
-            for sensor in ble_data["sensors"].values():
+            for sensor in ble_data.sensors.values():
                 sensor.update_from_advertising_data(sensor_data)
 
         # Remove deprecated clock mode button entities
@@ -423,7 +402,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if removed_clock_buttons:
             _LOGGER.info("Removed deprecated clock mode buttons: %s", removed_clock_buttons)
 
-        # Remove invalid entities based on current device config
+        # Remove invalid entities based on the current device config
         removed_invalid = await async_remove_invalid_ble_entities(hass, entry, device_metadata)
         if removed_invalid:
             _LOGGER.info("Removed invalid BLE entities: %s", removed_invalid)
@@ -450,20 +429,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hub = Hub(hass, entry)
 
         # Do basic setup without WebSocket connection
-        if not await hub.async_setup_initial():
-            return False
+        # Raises ConfigEntryNotReady if AP is unreachable
+        await hub.async_setup_initial()
 
-        hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
+        entry.runtime_data = hub
 
         removed_entities = await async_migrate_camera_entities(hass, entry)
         if removed_entities:
-            persistent_notification.async_create(
+            # Inform users via repairs that camera entities were migrated and dashboards need updates
+            ir.async_create_issue(
                 hass,
-                f"OpenEPaperLink: Migrated {len(removed_entities)} camera entities to image entities.\n\n"
-                f"Please update your dashboards and automations to use the new image entities instead of camera entities.\n\n"
-                f"Removed entities: {', '.join(removed_entities)}",
-                title="OpenEPaperLink Migration",
-                notification_id="open_epaper_link_camera_migration"
+                DOMAIN,
+                f"camera_migration_{entry.entry_id}",
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="camera_migration_needed",
+                translation_placeholders={
+                    "count": str(len(removed_entities)),
+                    "entities": ", ".join(removed_entities),
+                },
             )
 
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -479,8 +463,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             # Otherwise wait for the started event
             hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, start_websocket)
 
-    # Set up services based on what device types are configured
-    await _setup_services_for_configured_devices(hass)
 
     # Listen for changes to options
     entry.async_on_unload(entry.add_update_listener(async_update_options))
@@ -488,7 +470,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def async_update_options(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry) -> None:
     """Handle updates to integration options.
 
     Called when the user updates integration options through the UI.
@@ -498,7 +480,7 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
         hass: Home Assistant instance
         entry: Updated configuration entry
     """
-    entry_data = hass.data[DOMAIN][entry.entry_id]
+    entry_data = entry.runtime_data
 
     # Only AP entries have hub with reload_config method
     if is_ble_entry(entry_data):
@@ -510,7 +492,7 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await hub.async_reload_config()
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry) -> bool:
     """Unload the integration when removed or restarted.
 
     Handles both BLE and AP entries with appropriate cleanup.
@@ -522,7 +504,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     Returns:
         bool: True if unload was successful, False otherwise
     """
-    entry_data = hass.data[DOMAIN][entry.entry_id]
+    entry_data = entry.runtime_data
 
     # Determine if BLE or AP entry
     is_ble_device = is_ble_entry(entry_data)
@@ -537,10 +519,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         if unload_ok:
             await hub.shutdown()
-
-    if unload_ok:
-        await async_unload_services(hass)
-        hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
 
@@ -583,6 +561,8 @@ async def async_remove_storage_files(hass: HomeAssistant) -> None:
     """
     from .tag_types import reset_tag_types_manager
 
+    storage_dir = hass.config.path(".storage")
+
     # Remove tag types file
     tag_types_file = hass.config.path("open_epaper_link_tagtypes.json")
     if await hass.async_add_executor_job(os.path.exists, tag_types_file):
@@ -592,8 +572,14 @@ async def async_remove_storage_files(hass: HomeAssistant) -> None:
         except OSError as err:
             _LOGGER.error("Error removing tag types file: %s", err)
 
+    # Remove tag types storage entry
+    try:
+        await storage.async_remove_store(hass, "open_epaper_link_tagtypes")
+        _LOGGER.debug("Removed tag types storage file")
+    except Exception as err:
+        _LOGGER.error("Error removing tag types storage file: %s", err)
+
     # Remove tag storage file
-    storage_dir = hass.config.path(".storage")
     tags_file = os.path.join(storage_dir, f"{DOMAIN}_tags")
     if await hass.async_add_executor_job(os.path.exists, tags_file):
         try:
@@ -670,13 +656,7 @@ async def _send_welcome_image(
         height = metadata.height
         color_scheme = metadata.color_scheme
 
-        colors = ["black", "white"]
-        if color_scheme == 1:  # BWR
-            colors.append("red")
-        elif color_scheme == 2:  # BWY
-            colors.append("yellow")
-        elif color_scheme == 3:  # BWRY
-            colors.extend(["red", "yellow"])
+        colors = list(color_scheme.palette.colors.keys())
 
         title_y_pct = 10
         title_size = max(12, int(height * 0.08))
@@ -752,11 +732,11 @@ async def _send_welcome_image(
             DOMAIN,
             "drawcustom",
             {
-                "device_id": device_id,
+                "device_id": [device_id],
                 "payload": payload,
                 "background": "white",
                 "rotate": 0,
-                "dither": 2,
+                "dither": 0,
                 "ttl": 60,
             },
             blocking=False,

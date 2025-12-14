@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import os.path
+import os
 
 import aiohttp
 import asyncio
 import json
 import logging
-from typing import Dict, Tuple, Optional, Any
 from datetime import datetime, timedelta
+from typing import Any, Dict, Optional, Tuple
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import storage
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,6 +19,8 @@ GITHUB_API_URL = "https://api.github.com/repos/OpenEPaperLink/OpenEPaperLink/con
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/OpenEPaperLink/OpenEPaperLink/master/resources/tagtypes"
 CACHE_DURATION = timedelta(hours=48)  # Cache tag definitions for 48 hours
 STORAGE_VERSION = 1
+STORAGE_KEY = "open_epaper_link_tagtypes"
+LEGACY_TAG_TYPES_FILE = "open_epaper_link_tagtypes.json"
 
 
 class TagType:
@@ -106,13 +110,14 @@ class TagType:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> TagType:
+    def from_dict(cls, type_id: int, data: dict) -> TagType:
         """Create TagType from stored dictionary.
 
         Factory method to reconstruct a TagType instance from a previously
         serialized dictionary when loaded from persistent storage.
 
         Args:
+            type_id: Numeric identifier for this tag type
             data: Dictionary containing serialized tag type properties
 
         Returns:
@@ -125,14 +130,15 @@ class TagType:
             'height': data.get('height'),
             'rotatebuffer': data.get('rotatebuffer'),
             'bpp': data.get('bpp'),
-            'shortlut': data.get('short_lut'),
+            'shortlut': data.get('short_lut', data.get('shortlut')),
             'colortable': data.get('colortable'),
             'options': data.get('options', []),
-            'contentids': data.get('content_ids', []),
+            'contentids': data.get('contentids', data.get('content_ids', [])),
             'template': data.get('template', {}),
+            'usetemplate': data.get('usetemplate'),
             'zlib_compression': data.get('zlib_compression', None),
         }
-        return cls(data.get('type_id'), raw_data)
+        return cls(type_id, raw_data)
 
     def get(self, attr: str, default: Any = None) -> Any:
         """Get attribute value, supporting dict-like access.
@@ -176,114 +182,135 @@ class TagTypesManager:
         self._tag_types: Dict[int, TagType] = {}
         self._last_update: Optional[datetime] = None
         self._lock = asyncio.Lock()
-        self._storage_file = self._hass.config.path("open_epaper_link_tagtypes.json")
+        self._legacy_storage_file = self._hass.config.path(LEGACY_TAG_TYPES_FILE)
+        self._store = storage.Store(
+            hass,
+            version=STORAGE_VERSION,
+            key=STORAGE_KEY,
+        )
         _LOGGER.debug("TagTypesManager instance created")
 
     async def load_stored_data(self) -> None:
         """Load stored tag type definitions from disk.
 
         Attempts to load previously cached tag type definitions from the
-        local storage file. If valid data is found, it's used to populate
-        the manager's state. Otherwise, a fresh fetch from GitHub is initiated.
+        Home Assistant storage helper. If valid data is found, it's used to
+        populate the manager's state. Otherwise, a fresh fetch from GitHub
+        is initiated and the legacy file in the config directory is removed.
 
         This helps reduce network requests and provides offline operation capability.
         """
+        stored_data: dict[str, Any] | None = None
         try:
-            _LOGGER.debug("Attempting to load stored tag types from %s", self._storage_file)
+            stored_data = await self._store.async_load()
+        except Exception as err:  # pragma: no cover - defensive
+            _LOGGER.error("Error loading tag types from storage: %s", err, exc_info=True)
 
-            def load_json():
-                """Load JSON file if it exists."""
-                if os.path.exists(self._storage_file):
-                    with open(self._storage_file, 'r', encoding='utf-8') as fp:
-                        return json.load(fp)
-                return None
-
-            stored_data = await self._hass.async_add_executor_job(load_json)
-
-            if stored_data and stored_data.get('version') == STORAGE_VERSION:
-                _LOGGER.info("Found valid stored tag types data")
-                self._last_update = datetime.fromisoformat(stored_data.get('last_update'))
-
-                # Convert stored data back to TagType objects
-                self._tag_types = {}
-                for type_id_str, type_data in stored_data.get('tag_types', {}).items():
-                    try:
-                        type_id = int(type_id_str)
-                        self._tag_types[type_id] = TagType.from_dict(type_data)
-                        _LOGGER.debug("Loaded tag type %d: %s",
-                                      type_id, self._tag_types[type_id].name)
-                    except Exception as e:
-                        _LOGGER.error("Error loading tag type %s: %s", type_id_str, str(e))
-
-                _LOGGER.info("Loaded %d tag types from storage", len(self._tag_types))
+        if stored_data:
+            if stored_data.get("version") == STORAGE_VERSION:
+                await self._load_from_payload(stored_data)
                 return
-            else:
-                _LOGGER.warning("Stored data invalid or wrong version, will fetch from GitHub")
+            _LOGGER.warning("Stored tag types version mismatch, refetching fresh definitions")
 
-        except Exception as e:
-            _LOGGER.error("Error loading stored tag types: %s", str(e), exc_info=True)
+        fetch_success = await self._fetch_tag_types()
+        if fetch_success:
+            await self._cleanup_legacy_file()
+        else:
+            await self._cleanup_legacy_file()
 
-        # If this point is reached, either no stored data exists or data is invalid
-        await self._fetch_tag_types()
+    async def _save_to_store(self) -> None:
+        """Persist tag types using Home Assistant storage helper."""
+        if not self._last_update:
+            self._last_update = datetime.now()
 
-    async def save_to_storage(self) -> None:
-        """Save tag types to persistent storage.
-
-        Serializes current tag type definitions to JSON and saves them
-        to the local storage file. Uses atomic writes to prevent data
-        corruption if interrupted.
-
-        The storage format includes a version identifier and timestamp
-        to facilitate future compatibility and freshness checking.
-        """
+        data = {
+            "version": STORAGE_VERSION,
+            "last_update": self._last_update.isoformat(),
+            "tag_types": {
+                str(type_id): tag_type.to_dict()
+                for type_id, tag_type in self._tag_types.items()
+            },
+        }
 
         try:
-            _LOGGER.debug("Saving tag types to storage")
-            data = {
-                'version': STORAGE_VERSION,
-                'last_update': self._last_update.isoformat(),
-                'tag_types': {
-                    str(type_id): tag_type.to_dict()
-                    for type_id, tag_type in self._tag_types.items()
-                }
-            }
+            await self._store.async_save(data)
+        except Exception as err:  # pragma: no cover - storage helper handles atomicity
+            _LOGGER.error("Error saving tag types to storage: %s", err)
 
-            def write_json():
-                temp_file = f"{self._storage_file}.temp"
-                try:
-                    with open(temp_file, 'w', encoding='utf-8') as file:
-                        json.dump(data, file, default=str, indent=2)
-                    os.replace(temp_file, self._storage_file)
-                except Exception as e:
-                    _LOGGER.error(f"Error writing tag types to storage: {str(e)}")
-                    if os.path.exists(temp_file):
-                        os.remove(temp_file)
-                    raise e
+    async def _load_from_payload(self, stored_data: dict[str, Any]) -> None:
+        """Populate tag types from stored payload."""
+        try:
+            last_update = stored_data.get("last_update")
+            self._last_update = (
+                datetime.fromisoformat(last_update) if last_update else datetime.now()
+            )
+        except (TypeError, ValueError):
+            self._last_update = datetime.now()
 
-            await self._hass.async_add_executor_job(write_json)
-            _LOGGER.debug("Tag types saved to storage")
-        except Exception as e:
-            _LOGGER.error(f"Error saving tag types to storage: {str(e)}")
+        self._tag_types = {}
+        for type_id_str, type_data in stored_data.get("tag_types", {}).items():
+            try:
+                type_id = int(type_id_str)
+                self._tag_types[type_id] = TagType.from_dict(type_id, type_data)
+                _LOGGER.debug(
+                    "Loaded tag type %d: %s", type_id, self._tag_types[type_id].name
+                )
+            except Exception as err:  # pragma: no cover - defensive
+                _LOGGER.error("Error loading tag type %s: %s", type_id_str, err)
+
+        _LOGGER.info("Loaded %d tag types from storage", len(self._tag_types))
+
+    async def _cleanup_legacy_file(self) -> None:
+        """Remove legacy tag types file from config directory."""
+
+        def _remove() -> bool:
+            if os.path.exists(self._legacy_storage_file):
+                os.remove(self._legacy_storage_file)
+                return True
+            return False
+
+        try:
+            removed = await self._hass.async_add_executor_job(_remove)
+            if removed:
+                _LOGGER.info("Migrated tag types to Home Assistant storage; legacy file removed")
+        except OSError as err:
+            _LOGGER.error("Error removing legacy tag types file: %s", err)
 
     async def ensure_types_loaded(self) -> None:
         """Ensure tag types are loaded and not too old.
 
-        Checks if tag types are already loaded and sufficiently recent.
+        Checks if tag types are already loaded and recent enough.
         If not loaded or older than CACHE_DURATION, initiates a refresh from GitHub.
 
         This is the primary method that should be called before accessing
         tag type information to ensure data availability.
+
+        Raises:
+            HomeAssistantError: If tag types could not be loaded
         """
         async with self._lock:
-            _LOGGER.debug(f"Last update: {self._last_update}, {datetime.now()}")
             if not self._tag_types:
                 await self.load_stored_data()
 
-            elif (not self._last_update or
-                  datetime.now() - self._last_update > CACHE_DURATION):
-                await self._fetch_tag_types()
+            # If still no types after loading from storage, this is a critical failure
+            if not self._tag_types:
+                raise HomeAssistantError(
+                    "Failed to load tag type definitions. No stored data available. "
+                    "Check network connectivity or GitHub access."
+                )
 
-    async def _fetch_tag_types(self) -> None:
+            # If the cache is expired, attempt refresh
+            if not self._last_update or datetime.now() - self._last_update > CACHE_DURATION:
+                _LOGGER.debug("Tag types cache expired, attempting refresh")
+                fetch_success = await self._fetch_tag_types()
+
+                # If refresh failed and have no valid types, raise an exception
+                if not fetch_success and not self._tag_types:
+                    raise HomeAssistantError(
+                        "Failed to refresh tag type definitions. Check network connectivity or GitHub access."
+                    )
+
+    async def _fetch_tag_types(self) -> bool:
         """Fetch tag type definitions from GitHub.
 
         Retrieves tag type definitions from the OpenEPaperLink GitHub repository:
@@ -355,16 +382,16 @@ class TagTypesManager:
                     self._tag_types = new_types
                     self._last_update = datetime.now()
                     _LOGGER.info(f"Successfully loaded {len(new_types)} tag definitions")
-                    await self.save_to_storage()
-                else:
-                    _LOGGER.error("No valid tag definitions found")
+                    await self._save_to_store()
+                    return True
+                _LOGGER.error("No valid tag definitions found")
 
         except Exception as e:
             _LOGGER.error(f"Error fetching tag types: {str(e)}")
-            if not self._tag_types:
-                # Load built-in fallback for first-time failures
-                self._load_fallback_types()
-                await self.save_to_storage()
+            return False
+
+        # Do NOT load fallback types - let caller decide how to handle failure
+        return False
 
     def _validate_tag_definition(self, data: Dict) -> bool:
         """Validate that a tag definition has required fields.
@@ -402,15 +429,19 @@ class TagTypesManager:
         - LILYGO TPANEL
         - Segmented tag type
         """
-        self._tag_types = {
+        fallback_definitions = {
             0: {"name": "M2 1.54\"", "width": 152, "height": 152},
             1: {"name": "M2 2.9\"", "width": 296, "height": 128},
             2: {"name": "M2 4.2\"", "width": 400, "height": 300},
             224: {"name": "AP display", "width": 320, "height": 170},
             225: {"name": "AP display", "width": 160, "height": 80},
             226: {"name": "LILYGO TPANEL", "width": 480, "height": 480},
-            240: {"name": "Segmented", "width": 0, "height": 0}
+            240: {"name": "Segmented", "width": 0, "height": 0},
         }
+        self._tag_types = {
+            type_id: TagType(type_id, data) for type_id, data in fallback_definitions.items()
+        }
+        self._last_update = datetime.now()
         _LOGGER.warning("Loaded fallback tag definitions")
 
     async def get_tag_info(self, hw_type: int) -> TagType:

@@ -5,9 +5,22 @@
                 "title": "BLE-Tag einrichten",
                 "description": "**{name}** einrichten?\n\n**Details:**\n- Adresse: {address}\n- Signal: {rssi} dBm\n- Batterie: {battery}\n- Firmware: {fw_version}\n- Config-Version: {config_version}"
             },
+            "reconfigure": {
+                "title": "Access Point aktualisieren",
+                "description": "Adresse des OpenEPaperLink-Access-Points aktualisieren.",
+                "data": {
+                    "host": "Hostname oder IP"
+                },
+                "data_description": {
+                    "host": "Hostname oder IP des OpenEPaperLink-Access-Points."
+                }
+            },
             "user": {
                 "data": {
                     "host": "Hostname oder IP"
+                },
+                "data_description": {
+                    "host": "Hostname oder IP des OpenEPaperLink-Access-Points."
                 }
             }
         },
@@ -18,7 +31,8 @@
         "abort": {
             "single_instance_allowed": "Nur ein OpenEPaperLink-Hub kann konfiguriert werden. Mehrere BLE-Geräte werden unterstützt, aber nur ein AP-Hub ist erlaubt.",
             "unsupported_protocol": "Nicht unterstütztes BLE-Firmware-Protokoll. Nur ATC- und OEPL-Firmware werden unterstützt.",
-            "invalid_advertising_data": "Advertising-Daten des Geräts konnten nicht analysiert werden. Bitte sicherstellen, dass das Gerät eine kompatible Firmware verwendet."
+            "invalid_advertising_data": "Advertising-Daten des Geräts konnten nicht analysiert werden. Bitte sicherstellen, dass das Gerät eine kompatible Firmware verwendet.",
+            "no_reconfigure_ble": "BLE-Geräte unterstützen keine Neukonfiguration. Gerät entfernen und erneut hinzufügen, wenn Einstellungen geändert werden sollen."
         }
     },
     "options": {
@@ -31,6 +45,12 @@
                     "button_debounce": "Tasten-Entstörzeit (Sekunden)",
                     "nfc_debounce": "NFC-Entstörzeit (Sekunden)",
                     "custom_font_dirs": "Benutzerdefinierte Schriftarten-Verzeichnisse"
+                },
+                "data_description": {
+                    "blacklisted_tags":"Tags ausblenden; geblacklistete Tags werden nicht aktualisiert und lösen keine Dienste aus.",
+                    "button_debounce": "Wartezeit, bevor ein weiterer Tastendruck akzeptiert wird (Sekunden).",
+                    "nfc_debounce": "Wartezeit, bevor ein weiterer NFC-Tap akzeptiert wird (Sekunden).",
+                    "custom_font_dirs":  "Kommagetrennte Verzeichnisse mit zusätzlichen Schriftarten für erzeugte Bilder."
                 }
             }
         },
@@ -278,6 +298,11 @@
             "refresh_config": {
                 "name": "Konfiguration aktualisieren"
             }
+        },
+        "update": {
+            "firmware": {
+                "name": "Firmware"
+            }
         }
     },
     "services": {
@@ -338,6 +363,18 @@
         "refresh_tag_types": {
             "name": "Tag-Typen aktualisieren",
             "description": "Aktualisiert die Tag-Typen von GitHub"
+        }
+    },
+    "issues": {
+        "camera_migration_needed": {
+            "title": "Kamera-Entitäten migriert",
+            "description": "OpenEPaperLink hat {count} Kamera-Entitäten in Bild-Entitäten migriert. Dashboards und Automationen aktualisieren, um die neuen Bild-Entitäten zu verwenden. Entfernte Entitäten: {entities}"
+        }
+    },
+    "preview_features": {
+        "oepl_ble_updates": {
+            "name": "OEPL BLE Firmware-Updates",
+            "description": "Zeigt ein Firmware-Update-Entity für OEPL BLE Tags im Vergleich zur neuesten OEPL_BLE GitHub-Version. Installation ist noch nicht verfügbar."
         }
     }
 }

@@ -41,7 +41,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for OpenEPaperLink.
 
-    Implements the flow for initial integration setup and reauthorization.
+    Implements the flow for initial integration setup.
     The flow validates that the provided AP host is reachable and responds
     correctly before creating a configuration entry.
 
@@ -63,7 +63,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
         """
         errors = {}
-        info = None
 
         # Remove any http:// or https:// prefix
         host = host.replace("http://", "").replace("https://", "")
@@ -130,6 +129,42 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=STEP_USER_DATA_SCHEMA,
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle reconfiguration of the AP host."""
+        entry = self._get_reconfigure_entry()
+
+        # BLE entries do not expose reconfiguration
+        if entry.data.get("device_type") == "ble":
+            return self.async_abort(reason="no_reconfigure_ble")
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            info, error = await self._validate_input(user_input[CONF_HOST])
+            if not error:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    unique_id=self._host,
+                    title=info.get("title"),
+                    data_updates={CONF_HOST: self._host},
+                )
+            errors["base"] = error
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_HOST,
+                        default=entry.data.get(CONF_HOST, ""),
+                    ): str
+                }
+            ),
             errors=errors,
         )
 
@@ -210,6 +245,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
 
                 # Interrogate device using protocol-specific method
+                fw_info: dict[str, Any] | None = None
+
                 async with BLEConnection(
                     self.hass,
                     self._discovered_device["address"],
@@ -217,6 +254,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     protocol
                 ) as conn:
                     capabilities = await protocol.interrogate_device(conn)
+                    # OEPL devices expose firmware version via 0x0043
+                    if self._discovered_device["protocol_type"] == "oepl":
+                        try:
+                            fw_info = await protocol.read_firmware_version(conn)
+                        except Exception as fw_err:
+                            _LOGGER.warning(
+                                "Failed to read firmware version for %s: %s",
+                                self._discovered_device["address"],
+                                fw_err,
+                            )
 
                 _LOGGER.debug("Device capabilities: %s", capabilities)
 
@@ -236,6 +283,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         device_metadata = {
                             "oepl_config": config_to_dict(protocol._last_config),
                         }
+                        if fw_info:
+                            device_metadata["fw_version"] = fw_info.get("version")
+                            device_metadata["fw_version_raw"] = fw_info.get("raw")
+                            if fw_info.get("sha"):
+                                device_metadata["fw_sha"] = fw_info["sha"]
 
                         # Generate model name from display config
                         if protocol._last_config.displays:
@@ -370,37 +422,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders=description_placeholders,
         )
 
-    async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> FlowResult:
-        """Handle reauthorization."""
-        self._host = entry_data[CONF_HOST]
-        return await self.async_step_reauth_confirm()
-
-    async def async_step_reauth_confirm(
-            self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle reauthorization confirmation."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            info, error = await self._validate_input(self._host)
-            if not error:
-                entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
-                if entry:
-                    self.hass.config_entries.async_update_entry(
-                        entry,
-                        data={**entry.data, CONF_HOST: self._host},
-                    )
-                    await self.hass.config_entries.async_reload(entry.entry_id)
-                    return self.async_abort(reason="reauth_successful")
-
-            errors["base"] = error
-
-        return self.async_show_form(
-            step_id="reauth_confirm",
-            description_placeholders={"host": self._host},
-            errors=errors,
-        )
-
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
@@ -463,7 +484,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self._custom_font_dirs = self.config_entry.options.get("custom_font_dirs", "")
 
         # Check if this is a BLE device
-        entry_data = self.hass.data[DOMAIN][self.config_entry.entry_id]
+        entry_data = self.config_entry.runtime_data
         is_ble_device = is_ble_entry(entry_data)
         
         if is_ble_device:

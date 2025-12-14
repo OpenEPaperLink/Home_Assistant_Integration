@@ -22,6 +22,12 @@
   "integration_type": "hub",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/OpenEPaperLink/Home_Assistant_Integration/issues",
+  "preview_features": {
+    "oepl_ble_updates": {
+      "learn_more_url": "https://github.com/OpenEPaperLink/OEPL_BLE",
+      "report_issue_url": "https://github.com/OpenEPaperLink/Home_Assistant_Integration/issues"
+    }
+  },
   "requirements": [
     "qrcode[pil]==7.4.2",
     "requests_toolbelt==1.0.0",

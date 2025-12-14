@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import re
 import logging
-from typing import List, Tuple
 
-from PIL import ImageDraw, ImageFont
+from PIL import ImageDraw
 
 from .colors import BLACK
 from .registry import element_handler
-from .types import ElementType, DrawingContext, TextSegment
+from .types import ElementType, DrawingContext
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
 _LOGGER = logging.getLogger(__name__)
+_ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
 
 class FontManager:
@@ -45,15 +46,16 @@ class FontManager:
         """Set up font directories based on the Home Assistant environment.
 
         Follows the documented search order:
-        1. Integration directory (for default fonts)
+        1. Integration assets directory (for default fonts)
         2. Web directory (/config/www/fonts/)
         3. Media directory (/media/fonts/)
         """
         # Clear existing dirs
         self._font_dirs = []
 
-        # Integration directory
-        self._font_dirs.append(os.path.dirname(os.path.dirname(__file__)))
+        # Integration assets directory
+        if os.path.exists(_ASSETS_DIR):
+            self._font_dirs.append(_ASSETS_DIR)
 
         # Web directory
         www_fonts_dir = self._hass.config.path("www/fonts")
@@ -104,11 +106,7 @@ class FontManager:
                 self.clear_cache()
 
                 # Reset known dirs and load new ones
-                self._font_dirs = [
-                    os.path.dirname(os.path.dirname(__file__)),  # Integration directory
-                    self._hass.config.path("www/fonts"),  # /config/www/fonts directory
-                    self._hass.config.path("media/fonts")  # /config/media/fonts directory
-                ]
+                self._setup_font_dirs()
                 for directory in current_dirs:
                     if directory and directory.strip():
                         self.add_font_directory(directory.strip())
@@ -207,7 +205,7 @@ class FontManager:
         # Try default fonts as fallback
         for default_font in self._default_fonts:
             try:
-                default_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), default_font)
+                default_path = os.path.join(_ASSETS_DIR, default_font)
                 return ImageFont.truetype(default_path, size)
             except (OSError, IOError):
                 continue

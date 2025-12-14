@@ -1,5 +1,8 @@
-from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
+PARALLEL_UPDATES = 1
+
+from dataclasses import dataclass
+
+from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -9,15 +12,18 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 import logging
 
+from .ble import get_protocol_by_name
+from .entity import OpenEPaperLinkTagEntity, OpenEPaperLinkAPEntity, OpenEPaperLinkBLEEntity
+from .runtime_data import OpenEPaperLinkConfigEntry
 from .tag_types import get_tag_types_manager
-from .util import send_tag_cmd, reboot_ap, is_ble_entry
+from .util import is_ble_entry
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 
 def _compare_configs(old: any, new: any, path: str = "") -> list[tuple[str, any, any]]:
-    """Recursively compare two configs and return list of changes.
+    """Recursively compare two configs and return a list of changes.
 
     Compares two configuration structures (dicts, lists, or values) and identifies
     all fields that have changed between them. Handles nested structures by building
@@ -116,7 +122,8 @@ def _format_value(value: any) -> str:
     return str(value)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry,
+                            async_add_entities: AddEntitiesCallback) -> None:
     """Set up button entities from a config entry.
 
     Creates button entities based on device type:
@@ -142,29 +149,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         entry: Configuration entry
         async_add_entities: Callback to register new entities
     """
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    
+    entry_data = entry.runtime_data
+
     # Check if this is a BLE device
     is_ble_device = is_ble_entry(entry_data)
-    
+
     if is_ble_device:
         # BLE device setup - create clock mode buttons
-        mac_address = entry_data["mac_address"]
-        name = entry_data["name"]
-        device_metadata = entry_data.get("device_metadata", {})
-        protocol_type = entry_data.get("protocol_type", "atc")  # Default to ATC for backward compatibility
+        mac_address = entry_data.mac_address
+        name = entry_data.name
+        device_metadata = entry_data.device_metadata
+        protocol_type = entry_data.protocol_type  # Default to ATC for backward compatibility
 
         ble_buttons = []
 
         # Add refresh config button for OEPL devices only
         if protocol_type == "oepl":
             ble_buttons.append(
-                RefreshConfigButton(mac_address, name, device_metadata, protocol_type, entry.entry_id)
+                RefreshConfigButton(mac_address, name, device_metadata, protocol_type, entry)
             )
 
         async_add_entities(ble_buttons)
         return
-    
+
     # AP device setup (original logic)
     hub = entry_data
 
@@ -203,11 +210,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
         added_tags.add(tag_mac)
         new_buttons = [
-            ClearPendingTagButton(hass, tag_mac, hub),
-            ForceRefreshButton(hass, tag_mac, hub),
-            RebootTagButton(hass, tag_mac, hub),
-            ScanChannelsButton(hass, tag_mac, hub),
-            DeepSleepButton(hass, tag_mac, hub),
+            OpenEPaperLinkTagButton(hass, tag_mac, hub, description)
+            for description in TAG_BUTTON_TYPES
         ]
         async_add_entities(new_buttons)
 
@@ -218,7 +222,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     # Add AP-level buttons
     async_add_entities([
         RebootAPButton(hass, hub),
-        RefreshTagTypesButton(hass),
+        RefreshTagTypesButton(hass, hub),
     ])
 
     # Listen for new tag discoveries
@@ -279,415 +283,94 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         )
     )
 
-class ClearPendingTagButton(ButtonEntity):
-    """Button to clear pending updates for a tag.
 
-    Creates a button entity that clears any pending content updates
-    for a specific tag. This is useful when a tag has queued updates
-    that are not being applied or need to be canceled.
-    """
-    def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
-        """Initialize the button entity.
+@dataclass(frozen=True, kw_only=True)
+class OpenEPaperLinkTagButtonDescription(ButtonEntityDescription):
+    """Describes an OpenEPaperLink tag button."""
+    command: str
 
-        Sets up the button entity with appropriate name, icon, and identifiers.
 
-        Args:
-            hass: Home Assistant instance
-            tag_mac: MAC address of the tag
-            hub: Hub instance for AP communication
-        """
+TAG_BUTTON_TYPES: tuple[OpenEPaperLinkTagButtonDescription, ...] = (
+    OpenEPaperLinkTagButtonDescription(
+        key="clear_pending",
+        translation_key="clear_pending",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        command="clear",
+        entity_registry_enabled_default=True
+    ),
+    OpenEPaperLinkTagButtonDescription(
+        key="force_refresh",
+        translation_key="force_refresh",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        command="refresh",
+        entity_registry_enabled_default=True
+    ),
+    OpenEPaperLinkTagButtonDescription(
+        key="reboot_tag",
+        translation_key="reboot_tag",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        command="reboot",
+    ),
+    OpenEPaperLinkTagButtonDescription(
+        key="scan_channels",
+        translation_key="scan_channels",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        command="scan",
+    ),
+    OpenEPaperLinkTagButtonDescription(
+        key="deep_sleep",
+        translation_key="deep_sleep",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        command="deepsleep",
+    ),
+)
+
+
+class OpenEPaperLinkTagButton(OpenEPaperLinkTagEntity, ButtonEntity):
+    """Generic tag button entity."""
+
+    entity_description: OpenEPaperLinkTagButtonDescription
+
+    def __init__(self, hass: HomeAssistant, tag_mac: str, hub, description: OpenEPaperLinkTagButtonDescription) -> None:
+        """Initialize the button entity."""
+        super().__init__(hub, tag_mac)
         self.hass = hass
-        self._tag_mac = tag_mac
         self._entity_id = f"{DOMAIN}.{tag_mac}"
-        self._hub = hub
-        self._attr_has_entity_name = True
-        self._attr_translation_key = "clear_pending"
-        # self._attr_name = f"{hub._data[tag_mac]['tag_name']} Clear Pending"
-        self._attr_unique_id = f"{tag_mac}_clear_pending"
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        self._attr_icon = "mdi:broom"
-
-    @property
-    def device_info(self):
-        """Return device info for the tag.
-
-        Associates this button with the tag device in Home Assistant
-        using the tag MAC address as the identifier.
-
-        Returns:
-            dict: Device information dictionary
-        """
-        tag_name = self._hub._data[self._tag_mac]['tag_name']
-        return {
-            "identifiers": {(DOMAIN, self._tag_mac)},
-            "name": tag_name,
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available.
-
-        A button is available if its associated tag is known to the AP
-        and not blacklisted in the integration options.
-
-        Returns:
-            bool: True if the tag is available, False otherwise
-        """
-        return self._tag_mac not in self._hub.get_blacklisted_tags()
+        self.entity_description = description
+        self._attr_unique_id = f"{tag_mac}_{description.key}"
 
     async def async_press(self) -> None:
-        """Handle the button press.
+        """Handle the button press."""
+        await self._hub.send_tag_cmd(self._entity_id, self.entity_description.command)
 
-        Sends the "clear" command to the tag via the AP when the
-        button is pressed in the UI.
-        """
-        await send_tag_cmd(self.hass, self._entity_id, "clear")
 
-class ForceRefreshButton(ButtonEntity):
-    """Button to force refresh a tag's display.
+class RebootAPButton(OpenEPaperLinkAPEntity, ButtonEntity):
+    """Button to reboot the Access Point."""
 
-    Creates a button entity that triggers an immediate display update
-    on the tag, forcing it to refresh with the current content.
-    This is useful when a tag's display hasn't updated as expected.
-    """
-    def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
-        """Initialize the button entity.
+    _attr_entity_registry_enabled_default = True
 
-        Sets up the button entity with appropriate name, icon, and identifiers.
-
-        Args:
-            hass: Home Assistant instance
-            tag_mac: MAC address of the tag
-            hub: Hub instance for AP communication
-        """
-        self.hass = hass
-        self._tag_mac = tag_mac
-        self._entity_id = f"{DOMAIN}.{tag_mac}"
-        self._hub = hub
-        self._attr_has_entity_name = True
-        self._attr_translation_key = "force_refresh"
-        # self._attr_name = f"{hub._data[tag_mac]['tag_name']} Force Refresh"
-        self._attr_unique_id = f"{tag_mac}_force_refresh"
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        self._attr_icon = "mdi:refresh"
-
-    @property
-    def device_info(self):
-        """Return device info for the tag.
-
-        Associates this button with the tag device in Home Assistant
-        using the tag MAC address as the identifier.
-
-        Returns:
-            dict: Device information dictionary
-        """
-        tag_name = self._hub._data[self._tag_mac]['tag_name']
-        return {
-            "identifiers": {(DOMAIN, self._tag_mac)},
-            "name": tag_name,
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available.
-
-        A button is available if its associated tag is known to the AP
-        and not blacklisted in the integration options.
-
-        Returns:
-            bool: True if the tag is available, False otherwise
-        """
-        return self._tag_mac not in self._hub.get_blacklisted_tags()
-
-    async def async_press(self) -> None:
-        """Handle the button press.
-
-        Sends the "refresh" command to the tag via the AP when the
-        button is pressed in the UI.
-        """
-        await send_tag_cmd(self.hass, self._entity_id, "refresh")
-
-class RebootTagButton(ButtonEntity):
-    """Button to reboot a tag.
-
-    Creates a button entity that sends a reboot command to the tag,
-    forcing a complete restart of the tag's firmware.
-    """
-    def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
-        """Initialize the button entity.
-
-        Sets up the button entity with appropriate name, icon, and identifiers.
-
-        Args:
-            hass: Home Assistant instance
-            tag_mac: MAC address of the tag
-            hub: Hub instance for AP communication
-        """
-        self.hass = hass
-        self._tag_mac = tag_mac
-        self._entity_id = f"{DOMAIN}.{tag_mac}"
-        self._hub = hub
-        self._attr_has_entity_name = True
-        self._attr_translation_key = "reboot_tag"
-        # self._attr_name = f"{hub._data[tag_mac]['tag_name']} Reboot"
-        self._attr_unique_id = f"{tag_mac}_reboot"
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        self._attr_icon = "mdi:restart"
-
-    @property
-    def device_info(self):
-        """Return device info for the tag.
-
-        Associates this button with the tag device in Home Assistant
-        using the tag MAC address as the identifier.
-
-        Returns:
-            dict: Device information dictionary
-        """
-        tag_name = self._hub._data[self._tag_mac]['tag_name']
-        return {
-            "identifiers": {(DOMAIN, self._tag_mac)},
-            "name": tag_name,
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available.
-
-        A button is available if its associated tag is known to the AP
-        and not blacklisted in the integration options.
-
-        Returns:
-            bool: True if the tag is available, False otherwise
-        """
-        return self._tag_mac not in self._hub.get_blacklisted_tags()
-
-    async def async_press(self) -> None:
-        """Handle the button press.
-
-        Sends the "reboot" command to the tag via the AP when the
-        button is pressed in the UI.
-        """
-        await send_tag_cmd(self.hass, self._entity_id, "reboot")
-
-class ScanChannelsButton(ButtonEntity):
-    """Button to initiate channel scanning on a tag.
-
-    Creates a button entity that triggers an IEEE 802.15.4 channel scan
-    on the tag.
-    """
-    def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
-        """Initialize the button entity.
-
-        Sets up the button entity with appropriate name, icon, and identifiers.
-
-        Args:
-            hass: Home Assistant instance
-            tag_mac: MAC address of the tag
-            hub: Hub instance for AP communication
-        """
-        self.hass = hass
-        self._tag_mac = tag_mac
-        self._entity_id = f"{DOMAIN}.{tag_mac}"
-        self._hub = hub
-        self._attr_has_entity_name = True
-        self._attr_translation_key = "scan_channels"
-        # self._attr_name = f"{hub._data[tag_mac]['tag_name']} Scan Channels"
-        self._attr_unique_id = f"{tag_mac}_scan_channels"
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        self._attr_icon = "mdi:wifi"
-
-    @property
-    def device_info(self):
-        """Return device info for the tag.
-
-        Associates this button with the tag device in Home Assistant
-        using the tag MAC address as the identifier.
-
-        Returns:
-            dict: Device information dictionary
-        """
-        tag_name = self._hub._data[self._tag_mac]['tag_name']
-        return {
-            "identifiers": {(DOMAIN, self._tag_mac)},
-            "name": tag_name,
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available.
-
-        A button is available if its associated tag is known to the AP
-        and not blacklisted in the integration options.
-
-        Returns:
-            bool: True if the tag is available, False otherwise
-        """
-        return self._tag_mac not in self._hub.get_blacklisted_tags()
-
-    async def async_press(self) -> None:
-        """Handle the button press.
-
-        Sends the "scan" command to the tag via the AP when the
-        button is pressed in the UI.
-        """
-        await send_tag_cmd(self.hass, self._entity_id, "scan")
-
-class DeepSleepButton(ButtonEntity):
-    """Button to put a tag into deep sleep mode.
-
-    Creates a button entity that sends a deep sleep command to the tag,
-    putting it into a low-power state to conserve battery.
-    """
-    def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
-        """Initialize the button entity.
-
-        Sets up the button entity with appropriate name, icon, and identifiers.
-
-        Args:
-            hass: Home Assistant instance
-            tag_mac: MAC address of the tag
-            hub: Hub instance for AP communication
-        """
-        self.hass = hass
-        self._tag_mac = tag_mac
-        self._entity_id = f"{DOMAIN}.{tag_mac}"
-        self._hub = hub
-        self._attr_has_entity_name = True
-        self._attr_translation_key = "deep_sleep"
-        # self._attr_name = f"{hub._data[tag_mac]['tag_name']} Scan Channels"
-        self._attr_unique_id = f"{tag_mac}_deep_sleep"
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        self._attr_icon = "mdi:sleep"
-
-    @property
-    def device_info(self):
-        """Return device info for the tag.
-
-        Associates this button with the tag device in Home Assistant
-        using the tag MAC address as the identifier.
-
-        Returns:
-            dict: Device information dictionary
-        """
-        tag_name = self._hub._data[self._tag_mac]['tag_name']
-        return {
-            "identifiers": {(DOMAIN, self._tag_mac)},
-            "name": tag_name,
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available.
-
-        A button is available if its associated tag is known to the AP
-        and not blacklisted in the integration options.
-
-        Returns:
-            bool: True if the tag is available, False otherwise
-        """
-        return self._tag_mac not in self._hub.get_blacklisted_tags()
-
-    async def async_press(self) -> None:
-        """Handle the button press.
-
-        Sends the "deepsleep" command to the tag via the AP when the
-        button is pressed in the UI.
-        """
-        await send_tag_cmd(self.hass, self._entity_id, "deepsleep")
-
-class RebootAPButton(ButtonEntity):
-    """Button to reboot the Access Point.
-
-    Creates a button entity that triggers a reboot of the OpenEPaperLink
-    Access Point, restarting all AP services and connections.
-
-    Note: Rebooting the AP will temporarily disconnect all tags
-    until they reconnect after the AP comes back online.
-    """
     def __init__(self, hass: HomeAssistant, hub) -> None:
-        """Initialize the button entity.
-
-        Sets up the button with appropriate name, icon, and device association.
-
-        Args:
-            hass: Home Assistant instance
-            hub: Hub instance for AP communication
-        """
+        """Initialize the button entity."""
+        super().__init__(hub)
         self.hass = hass
-        self._hub = hub
-        # self._attr_name = "Reboot AP"
-        self._attr_has_entity_name = True
         self._attr_translation_key = "reboot_ap"
         self._attr_unique_id = "reboot_ap"
-        self._attr_icon = "mdi:restart"
-
-    @property
-    def device_info(self):
-        """Return device info for the AP.
-
-        Associates this button with the AP device in Home Assistant.
-
-        Returns:
-            dict: Device information dictionary
-        """
-        return {
-            "identifiers": {(DOMAIN, "ap")},
-        }
 
     async def async_press(self) -> None:
-        """Handle the button press.
+        """Handle the button press."""
+        await self._hub.reboot_ap()
 
-        Sends a reboot command to the AP when the button is pressed
-        in the UI. The AP will disconnect and restart all services.
-        """
-        await reboot_ap(self.hass)
 
-class RefreshTagTypesButton(ButtonEntity):
-    """Button to manually refresh tag types from GitHub.
+class RefreshTagTypesButton(OpenEPaperLinkAPEntity, ButtonEntity):
+    """Button to manually refresh tag types from GitHub."""
 
-    Creates a button entity that triggers a refresh of the tag type
-    definitions from the OpenEPaperLink GitHub repository.
-
-    This is useful when new tag models are added to the repository
-    or when the local cache needs to be updated for any reason.
-
-    A persistent notification is shown when the refresh completes
-    to inform the user of the result.
-    """
-
-    def __init__(self, hass: HomeAssistant) -> None:
-        """Initialize the button entity.
-
-        Sets up the button with appropriate name, icon, and device association.
-
-        Args:
-            hass: Home Assistant instance
-        """
+    def __init__(self, hass: HomeAssistant, hub) -> None:
+        """Initialize the button entity."""
+        super().__init__(hub)
         self._hass = hass
-        self._attr_unique_id = "refresh_tag_types"
-        # self._attr_name = "Refresh Tag Types"
-        self._attr_has_entity_name = True
         self._attr_translation_key = "refresh_tag_types"
+        self._attr_unique_id = "refresh_tag_types"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        self._attr_icon = "mdi:refresh"
-
-    @property
-    def device_info(self):
-        """Return device info for the AP.
-
-        Associates this button with the AP device in Home Assistant,
-        adding manufacturer and model information.
-
-        Returns:
-            dict: Device information dictionary
-        """
-        return {
-            "identifiers": {(DOMAIN, "ap")},
-            "name": "OpenEPaperLink AP",
-            # "model": self._hub.ap_model,
-            "manufacturer": "OpenEPaperLink",
-        }
 
     async def async_press(self) -> None:
         """Handle the button press.
@@ -718,14 +401,24 @@ class RefreshTagTypesButton(ButtonEntity):
         )
 
 
-class RefreshConfigButton(ButtonEntity):
-    """Button to refresh OEPL device configuration.
+class RefreshConfigButton(OpenEPaperLinkBLEEntity, ButtonEntity):
+    """
+    Button to refresh OEPL device configuration.
 
     Creates a button entity that re-interrogates an OEPL device to fetch
     updated configuration and update the device metadata in Home Assistant.
-    This is useful when device configuration has been changed externally.
+    This is useful when the device configuration has been changed externally.
     """
-    def __init__(self, mac_address: str, name: str, device_metadata: dict, protocol_type: str, entry_id: str) -> None:
+
+    _attr_entity_registry_enabled_default = True
+
+    def __init__(self,
+                 mac_address: str,
+                 name: str,
+                 device_metadata: dict,
+                 protocol_type: str,
+                 entry: OpenEPaperLinkConfigEntry
+                 ) -> None:
         """Initialize the button entity.
 
         Args:
@@ -733,39 +426,20 @@ class RefreshConfigButton(ButtonEntity):
             name: Human-readable name for the device
             device_metadata: Device metadata dictionary
             protocol_type: BLE protocol type (should be "oepl")
-            entry_id: Configuration entry ID
+            entry: Configuration entry for the device
         """
-        from .ble import get_protocol_by_name
+        super().__init__(mac_address, name, entry)
 
-        self._mac_address = mac_address
-        self._name = name
         self._device_metadata = device_metadata
-        self._entry_id = entry_id
+        self._entry_id = entry.entry_id
         self._protocol_type = protocol_type
-        self._attr_has_entity_name = True
         self._attr_translation_key = "refresh_config"
         self._attr_unique_id = f"ble_{mac_address}_refresh_config"
-        self._attr_icon = "mdi:refresh"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
         # Get protocol handler for service UUID
         self._protocol = get_protocol_by_name(protocol_type)
         self._service_uuid = self._protocol.service_uuid
-
-    @property
-    def device_info(self):
-        """Return device info for the BLE device."""
-        from .ble import BLEDeviceMetadata
-        metadata = BLEDeviceMetadata(self._device_metadata)
-
-        return {
-            "identifiers": {(DOMAIN, f"ble_{self._mac_address}")},
-            "name": self._name,
-            "manufacturer": "OpenEPaperLink",
-            "model": metadata.model_name,
-            "sw_version": f"0x{metadata.fw_version:04x}",
-            "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
-        }
 
     async def async_press(self) -> None:
         """Re-interrogate device and update configuration."""
@@ -778,10 +452,19 @@ class RefreshConfigButton(ButtonEntity):
         try:
             # Get protocol handler
             protocol = get_protocol_by_name(self._protocol_type)
+            fw_info = None
 
             # Connect and interrogate device
             async with BLEConnection(self.hass, self._mac_address, self._service_uuid, protocol) as conn:
                 capabilities = await protocol.interrogate_device(conn)
+                try:
+                    fw_info = await protocol.read_firmware_version(conn)
+                except Exception as fw_err:
+                    _LOGGER.warning(
+                        "Failed to read firmware version for %s: %s",
+                        self._mac_address,
+                        fw_err,
+                    )
 
                 if not capabilities:
                     raise HomeAssistantError("Device returned invalid configuration data")
@@ -796,6 +479,18 @@ class RefreshConfigButton(ButtonEntity):
                 new_metadata = {
                     "oepl_config": config_to_dict(config),
                 }
+                if fw_info:
+                    new_metadata["fw_version"] = fw_info.get("version")
+                    new_metadata["fw_version_raw"] = fw_info.get("raw")
+                    if fw_info.get("sha"):
+                        new_metadata["fw_sha"] = fw_info["sha"]
+                elif "fw_version" in self._device_metadata:
+                    # Preserve the previously known firmware version if read fails
+                    new_metadata["fw_version"] = self._device_metadata.get("fw_version")
+                    if "fw_version_raw" in self._device_metadata:
+                        new_metadata["fw_version_raw"] = self._device_metadata.get("fw_version_raw")
+                    if "fw_sha" in self._device_metadata:
+                        new_metadata["fw_sha"] = self._device_metadata.get("fw_sha")
 
                 # Generate and store model name
                 if config.displays:
@@ -825,7 +520,8 @@ class RefreshConfigButton(ButtonEntity):
                             sections[section].append((field_path, old_val, new_val))
 
                         # Build section change lines
-                        for section in ["power", "displays", "leds", "sensors", "buses", "inputs", "system", "manufacturer"]:
+                        for section in ["power", "displays", "leds", "sensors", "buses", "inputs", "system",
+                                        "manufacturer"]:
                             if section in sections:
                                 log_lines.append(f"  {section.title()}:")
                                 for field_path, old_val, new_val in sections[section]:
@@ -834,48 +530,47 @@ class RefreshConfigButton(ButtonEntity):
                                     new_str = _format_value(new_val)
                                     log_lines.append(f"    {field_path}: {old_str} → {new_str}")
 
-                        # Log complete message in single statement
+                        # Log complete message in a single statement
                         _LOGGER.info("\n".join(log_lines))
                 else:
                     _LOGGER.info("No configuration changes for %s", self._mac_address)
 
-                # Update config entry
-                entry = self.hass.config_entries.async_get_entry(self._entry_id)
-                if entry:
-                    self.hass.config_entries.async_update_entry(
-                        entry,
-                        data={**entry.data, "device_metadata": new_metadata}
+                # Update config entry (persisted data)
+                self.hass.config_entries.async_update_entry(
+                    self._entry,
+                    data={**self._entry.data, "device_metadata": new_metadata}
+                )
+
+                # Update runtime_data so existing entities pick up new metadata
+                self._entry.runtime_data.device_metadata = new_metadata
+                self._device_metadata = new_metadata
+
+                # Update device registry attributes
+                device_registry = dr.async_get(self.hass)
+                device = device_registry.async_get_device(
+                    identifiers={(DOMAIN, f"ble_{self._mac_address}")}
+                )
+
+                if device:
+                    sw_version = fw_info.get("version") if fw_info else device.sw_version
+                    device_registry.async_update_device(
+                        device.id,
+                        hw_version=f"{capabilities.width}x{capabilities.height}",
+                        model=model_name,
+                        sw_version=str(sw_version) if sw_version else None,
                     )
 
-                    # Update hass.data so existing entities pick up new metadata
-                    if self._entry_id in self.hass.data[DOMAIN]:
-                        self.hass.data[DOMAIN][self._entry_id]["device_metadata"] = new_metadata
+                # Remove entities that will become invalid with the new config
+                from . import async_remove_invalid_ble_entities
+                removed = await async_remove_invalid_ble_entities(self.hass, self._entry, new_metadata)
+                if removed:
+                    _LOGGER.info("Removed invalid entities: %s", removed)
 
-                    # Update device registry attributes
-                    device_registry = dr.async_get(self.hass)
-                    device = device_registry.async_get_device(
-                        identifiers={(DOMAIN, f"ble_{self._mac_address}")}
-                    )
-                    if device:
-                        device_registry.async_update_device(
-                            device.id,
-                            hw_version=f"{capabilities.width}x{capabilities.height}",
-                            model=model_name,
-                        )
+                # Reload integration to re-create entities based on the new config
+                _LOGGER.info("Reloading integration to apply config changes for %s", self._mac_address)
+                await self.hass.config_entries.async_reload(self._entry_id)
 
-                    # Remove entities that will become invalid with new config
-                    from . import async_remove_invalid_ble_entities
-                    removed = await async_remove_invalid_ble_entities(self.hass, entry, new_metadata)
-                    if removed:
-                        _LOGGER.info("Removed invalid entities: %s", removed)
-
-                    # Reload integration to re-create entities based on new config
-                    _LOGGER.info("Reloading integration to apply config changes for %s", self._mac_address)
-                    await self.hass.config_entries.async_reload(self._entry_id)
-
-                    _LOGGER.info("Successfully refreshed configuration for %s", self._mac_address)
-                else:
-                    raise HomeAssistantError("Configuration entry not found")
+                _LOGGER.info("Successfully refreshed configuration for %s", self._mac_address)
 
         except Exception as e:
             _LOGGER.error("Failed to refresh configuration for %s: %s", self._mac_address, e)

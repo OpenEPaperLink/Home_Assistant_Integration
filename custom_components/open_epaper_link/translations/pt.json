@@ -5,9 +5,22 @@
         "title": "Configurar Etiqueta BLE",
         "description": "Configurar **{name}**?\n\n**Detalhes:**\n- Endereço: {address}\n- Sinal: {rssi} dBm\n- Bateria: {battery}\n- Firmware: {fw_version}\n- Versão Config: {config_version}"
       },
+      "reconfigure": {
+        "title": "Atualizar Ponto de Acesso",
+        "description": "Atualize o endereço do ponto de acesso OpenEPaperLink.",
+        "data": {
+          "host": "Host ou IP"
+        },
+        "data_description": {
+          "host": "Nome do host ou IP do ponto de acesso OpenEPaperLink."
+        }
+      },
       "user": {
         "data": {
           "host": "Host ou IP"
+        },
+        "data_description": {
+          "host": "Nome do host ou IP do ponto de acesso OpenEPaperLink."
         }
       }
     },
@@ -18,7 +31,8 @@
     "abort": {
       "single_instance_allowed": "Apenas um hub OpenEPaperLink pode ser configurado. Múltiplos dispositivos BLE são suportados, mas apenas um hub AP é permitido.",
       "unsupported_protocol": "Protocolo de firmware BLE não suportado. Apenas firmware ATC e OEPL são suportados.",
-      "invalid_advertising_data": "Não foi possível analisar os dados de advertising do dispositivo. Por favor, certifique-se de que o dispositivo está usando firmware compatível."
+      "invalid_advertising_data": "Não foi possível analisar os dados de advertising do dispositivo. Por favor, certifique-se de que o dispositivo está usando firmware compatível.",
+      "no_reconfigure_ble": "Dispositivos BLE não suportam reconfiguração. Remova e adicione o dispositivo novamente se precisar alterar suas definições."
     }
   },
   "options": {
@@ -31,6 +45,12 @@
           "button_debounce": "Tempo de Debounce do Botão (segundos)",
           "nfc_debounce": "Tempo de Debounce NFC (segundos)",
           "custom_font_dirs": "Diretórios de Fontes Personalizadas"
+        },
+        "data_description": {
+          "blacklisted_tags": "Tags para ocultar; tags na lista negra não serão atualizadas nem disparam serviços.",
+          "button_debounce": "Atraso antes de aceitar outro acionamento do botão (segundos).",
+          "nfc_debounce":  "Atraso antes de aceitar outro toque NFC (segundos).",
+          "custom_font_dirs":  "Diretórios separados por vírgula com fontes adicionais para imagens geradas."
         }
       }
     },
@@ -235,6 +255,23 @@
       "refresh_config": {
         "name": "Atualizar Configuração"
       }
+    },
+    "update": {
+      "firmware": {
+        "name": "Firmware"
+      }
+    }
+  },
+  "issues": {
+    "camera_migration_needed": {
+      "title": "Entidades de câmera migradas",
+      "description": "OpenEPaperLink migrou {count} entidades de câmera para entidades de imagem. Atualize os seus dashboards e automações para usar as novas entidades de imagem. Entidades removidas: {entities}"
+    }
+  },
+  "preview_features": {
+    "oepl_ble_updates": {
+      "name": "Atualizações de firmware OEPL BLE",
+      "description": "Mostra uma entidade de atualização de firmware para tags OEPL BLE comparando a versão instalada com o último release do OEPL_BLE no GitHub. Instalação ainda não disponível."
     }
   }
 }
