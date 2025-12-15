@@ -49,7 +49,7 @@
 - [x] `entity-device-class` - Entities use device classes where possible
 - [x] `entity-disabled-by-default` - Integration disables less popular (or noisy) entities
 - [x] `entity-translations` - Entities have translated names
-- [ ] `exception-translations` - Exception messages are translatable
+- [x] `exception-translations` - Exception messages are translatable
 - [x] `icon-translations` - Entities implement icon translations
 - [x] `reconfiguration-flow` - Integrations should have a reconfigure flow
 - [x] `repair-issues` - Repair issues and repair flows are used when user intervention is needed
