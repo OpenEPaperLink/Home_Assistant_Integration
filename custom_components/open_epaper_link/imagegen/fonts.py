@@ -7,6 +7,8 @@ from PIL import ImageFont
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
+from ..const import DOMAIN
+
 _LOGGER = logging.getLogger(__name__)
 _ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
@@ -210,11 +212,10 @@ class FontManager:
             except (OSError, IOError):
                 continue
 
-        _LOGGER.error(
-            "Could not load any font, even defaults. "
-            "This indicates a problem with the integration installation."
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="font_load_failed"
         )
-        raise HomeAssistantError("Could not load any font")
 
     def _load_custom_font_dirs(self) -> None:
         """Load custom font directories from config entry.

@@ -11,7 +11,7 @@ from typing import Any, ClassVar
 from .exceptions import ConfigValidationError
 from .protocol_base import DeviceCapabilities
 from .color_scheme import ColorScheme
-
+from ..const import DOMAIN
 
 # TLV packet type constants
 PACKET_TYPE_SYSTEM_CONFIG = 0x01
@@ -40,7 +40,11 @@ class SystemConfig:
     def from_bytes(cls, data: bytes) -> "SystemConfig":
         """Parse SystemConfig from bytes."""
         if len(data) < cls.SIZE:
-            raise ConfigValidationError(f"SystemConfig requires {cls.SIZE} bytes, got {len(data)}")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="tlv_section_too_short",
+                translation_placeholders={"section": "SystemConfig", "expected": cls.SIZE, "actual": len(data)}
+            )
         ic_type, comm_modes, dev_flags, pwr_pin = struct.unpack_from("<HBBB", data, 0)
         reserved = data[5:22]
         return cls(ic_type, comm_modes, dev_flags, pwr_pin, reserved)
@@ -61,7 +65,11 @@ class ManufacturerData:
     def from_bytes(cls, data: bytes) -> "ManufacturerData":
         """Parse ManufacturerData from bytes."""
         if len(data) < cls.SIZE:
-            raise ConfigValidationError(f"ManufacturerData requires {cls.SIZE} bytes, got {len(data)}")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="tlv_section_too_short",
+                translation_placeholders={"section": "ManufacturerData", "expected": cls.SIZE, "actual": len(data)}
+            )
         mfg_id, board_type, board_rev = struct.unpack_from("<HBB", data, 0)
         reserved = data[4:22]
         return cls(mfg_id, board_type, board_rev, reserved)
@@ -90,7 +98,11 @@ class PowerOption:
     def from_bytes(cls, data: bytes) -> "PowerOption":
         """Parse PowerOption from bytes."""
         if len(data) < cls.SIZE:
-            raise ConfigValidationError(f"PowerOption requires {cls.SIZE} bytes, got {len(data)}")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="tlv_section_too_short",
+                translation_placeholders={"section": "PowerOption", "expected": cls.SIZE, "actual": len(data)}
+            )
 
         # Battery capacity is 3 bytes (little-endian)
         battery_capacity = int.from_bytes(data[1:4], byteorder="little")
@@ -158,7 +170,11 @@ class DisplayConfig:
     def from_bytes(cls, data: bytes) -> "DisplayConfig":
         """Parse DisplayConfig from bytes."""
         if len(data) < cls.SIZE:
-            raise ConfigValidationError(f"DisplayConfig requires {cls.SIZE} bytes, got {len(data)}")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="tlv_section_too_short",
+                translation_placeholders={"section": "DisplayConfig", "expected": cls.SIZE, "actual": len(data)}
+            )
 
         (
             instance_num,
@@ -227,7 +243,11 @@ class LedConfig:
     def from_bytes(cls, data: bytes) -> "LedConfig":
         """Parse LedConfig from bytes."""
         if len(data) < cls.SIZE:
-            raise ConfigValidationError(f"LedConfig requires {cls.SIZE} bytes, got {len(data)}")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="tlv_section_too_short",
+                translation_placeholders={"section": "LedConfig", "expected": cls.SIZE, "actual": len(data)}
+            )
 
         instance_num, led_type, led_1, led_2, led_3, led_4, led_flags = struct.unpack_from(
             "<BBBBBBB", data, 0
@@ -252,7 +272,11 @@ class SensorData:
     def from_bytes(cls, data: bytes) -> "SensorData":
         """Parse SensorData from bytes."""
         if len(data) < cls.SIZE:
-            raise ConfigValidationError(f"SensorData requires {cls.SIZE} bytes, got {len(data)}")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="tlv_section_too_short",
+                translation_placeholders={"section": "SensorData", "expected": cls.SIZE, "actual": len(data)}
+            )
 
         instance_num, sensor_type, bus_id = struct.unpack_from("<BHB", data, 0)
         reserved = data[4:30]
@@ -285,7 +309,11 @@ class DataBus:
     def from_bytes(cls, data: bytes) -> "DataBus":
         """Parse DataBus from bytes."""
         if len(data) < cls.SIZE:
-            raise ConfigValidationError(f"DataBus requires {cls.SIZE} bytes, got {len(data)}")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="tlv_section_too_short",
+                translation_placeholders={"section": "DataBus", "expected": cls.SIZE, "actual": len(data)}
+            )
 
         (
             instance_num,
@@ -343,7 +371,11 @@ class BinaryInputs:
     def from_bytes(cls, data: bytes) -> "BinaryInputs":
         """Parse BinaryInputs from bytes."""
         if len(data) < cls.SIZE:
-            raise ConfigValidationError(f"BinaryInputs requires {cls.SIZE} bytes, got {len(data)}")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="tlv_section_too_short",
+                translation_placeholders={"section": "BinaryInputs", "expected": cls.SIZE, "actual": len(data)}
+            )
 
         instance_num, input_type, display_as = struct.unpack_from("<BBB", data, 0)
         reserved_pins = data[3:11]
@@ -405,7 +437,11 @@ def parse_tlv_config(data: bytes) -> GlobalConfig:
         ConfigValidationError: If data is invalid or CRC check fails
     """
     if len(data) < 2:
-        raise ConfigValidationError(f"Config data too short: {len(data)} bytes (minimum 2)")
+        raise ConfigValidationError(
+            translation_domain=DOMAIN,
+            translation_key="tlv_data_too_short",
+            translation_placeholders={ "length": str(len(data))}
+        )
 
     # Auto-detect format by checking for magic number
     has_header = False
@@ -424,7 +460,12 @@ def parse_tlv_config(data: bytes) -> GlobalConfig:
 
         if crc32_actual != crc32_expected:
             raise ConfigValidationError(
-                f"CRC32 mismatch: expected {crc32_expected:#010x}, got {crc32_actual:#010x}"
+                translation_domain=DOMAIN,
+                translation_key="tlv_crc_mismatch",
+                translation_placeholders={
+                    "expected_crc32":  f"{crc32_expected:#010x}",
+                    "actual_crc32": f"{crc32_actual:#010x}"
+                }
             )
 
         # Create config object
@@ -480,12 +521,25 @@ def parse_tlv_config(data: bytes) -> GlobalConfig:
         elif packet_id == PACKET_TYPE_BINARY_INPUTS:
             packet_size = BinaryInputs.SIZE
         else:
-            raise ConfigValidationError(f"Unknown packet ID: {packet_id:#04x} at offset {offset - 2}")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="tlv_unknown_packet",
+                translation_placeholders={
+                    "packet_id": f"{packet_id:#04x}",
+                    "offset": offset - 2
+                }
+            )
 
         if offset + packet_size > len(data):
             raise ConfigValidationError(
-                f"Packet ID {packet_id:#04x} requires {packet_size} bytes, "
-                f"but only {len(data) - offset} bytes remaining at offset {offset}"
+                translation_domain=DOMAIN,
+                translation_key="tlv_packet_too_short",
+                translation_placeholders={
+                    "packet_id": f"{packet_id:#04x}",
+                    "packet_size": packet_size,
+                    "remaining_bytes": len(data) - offset,
+                    "offset": offset
+                }
             )
 
         packet_data = data[offset : offset + packet_size]
@@ -521,7 +575,13 @@ def parse_tlv_config(data: bytes) -> GlobalConfig:
 
         except Exception as e:
             raise ConfigValidationError(
-                f"Failed to parse packet type {packet_id:#04x} at offset {offset-2}: {e}"
+                translation_domain=DOMAIN,
+                translation_key="tlv_packet_parse_failed",
+                translation_placeholders={
+                    "packet_id": f"{packet_id:#04x}",
+                    "offset": offset - 2,
+                    "error": str(e)
+                }
             ) from e
 
     return config
@@ -567,7 +627,10 @@ def extract_display_capabilities(config: GlobalConfig) -> DeviceCapabilities:
         ConfigValidationError: If no display configuration found
     """
     if not config.displays:
-        raise ConfigValidationError("No display configuration found in device config")
+        raise ConfigValidationError(
+            translation_domain=DOMAIN,
+            translation_key="tlv_no_display_config"
+        )
 
     # Use first display
     display = config.displays[0]
@@ -614,7 +677,12 @@ def generate_model_name(display: DisplayConfig) -> str:
     # Validate pixel dimensions
     if display.pixel_width <= 0 or display.pixel_height <= 0:
         raise ConfigValidationError(
-            f"Invalid pixel dimensions: {display.pixel_width}x{display.pixel_height}"
+            translation_domain=DOMAIN,
+            translation_key="tlv_invalid_dimensions",
+            translation_placeholders={
+                "width": str(display.pixel_width),
+                "height": str(display.pixel_height)
+            }
         )
 
     # Calculate diagonal size from physical dimensions (mm)

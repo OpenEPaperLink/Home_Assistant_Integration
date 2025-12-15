@@ -134,7 +134,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ):
         """Handle reconfiguration of the AP host."""
         entry = self._get_reconfigure_entry()
 
@@ -269,7 +269,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
                 # Interrogation must succeed - no fallback
                 if not capabilities:
-                    raise ConfigValidationError("Device returned invalid configuration data")
+                    raise ConfigValidationError(
+                        translation_domain=DOMAIN,
+                        translation_key="config_flow_invalid_config"
+                    )
 
                 # Generate model name based on protocol type
                 hw_type = self._discovered_device["hw_type"]

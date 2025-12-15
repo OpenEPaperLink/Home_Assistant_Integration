@@ -10,6 +10,7 @@ from .tlv_parser import (
     parse_tlv_config,
 )
 from .exceptions import ConfigValidationError
+from ..const import DOMAIN
 
 if TYPE_CHECKING:
     from .connection import BLEConnection
@@ -244,13 +245,21 @@ class OEPLProtocol(BLEProtocol):
 
         # Parse chunk header
         if len(chunk_data) < 4:
-            raise ConfigValidationError(f"Chunk data too short: {len(chunk_data)} bytes")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="oepl_config_chunk_short",
+                translation_placeholders={"length": str(len(chunk_data))}
+            )
 
         chunk_num = int.from_bytes(chunk_data[0:2], "little")
         _LOGGER.debug("Received chunk number: %d", chunk_num)
 
         if chunk_num != 0:
-            raise ConfigValidationError(f"Expected chunk 0, got chunk {chunk_num}")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="oepl_expected_chunk_zero",
+                translation_placeholders={"chunk_num": str(chunk_num)}
+            )
 
         # Parse total length from chunk 0
         total_length = int.from_bytes(chunk_data[2:4], "little")
@@ -325,7 +334,11 @@ class OEPLProtocol(BLEProtocol):
         # Strip OEPL config header: [length:2][version:1]
         # The firmware sends: [length:2][version:1][packets...][crc:2]
         if len(tlv_data) < 3:
-            raise ConfigValidationError(f"Config data too short: {len(tlv_data)} bytes (need at least 3)")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="oepl_config_too_short",
+                translation_placeholders={"length": str(len(tlv_data))}
+            )
 
         config_length = int.from_bytes(tlv_data[0:2], "little")
         config_version = tlv_data[2]
@@ -419,7 +432,11 @@ class OEPLProtocol(BLEProtocol):
             payload = response
 
         if len(payload) < 2:
-            raise ConfigValidationError(f"Firmware version response too short: {len(payload)} bytes")
+            raise ConfigValidationError(
+                translation_domain=DOMAIN,
+                translation_key="oepl_fw_response_short",
+                translation_placeholders={"length": str(len(payload))}
+            )
 
         major = payload[0]
         minor = payload[1]
@@ -430,7 +447,9 @@ class OEPLProtocol(BLEProtocol):
             if sha_length > 0:
                 if len(payload) < 3 + sha_length:
                     raise ConfigValidationError(
-                        f"Firmware version SHA length {sha_length} exceeds payload ({len(payload)} bytes)"
+                        translation_domain=DOMAIN,
+                        translation_key="oepl_fw_version_format",
+                        translation_placeholders={ "sha_length": str(sha_length)}
                     )
                 sha_bytes = payload[3:3 + sha_length]
                 sha = bytes(sha_bytes).decode("ascii", errors="ignore")

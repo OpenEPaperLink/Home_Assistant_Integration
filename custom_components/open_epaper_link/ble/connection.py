@@ -14,6 +14,8 @@ from bleak_retry_connector import (
 )
 
 from .exceptions import BLEConnectionError, BLEProtocolError, BLETimeoutError
+from ..const import DOMAIN
+
 
 if TYPE_CHECKING:
     from .protocol_base import BLEProtocol
@@ -62,7 +64,11 @@ class BLEConnection:
                 self.hass, self.mac_address, connectable=True
             )
             if not device:
-                raise BLEConnectionError(f"Device {self.mac_address} not found")
+                raise BLEConnectionError(
+                    translation_domain=DOMAIN,
+                    translation_key="ble_device_not_found",
+                    translation_placeholders={"mac_address": self.mac_address}
+                )
 
             self.client = await establish_connection(
                 BleakClientWithServiceCache,
@@ -76,7 +82,9 @@ class BLEConnection:
             if not self._resolve_characteristic():
                 await self.client.disconnect()
                 raise BLEConnectionError(
-                    f"Could not resolve characteristic for service {self.service_uuid}"
+                    translation_domain=DOMAIN,
+                    translation_key="ble_characteristic_not_resolved",
+                    translation_placeholders={ "service_uuid": self.service_uuid}
                 )
 
             # Enable notifications for protocol responses
@@ -91,14 +99,18 @@ class BLEConnection:
         except BleakOutOfConnectionSlotsError as e:
             await self._cleanup()
             raise BLEConnectionError(
-                f"No available Bluetooth connection slots for {self.mac_address}. "
-                f"Add more ESPHome Bluetooth proxies near this device or wait for "
-                f"existing connections to free up. Details: {e}"
+                translation_domain=DOMAIN,
+                translation_key="ble_slots_unavailable",
+                translation_placeholders={"mac_address": self.mac_address, "error": str(e)}
             ) from e
 
         except (BleakError, asyncio.TimeoutError) as e:
             await self._cleanup()
-            raise BLEConnectionError(f"Failed to connect to {self.mac_address}: {e}") from e
+            raise BLEConnectionError(
+                translation_domain=DOMAIN,
+                translation_key="ble_connection_failed",
+                translation_placeholders={"mac_address": self.mac_address, "error": str(e)}
+            ) from e
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Clean up BLE connection."""
@@ -177,7 +189,10 @@ class BLEConnection:
             BLEProtocolError: If write characteristic is not available
         """
         if not self.write_char:
-            raise BLEProtocolError("Write characteristic not available")
+            raise BLEProtocolError(
+                translation_domain=DOMAIN,
+                translation_key="ble_write_char_missing",
+            )
 
         await self.client.write_gatt_char(self.write_char, data, response=False)
 
@@ -210,7 +225,9 @@ class BLEConnection:
             return response
         except asyncio.TimeoutError:
             raise BLETimeoutError(
-                f"No response received from {self.mac_address} within {timeout}s"
+                translation_domain=DOMAIN,
+                translation_key="ble_timeout",
+                translation_placeholders={"mac_address": self.mac_address, "timeout": timeout},
             ) from None
 
     async def write_command(self, data: bytes) -> None:

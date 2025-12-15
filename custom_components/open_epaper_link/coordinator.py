@@ -183,7 +183,9 @@ class Hub:
             await self.async_update_ap_info()
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             raise ConfigEntryNotReady(
-                f"Cannot connect to AP at {self.host}: {err}"
+                translation_domain=DOMAIN,
+                translation_key="ap_cannot_connect",
+                translation_placeholders={"host": self.host, "err": str(err)},
             ) from err
 
         # Load tags from AP - already has 10 retries built-in
@@ -192,7 +194,9 @@ class Hub:
             await self.async_load_all_tags()
         except Exception as err:
             raise ConfigEntryNotReady(
-                f"Failed to load tags from AP at {self.host}: {err}"
+                translation_domain=DOMAIN,
+                translation_key="ap_failed_load_tags",
+                translation_placeholders={"host": self.host, "err": str(err)},
             ) from err
 
     async def async_start_websocket(self) -> bool:
@@ -753,11 +757,23 @@ class Hub:
         try:
             resp = await self._run_ap_command(call)
         except requests.exceptions.Timeout:
-            raise HomeAssistantError(f"Timeout {action}") from None
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="ap_timeout_action",
+                translation_placeholders={"action": action},
+            ) from None
         except requests.exceptions.RequestException as err:
-            raise HomeAssistantError(f"Network error {action}: {err}") from err
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="ap_network_error_action",
+                translation_placeholders={"action": action, "error": str(err)}
+            ) from err
         if resp.status_code != 200:
-            raise HomeAssistantError(f"Failed to {action}: HTTP {resp.status_code} - {resp.text}")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="ap_failed_action_http",
+                translation_placeholders={"action": action, "status": resp.status_code, "text": resp.text},
+            )
         return resp
 
     async def set_led_pattern(self, entity_id: str, pattern: str) -> None:

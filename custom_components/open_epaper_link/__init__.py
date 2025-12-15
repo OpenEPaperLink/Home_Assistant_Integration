@@ -317,7 +317,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
         # Lightweight presence check - only checks cached advertisement data
         if not bluetooth.async_address_present(hass, mac_address, connectable=False):
             raise ConfigEntryNotReady(
-                f"BLE device {name} ({mac_address}) not detected in Bluetooth range"
+                translation_domain=DOMAIN,
+                translation_key="ble_device_not_detected",
+                translation_placeholders={"name": name, "mac_address": mac_address},
             )
 
         if entry.data.get("send_welcome_image", False):

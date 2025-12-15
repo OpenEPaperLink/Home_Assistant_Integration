@@ -6,7 +6,6 @@ import asyncio
 import logging
 from typing import Any
 
-from homeassistant.components import bluetooth
 from homeassistant.components.light import (
     ColorMode,
     LightEntity,
@@ -25,9 +24,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: OpenEPaperLinkConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+        hass: HomeAssistant,
+        entry: OpenEPaperLinkConfigEntry,
+        async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up BLE light entities."""
     # Only create light entity for BLE devices
@@ -117,10 +116,17 @@ class OpenEPaperLinkBLELight(OpenEPaperLinkBLEEntity, LightEntity):
                 self._auto_off_task = asyncio.create_task(self._auto_off_timer())
             else:
                 self.async_write_ha_state()
-                raise HomeAssistantError("Failed to turn on LED")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="led_on_failed"
+                )
         except Exception as e:
             self.async_write_ha_state()
-            raise HomeAssistantError(f"Error turning on LED: {e}") from e
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="led_on_error",
+                translation_placeholders={"error": str(e)}
+            ) from e
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the light off."""
@@ -133,10 +139,17 @@ class OpenEPaperLinkBLELight(OpenEPaperLinkBLEEntity, LightEntity):
                 self.async_write_ha_state()
             else:
                 self.async_write_ha_state()
-                raise HomeAssistantError("Failed to turn off LED")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="led_off_failed",
+                )
         except Exception as e:
             self.async_write_ha_state()
-            raise HomeAssistantError(f"Error turning off LED: {e}") from e
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="led_off_error",
+                translation_placeholders= {"error": str(e)}
+            ) from e
 
     async def async_update(self) -> None:
         """Update the light state."""

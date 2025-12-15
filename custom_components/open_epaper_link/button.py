@@ -467,13 +467,19 @@ class RefreshConfigButton(OpenEPaperLinkBLEEntity, ButtonEntity):
                     )
 
                 if not capabilities:
-                    raise HomeAssistantError("Device returned invalid configuration data")
+                    raise HomeAssistantError(
+                        translation_domain=DOMAIN,
+                        translation_key="config_flow_invalid_config"
+                    )
 
                 # Get updated config from protocol
                 config = protocol._last_config
 
                 if not config:
-                    raise HomeAssistantError("Device returned no configuration data")
+                    raise HomeAssistantError(
+                        translation_domain=DOMAIN,
+                        translation_key="config_flow_missing_config"
+                    )
 
                 # Store complete OEPL config
                 new_metadata = {
@@ -574,4 +580,8 @@ class RefreshConfigButton(OpenEPaperLinkBLEEntity, ButtonEntity):
 
         except Exception as e:
             _LOGGER.error("Failed to refresh configuration for %s: %s", self._mac_address, e)
-            raise HomeAssistantError(f"Failed to refresh configuration: {e}") from e
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="refresh_config_failed",
+                translation_placeholders={"error": str(e)},
+            ) from e

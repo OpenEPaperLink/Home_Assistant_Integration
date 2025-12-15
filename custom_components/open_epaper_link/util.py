@@ -88,7 +88,10 @@ def get_hub_from_hass(hass: HomeAssistant):
             if not isinstance(entry.runtime_data, OpenEPaperLinkBLERuntimeData):
                 return entry.runtime_data
 
-    raise HomeAssistantError("No AP hub configured. Only BLE devices found.")
+    raise HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key="no_hub_configured",
+    )
 
 
 def is_ble_entry(entry_data) -> bool:

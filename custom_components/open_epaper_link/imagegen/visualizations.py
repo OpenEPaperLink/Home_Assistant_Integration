@@ -13,6 +13,7 @@ from homeassistant.util import dt
 
 from .registry import element_handler
 from .types import ElementType, DrawingContext
+from ..const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,7 +49,10 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
         # Get time range
         duration_seconds = float(element.get("duration", 60 * 60 * 24))
         if duration_seconds <= 0:
-            raise ServiceValidationError("duration must be greater than 0 seconds")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="plot_duration_invalid",
+            )
         duration = timedelta(seconds=duration_seconds)
         end = dt.now()
         start = end - duration
@@ -76,7 +80,11 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
         raw_data = []
         for plot in element["data"]:
             if plot["entity"] not in all_states:
-                raise ServiceValidationError(f"No recorded data found for {plot['entity']}")
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="plot_no_data",
+                    translation_placeholders={"entity": plot["entity"]}
+                )
 
             states = all_states[plot["entity"]]
             state_obj = states[0]
@@ -114,7 +122,10 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
             raw_data.append(points)
 
         if not raw_data:
-            raise ServiceValidationError("No valid data points found")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="plot_no_valid_points"
+            )
 
         # Apply rounding if requested
         if element.get("round_values", False):
@@ -167,7 +178,10 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
             y_axis_tick_width = y_axis.get("tick_width", 2)
             y_axis_tick_every = float(y_axis.get("tick_every", 1))
             if y_axis_tick_every <= 0:
-                raise ServiceValidationError("yaxis.tick_every must be greater than 0")
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="plot_yaxis_invalid"
+                )
             y_axis_grid = y_axis.get("grid", True)
             y_axis_grid_color = ctx.colors.resolve(y_axis.get("grid_color", "black"))
             y_axis_grid_style = y_axis.get("grid_style", "dotted")
@@ -194,7 +208,10 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
             if time_position not in ("top", "bottom", None):
                 time_position = "bottom"
         if time_interval <= 0:
-            raise ServiceValidationError("xlegend.interval must be greater than 0")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="plot_xlegend_invalid"
+            )
 
         # Configure x axis
         x_axis = element.get("xaxis", {})
@@ -663,7 +680,11 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
         ctx.pos_y = y_end
 
     except Exception as e:
-        raise HomeAssistantError(f"Failed to draw plot: {str(e)}")
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="plot_draw_failed",
+            translation_placeholders={"error": str(e)},
+        )
 
 
 @element_handler(ElementType.PROGRESS_BAR, requires=["x_start", "x_end", "y_start", "y_end", "progress"])
@@ -866,6 +887,10 @@ async def draw_diagram(ctx: DrawingContext, element: dict) -> None:
                 )
 
             except (ValueError, IndexError, KeyError) as e:
-                raise ServiceValidationError(f"Invalid bar data for diagram: {str(e)}") from e
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="plot_bar_invalid",
+                    translation_placeholders={ "error": str(e)}
+                ) from e
 
     ctx.pos_y = ctx.pos_y + height

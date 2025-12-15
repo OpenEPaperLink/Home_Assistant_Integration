@@ -62,13 +62,25 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         device_registry = dr.async_get(hass)
         device = device_registry.async_get(device_id)
         if not device:
-            raise ServiceValidationError(f"Device {device_id} not found")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="device_not_found",
+                translation_placeholders={"device_id": device_id},
+            )
         if not device.identifiers:
-            raise ServiceValidationError(f"No identifiers found for device {device_id}")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="device_no_identifiers",
+                translation_placeholders={"device_id": device_id},
+            )
 
         domain_mac = next(iter(device.identifiers))
         if domain_mac[0] != DOMAIN:
-            raise ServiceValidationError(f"Device {device_id} is not an OpenEPaperLink device")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="device_not_oepl",
+                translation_placeholders={"device_id": device_id},
+            )
 
         identifier = domain_mac[1]
         if identifier.startswith("ble_"):
@@ -112,7 +124,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             hub = get_hub_from_hass(hass)
             if not hub.online:
                 raise HomeAssistantError(
-                    "OpenEPaperLink AP is offline. Please check your network connection and AP status."
+                    translation_domain=DOMAIN,
+                    translation_key="ap_offline",
                 )
             return await func(service, hub *args, **kwargs)
         return wrapper
@@ -153,37 +166,39 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
             if not unique_device_ids:
                 raise ServiceValidationError(
-                    "No target devices specified. Please provide device_id, label_id, or area_id."
+                    translation_domain=DOMAIN,
+                    translation_key="no_targets_specified",
                 )
 
             # Process each device
-            errors = []
+            errors: list[tuple[str, str]] = []
             for device_id in unique_device_ids:
                 try:
                     entity_id = await get_entity_id_from_device_id(device_id)
                     await func(service, entity_id, *args, **kwargs)
                 except ServiceValidationError as err:
-                    error_msg = f"Error processing device {device_id}: {err}"
-                    _LOGGER.error(error_msg)
-                    errors.append(error_msg)
+                    errors.append((device_id, str(err)))
 
                 # Wait for all queued uploads to complete
                 # This is async/await so it doesn't block the HA event loop
                 try:
                     ble_errors = await ble_upload_queue.wait_for_current_batch()
                     hub_errors = await hub_upload_queue.wait_for_current_batch()
-                    errors.extend(ble_errors)
-                    errors.extend(hub_errors)
+                    for ble_error in ble_errors:
+                        errors.append((device_id, str(ble_error)))
+                    for hub_error in hub_errors:
+                        errors.append((device_id, str(hub_error)))
                 except (ServiceValidationError, HomeAssistantError) as err:
-                    # Upload errors - add to error collection
-                    error_msg = f"Upload error: {err}"
-                    _LOGGER.error(error_msg)
-                    errors.append(error_msg)
+                    errors.append((device_id, str(err)))
 
-                    # If ANY errors occurred, raise them
-                if errors:
-                    raise ServiceValidationError("\n".join(errors))
-
+            # If ANY errors occurred across all targets, raise them
+            if errors:
+                errors_str = "\n".join(f"{entity}: {message}" for entity, message in errors)
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="multiple_errors",
+                    translation_placeholders={"errors": errors_str},
+                )
         return wrapper
 
     @handle_targets
@@ -216,7 +231,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 hub = get_hub_from_hass(hass)
                 if not hub.online:
                     raise HomeAssistantError(
-                        "OpenEPaperLink AP is offline. Please check your network connection and AP status."
+                        translation_domain=DOMAIN,
+                        translation_key="ap_offline",
                     )
 
             # Generate image
@@ -232,6 +248,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 height=height,
                 accent_color=accent_color,
             )
+
+            if device_errors:
+                errors_str = "\n".join(device_errors)
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="invalid_payload",
+                    translation_placeholders={"errors": errors_str},
+                )
 
             if device_errors:
                 _LOGGER.warning(
@@ -258,8 +282,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 from .util import is_bluetooth_available
                 if not is_bluetooth_available(hass):
                     raise ServiceValidationError(
-                        f"Cannot upload to BLE device {entity_id}: "
-                        "Bluetooth integration is disabled or no scanners available."
+                        translation_domain=DOMAIN,
+                        translation_key="ble_upload_bt_disabled",
+                        translation_placeholders={"entity_id": entity_id},
                     )
 
                 # Determine upload method
@@ -296,7 +321,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         except Exception as err:
             # Unexpected errors - wrap as operational error
             raise HomeAssistantError(
-                f"Unexpected error processing device {entity_id}: {str(err)}"
+                translation_domain=DOMAIN,
+                translation_key="error_processing_device",
+                translation_placeholders={"entity_id": entity_id, "error": str(err)}
             ) from err
 
 
@@ -368,4 +395,3 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, "scan_channels", scan_channels_service)
     hass.services.async_register(DOMAIN, "reboot_ap", reboot_ap_service)
     hass.services.async_register(DOMAIN, "refresh_tag_types", refresh_tag_types_service)
-
