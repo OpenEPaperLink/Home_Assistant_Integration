@@ -35,7 +35,7 @@
 ## Gold
 - [x] `devices` - The integration creates devices
 - [x] `diagnostics` - Implements diagnostics
-- [ ] `discovery-update-info` - Integration uses discovery info to update network information
+- [x] `discovery-update-info` - Integration uses discovery info to update network information
 - [x] `discovery` - Devices can be discovered
 - [ ] `docs-data-update` - The documentation describes how data is updated
 - [ ] `docs-examples` - The documentation provides automation examples the user can use.
@@ -53,7 +53,7 @@
 - [x] `icon-translations` - Entities implement icon translations
 - [x] `reconfiguration-flow` - Integrations should have a reconfigure flow
 - [x] `repair-issues` - Repair issues and repair flows are used when user intervention is needed
-- [ ] `stale-devices` - Stale devices are removed
+- [x] `stale-devices` - Stale devices are removed
 
 ## Platinum
 - [ ] `async-dependency` - Dependency is async

@@ -522,6 +522,22 @@ async def async_unload_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEnt
 
     return unload_ok
 
+async def async_remove_config_entry_device(
+        hass: HomeAssistant, config_entry: ConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Allow manual removal of stale BLE devices."""
+    mac_address = None
+    for domain, ident in device_entry.identifiers:
+        if domain == DOMAIN and ident.startswith("ble_"):
+            mac_address = ident[4:]
+            break
+
+    if not mac_address:
+        return True  # Not a BLE device; let HA delete it.
+
+    # Lean option: always allow removal so users can clean up.
+    return True
+
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle complete removal of integration.
