@@ -73,7 +73,10 @@ drawcustom:
 
 setled:
   name: Set LED Pattern
-  description: Sets the LED flash pattern for one or more ESL tags
+  description: >
+    Sets the LED flash pattern; brightness controls flash on-time (0–15, higher = longer on-time);
+    missing color2/3 are skipped.
+    See https://github.com/OpenEPaperLink/OpenEPaperLink/wiki/Led-control for details.
   target:
   fields:
     mode:
@@ -88,7 +91,7 @@ setled:
             - "flash"
     brightness:
       name: Brightness
-      description: LED brightness (1-16)
+      description: LED flash on-time nibble (0–15). Higher = longer on-time; start low to save battery.
       required: false
       default: 1
       selector:
@@ -152,7 +155,7 @@ setled:
           mode: slider
     color2:
       name: Color 2
-      description: Second color in the pattern
+      description: Optional second color; omit to skip this group.
       required: false
       default: [0, 255, 0]
       selector:
@@ -171,7 +174,7 @@ setled:
           mode: slider
     flashCount2:
       name: Flash Count 2
-      description: Number of flashes for second color
+      description: Number of flashes for second color (0 skips this color).
       required: false
       default: 2
       selector:
@@ -194,7 +197,7 @@ setled:
           mode: slider
     color3:
       name: Color 3
-      description: Third color in the pattern
+      description: Optional third color; omit to skip this group.
       required: false
       default: [0, 0, 255]
       selector:
@@ -213,7 +216,7 @@ setled:
           mode: slider
     flashCount3:
       name: Flash Count 3
-      description: Number of flashes for third color
+      description: Number of flashes for third color (0 skips this color).
       required: false
       default: 2
       selector:

@@ -100,11 +100,21 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         def _color_segment(color_num: int) -> str:
             default_delay = 0.0 if color_num == 3 else 0.1
+            color = service_data.get(f"color{color_num}")
+            flash_speed = service_data.get(f"flashSpeed{color_num}", 0.2)
+            flash_count = service_data.get(f"flashCount{color_num}", 2)
+            delay = service_data.get(f"delay{color_num}", default_delay)
+
+            if not isinstance(color, (list, tuple)) or len(color) != 3:
+                color = (0, 0, 0)
+                flash_speed = 0
+                flash_count = 0
+
             return (
-                    rgb_to_rgb332(service_data.get(f"color{color_num}", "")) +
-                    hex(int(service_data.get(f"flashSpeed{color_num}", 0.2) * 10))[2:] +
-                    hex(service_data.get(f"flashCount{color_num}", 2))[2:] +
-                    int_to_hex_string(int(service_data.get(f"delay{color_num}", default_delay) * 10))
+                    rgb_to_rgb332(color)
+                    + hex(int(flash_speed * 10))[2:]
+                    + hex(flash_count)[2:]
+                    + int_to_hex_string(int(delay * 10))
             )
 
         return (
@@ -127,7 +137,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     translation_domain=DOMAIN,
                     translation_key="ap_offline",
                 )
-            return await func(service, hub *args, **kwargs)
+            return await func(service, *args, hub=hub, **kwargs)
         return wrapper
 
     def handle_targets(func: Callable) -> Callable:
@@ -330,33 +340,32 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     @require_hub_online
     @handle_targets
-    async def setled_service(service: ServiceCall, hub: Hub, entity_id: str) -> None:
-        mac = get_mac_from_entity_id(entity_id)
+    async def setled_service(service: ServiceCall, entity_id: str, hub: Hub) -> None:
         pattern = _build_led_pattern(service.data)
 
-        await hub.set_led_pattern(mac, pattern)
+        await hub.set_led_pattern(entity_id, pattern)
 
     @require_hub_online
     @handle_targets
-    async def clear_pending_service(service: ServiceCall, hub: Hub, entity_id: str) -> None:
+    async def clear_pending_service(service: ServiceCall, entity_id: str, hub: Hub) -> None:
         """Clear pending updates for target devices."""
         await hub.send_tag_cmd(entity_id, "clear")
 
     @require_hub_online
     @handle_targets
-    async def force_refresh_service(service: ServiceCall, hub: Hub, entity_id: str) -> None:
+    async def force_refresh_service(service: ServiceCall, entity_id: str, hub: Hub) -> None:
         """Force refresh target devices."""
         await hub.send_tag_cmd(entity_id, "refresh")
 
     @require_hub_online
     @handle_targets
-    async def reboot_tag_service(service: ServiceCall, hub: Hub, entity_id: str) -> None:
+    async def reboot_tag_service(service: ServiceCall,entity_id: str, hub: Hub) -> None:
         """Reboot target devices."""
         await hub.send_tag_cmd(entity_id, "reboot")
 
     @require_hub_online
     @handle_targets
-    async def scan_channels_service(service: ServiceCall, hub: Hub, entity_id: str) -> None:
+    async def scan_channels_service(service: ServiceCall, entity_id: str, hub: Hub) -> None:
         """Trigger channel scan on target devices."""
         await hub.send_tag_cmd(entity_id, "scan")
 
