@@ -793,8 +793,20 @@ class Hub:
         return True
 
     async def set_ap_config_item(self, key: str, value: str | int) -> bool:
-        await self._ap_request("post", "save_apcfg", data={"key": key, "value": str(value)}, action=f"set AP config {key}")
-        self.apconfig[key] = value
+        if key in ("sleeptime1", "sleeptime2"):
+            data = {"sleeptime1": self.ap_config.get("sleeptime1", 0),
+                    "sleeptime2": self.ap_config.get("sleeptime2", 0), key: value}
+        else:
+            data = {key: value}
+
+        await self._ap_request(
+            "post",
+            "save_apcfg",
+            data=data,
+            action=f"set AP config {key}",
+        )
+        for k, v in data.items():
+            self.ap_config[k] = v
         _LOGGER.info("Set AP config %s = %s", key, value)
         return True
 
