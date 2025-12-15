@@ -77,25 +77,6 @@ setled:
     Sets the LED flash pattern; brightness controls flash on-time (0–15, higher = longer on-time);
     missing color2/3 are skipped.
     See https://github.com/OpenEPaperLink/OpenEPaperLink/wiki/Led-control for details.
-  examples:
-    - mode: flash
-      brightness: 4
-      repeats: 1
-      color1: [255, 0, 0]
-      flashSpeed1: 0.2
-      flashCount1: 2
-      delay1: 0.1
-    - mode: flash
-      brightness: 4
-      repeats: 2
-      color1: [255, 0, 0]
-      flashSpeed1: 0.2
-      flashCount1: 2
-      delay1: 0.1
-      color2: [0, 255, 0]
-      flashSpeed2: 0.2
-      flashCount2: 2
-      delay2: 0.1
   target:
   fields:
     mode:
