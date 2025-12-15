@@ -8,7 +8,7 @@ from typing import Final
 import requests
 
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from . import is_ble_entry
+from .util import is_ble_entry
 from .entity import OpenEPaperLinkTagEntity, OpenEPaperLinkBLEEntity
 from .runtime_data import OpenEPaperLinkConfigEntry
 from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
@@ -120,6 +120,7 @@ class ESLImage(OpenEPaperLinkTagEntity, ImageEntity):
     """
 
     _attr_entity_registry_enabled_default = True
+    _attr_has_entity_name = True
 
     def __init__(self, hass: HomeAssistant, tag_mac: str, hub) -> None:
         """Initialize the image entity."""
@@ -249,6 +250,7 @@ class OpenEPaperLinkBLEImage(OpenEPaperLinkBLEEntity, ImageEntity):
     """
 
     _attr_entity_registry_enabled_default = True
+    _attr_has_entity_name = True
 
     def __init__(
             self,
