@@ -354,7 +354,7 @@ class RebootAPButton(OpenEPaperLinkAPEntity, ButtonEntity):
         super().__init__(hub)
         self.hass = hass
         self._attr_translation_key = "reboot_ap"
-        self._attr_unique_id = "reboot_ap"
+        self._attr_unique_id = f"{hub.entry.entry_id}_reboot_ap"
 
     async def async_press(self) -> None:
         """Handle the button press."""
@@ -369,7 +369,7 @@ class RefreshTagTypesButton(OpenEPaperLinkAPEntity, ButtonEntity):
         super().__init__(hub)
         self._hass = hass
         self._attr_translation_key = "refresh_tag_types"
-        self._attr_unique_id = "refresh_tag_types"
+        self._attr_unique_id = f"{hub.entry.entry_id}_refresh_tag_types"
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     async def async_press(self) -> None:
