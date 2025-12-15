@@ -198,9 +198,10 @@ class UploadQueueHandler:
             raise
         except Exception as err:
             # Unexpected error - wrap and raise
-            _LOGGER.error("Unexpected error uploading to %s: %s", entity_id, err, exc_info=True)
             raise HomeAssistantError(
-                f"Unexpected upload error for {entity_id}: {str(err)}"
+                translation_domain=DOMAIN,
+                translation_key="unexpected_upload",
+                translation_placeholders={"entity_id": entity_id, "error": str(err)},
             ) from err
         finally:
             # Decrement active upload counter
@@ -276,7 +277,9 @@ async def upload_to_hub(hub, entity_id: str, img: bytes, dither: int, ttl: int,
 
             if response.status_code != 200:
                 raise HomeAssistantError(
-                    f"Image upload failed for {entity_id} with status code: {response.status_code}"
+                    translation_domain=DOMAIN,
+                    translation_key="image_upload_status",
+                    translation_placeholders={"entity_id": entity_id, "status_code": response.status_code}
                 )
             break
 
@@ -290,17 +293,23 @@ async def upload_to_hub(hub, entity_id: str, img: bytes, dither: int, ttl: int,
                 backoff_delay *= 2
                 continue
             raise HomeAssistantError(
-                f"Image upload timed out for {entity_id} after {MAX_RETRIES} attempts"
+                translation_domain=DOMAIN,
+                translation_key="image_upload_timeout",
+                translation_placeholders={"entity_id": entity_id, "attempts": MAX_RETRIES}
             )
 
         except requests.exceptions.RequestException as err:
             raise HomeAssistantError(
-                f"Network error uploading image for {entity_id}: {str(err)}"
+                translation_domain=DOMAIN,
+                translation_key="image_upload_network",
+                translation_placeholders={"entity_id": entity_id, "error": str(err)}
             ) from err
 
         except Exception as err:
             raise HomeAssistantError(
-                f"Failed to upload image for {entity_id}: {str(err)}"
+                translation_domain=DOMAIN,
+                translation_key="image_upload_failed",
+                translation_placeholders={"entity_id": entity_id, "error": str(err)}
             ) from err
 
 
@@ -342,7 +351,11 @@ async def upload_to_ble_block(hass: HomeAssistant, entity_id: str, img: bytes, d
 
 
         if not device_metadata:
-            raise ServiceValidationError(f"No metadata found for BLE device {entity_id}")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="ble_no_metadata",
+                translation_placeholders={"entity_id": entity_id}
+            )
 
         # Get protocol handler for service UUID
         protocol = get_protocol_by_name(protocol_type)
@@ -357,7 +370,11 @@ async def upload_to_ble_block(hass: HomeAssistant, entity_id: str, img: bytes, d
             success, processed_image = await uploader.upload_image_block_based(img, metadata, protocol_type, dither)
 
             if not success:
-                raise HomeAssistantError(f"BLE image upload failed for {entity_id}")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="ble_upload_failed",
+                    translation_placeholders={"entity_id": entity_id}
+                )
 
             if processed_image is not None:
                 # Undo rotation for display (ATC rotation is for device memory, not viewing)
@@ -380,9 +397,10 @@ async def upload_to_ble_block(hass: HomeAssistant, entity_id: str, img: bytes, d
         # BLE-specific errors already inherit from HomeAssistantError
         raise  # Propagate with specific type
     except Exception as err:
-        _LOGGER.error("BLE upload error for %s: %s", entity_id, err)
         raise HomeAssistantError(
-            f"Unexpected error during BLE upload to {entity_id}: {str(err)}"
+            translation_domain=DOMAIN,
+            translation_key="unexpected_ble_upload",
+            translation_placeholders={"entity_id": entity_id, "error": str(err)}
         ) from err
 
 
@@ -427,14 +445,19 @@ async def upload_to_ble_direct(
                     break
 
         if not device_metadata:
-            raise ServiceValidationError(f"No metadata found for BLE device {entity_id}")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="ble_no_metadata",
+                translation_placeholders={"entity_id": entity_id}
+            )
 
         # Verify this is an OEPL device
         metadata = BLEDeviceMetadata(device_metadata)
         if not metadata.is_oepl:
             raise ServiceValidationError(
-                f"Direct write is only supported for OEPL devices, "
-                f"but {entity_id} appears to be an ATC device"
+                translation_domain=DOMAIN,
+                translation_key="ble_direct_write_not_supported",
+                translation_placeholders={"entity_id": entity_id}
             )
 
         # Get protocol handler for service UUID
@@ -447,7 +470,11 @@ async def upload_to_ble_direct(
             success, processed_image = await uploader.upload_direct_write(img, metadata, compressed, dither)
 
             if not success:
-                raise HomeAssistantError(f"BLE direct write upload failed for {entity_id}")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="ble_direct_write_failed",
+                    translation_placeholders={"entity_id": entity_id}
+                )
 
             if processed_image is not None:
                 buffer = BytesIO()
@@ -464,9 +491,10 @@ async def upload_to_ble_direct(
     except (BLEConnectionError, BLETimeoutError, BLEProtocolError) as err:
         raise  # BLE operational errors - propagate unchanged
     except Exception as err:
-        _LOGGER.error("BLE direct write error for %s: %s", entity_id, err)
         raise HomeAssistantError(
-            f"Unexpected error during BLE direct write to {entity_id}: {str(err)}"
+            translation_domain=DOMAIN,
+            translation_key="unexpected_ble_direct_write",
+            translation_placeholders={"entity_id": entity_id, "error": str(err)}
         ) from err
 
 

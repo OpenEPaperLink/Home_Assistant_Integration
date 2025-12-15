@@ -317,7 +317,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
         # Lightweight presence check - only checks cached advertisement data
         if not bluetooth.async_address_present(hass, mac_address, connectable=False):
             raise ConfigEntryNotReady(
-                f"BLE device {name} ({mac_address}) not detected in Bluetooth range"
+                translation_domain=DOMAIN,
+                translation_key="ble_device_not_detected",
+                translation_placeholders={"name": name, "mac_address": mac_address},
             )
 
         if entry.data.get("send_welcome_image", False):
@@ -521,6 +523,22 @@ async def async_unload_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEnt
             await hub.shutdown()
 
     return unload_ok
+
+async def async_remove_config_entry_device(
+        hass: HomeAssistant, config_entry: ConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Allow manual removal of stale BLE devices."""
+    mac_address = None
+    for domain, ident in device_entry.identifiers:
+        if domain == DOMAIN and ident.startswith("ble_"):
+            mac_address = ident[4:]
+            break
+
+    if not mac_address:
+        return True  # Not a BLE device; let HA delete it.
+
+    # Lean option: always allow removal so users can clean up.
+    return True
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:

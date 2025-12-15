@@ -10,6 +10,7 @@ from bleak.exc import BleakError
 
 from .connection import BLEConnection
 from .exceptions import BLEConnectionError
+from ..const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,18 +53,23 @@ def ble_device_operation(func):
                 except BLEConnectionError as e:
                     # Check if it's a connection slots error - don't retry these
                     if "No available Bluetooth connection slots" in str(e):
-                        _LOGGER.error("BLE operation %s failed: %s", func.__name__, e)
-                        raise HomeAssistantError(str(e)) from e
+                        raise HomeAssistantError(
+                            translation_domain=DOMAIN,
+                            translation_key="ble_slots_unavailable",
+                            translation_placeholders={"mac_address": mac_address, "error": str(e)},
+                        ) from e
 
                     # For other connection errors, retry
                     if attempt == max_attempts - 1:
-                        _LOGGER.error(
-                            "BLE operation %s failed after %d attempts: %s",
-                            func.__name__,
-                            max_attempts,
-                            e,
-                        )
-                        raise HomeAssistantError(str(e)) from e
+                        raise HomeAssistantError(
+                            translation_domain=DOMAIN,
+                            translation_key="ble_operation_failed",
+                            translation_placeholders={
+                                "operation": func.__name__,
+                                "attempts": max_attempts,
+                                "error": str(e),
+                            },
+                        ) from e
 
                     backoff_time = 0.25 * (attempt + 1)
                     _LOGGER.warning(

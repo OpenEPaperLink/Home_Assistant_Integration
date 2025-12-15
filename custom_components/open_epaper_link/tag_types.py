@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional, Tuple
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import storage
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -295,8 +296,8 @@ class TagTypesManager:
             # If still no types after loading from storage, this is a critical failure
             if not self._tag_types:
                 raise HomeAssistantError(
-                    "Failed to load tag type definitions. No stored data available. "
-                    "Check network connectivity or GitHub access."
+                    translation_domain=DOMAIN,
+                    translation_key="tagtypes_load_failed",
                 )
 
             # If the cache is expired, attempt refresh
@@ -307,7 +308,8 @@ class TagTypesManager:
                 # If refresh failed and have no valid types, raise an exception
                 if not fetch_success and not self._tag_types:
                     raise HomeAssistantError(
-                        "Failed to refresh tag type definitions. Check network connectivity or GitHub access."
+                        translation_domain=DOMAIN,
+                        translation_key="tagtypes_refresh_failed"
                     )
 
     async def _fetch_tag_types(self) -> bool:

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from .protocol_base import BLEProtocol, AdvertisingData, DeviceCapabilities
 from .exceptions import BLEProtocolError
+from ..const import DOMAIN
 
 if TYPE_CHECKING:
     from .connection import BLEConnection
@@ -135,21 +136,32 @@ class ATCProtocol(BLEProtocol):
         # Verify response format: 00 05 + payload
         if len(response) < BLE_MIN_RESPONSE_LENGTH:
             raise BLEProtocolError(
-                f"Invalid display info response length: {len(response)} "
-                f"(expected >= {BLE_MIN_RESPONSE_LENGTH})"
+                translation_domain=DOMAIN,
+                translation_key="ble_protocol_invalid_response_length",
+                translation_placeholders={
+                    "length": str(len(response)),
+                    "expected_length": str(BLE_MIN_RESPONSE_LENGTH)
+                }
             )
 
         # Verify command ID (should be 0x0005)
         if response[0] != 0x00 or response[1] != 0x05:
             raise BLEProtocolError(
-                f"Invalid command ID in response: {response[0]:02x}{response[1]:02x}"
+                translation_domain=DOMAIN,
+                translation_key="ble_protocol_invalid_command_id",
+                translation_placeholders={
+                    "command_id": f"{response[0]:02x}{response[1]:02x}"
+                }
             )
 
         # Skip command ID (first 2 bytes) and parse payload
         payload = response[2:]
 
         if len(payload) < 31:
-            raise BLEProtocolError("Display info payload too short")
+            raise BLEProtocolError(
+                translation_domain=DOMAIN,
+                translation_key="ble_protocol_invalid_response_payload",
+            )
 
         # Parse display specifications from 0005 response:
 

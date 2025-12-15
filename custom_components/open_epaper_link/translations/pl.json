@@ -1,0 +1,555 @@
+{
+  "config": {
+    "step": {
+      "bluetooth_confirm": {
+        "title": "Konfiguracja tagu BLE",
+        "description": "Skonfigurować **{name}**?\n\n**Szczegóły:**\n- Adres: {address}\n- Sygnał: {rssi} dBm\n- Bateria: {battery}\n- Firmware: {fw_version}\n- Wersja konfiguracji: {config_version}"
+      },
+      "reconfigure": {
+        "title": "Zaktualizuj punkt dostępowy",
+        "description": "Zaktualizuj adres punktu dostępowego OpenEPaperLink.",
+        "data": {
+          "host": "Host lub IP"
+        },
+        "data_description": {
+          "host": "Nazwa hosta lub adres IP punktu dostępowego OpenEPaperLink."
+        }
+      },
+      "user": {
+        "data": {
+          "host": "Host lub IP"
+        },
+        "data_description": {
+          "host": "Nazwa hosta lub adres IP punktu dostępowego OpenEPaperLink."
+        }
+      }
+    },
+    "error": {
+      "interrogation_failed": "Nie udało się połączyć z urządzeniem i odczytać informacji o wyświetlaczu. Błąd: {error}. Spróbuj ponownie lub sprawdź łączność urządzenia.",
+      "invalid_device_config": "Urządzenie zwróciło nieprawidłowe dane konfiguracyjne. Skonfiguruj urządzenie ponownie lub zaktualizuj jego firmware."
+    },
+    "abort": {
+      "single_instance_allowed": "Tylko jeden hub OpenEPaperLink może być skonfigurowany. Obsługiwanych jest wiele urządzeń BLE, ale tylko jeden hub AP.",
+      "unsupported_protocol": "Nieobsługiwany protokół firmware BLE. Obsługiwane są tylko ATC i OEPL.",
+      "invalid_advertising_data": "Nie można przetworzyć danych reklamowych urządzenia. Upewnij się, że urządzenie używa kompatybilnego firmware.",
+      "no_reconfigure_ble": "Urządzenia BLE nie obsługują rekonfiguracji. Usuń i dodaj urządzenie ponownie, jeśli potrzebna jest zmiana ustawień."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Zarządzanie tagami",
+        "description": "Wybierz tagi do umieszczenia na czarnej liście. Tagi z listy będą ukryte i ignorowane.",
+        "data": {
+          "blacklisted_tags": "Czarna lista tagów",
+          "button_debounce": "Opóźnienie przycisku (sekundy)",
+          "nfc_debounce": "Opóźnienie NFC (sekundy)",
+          "custom_font_dirs": "Niestandardowe katalogi czcionek"
+        },
+        "data_description": {
+          "blacklisted_tags": "Tagi do ukrycia; tagi na czarnej liście nie będą aktualizowane ani wywoływały usług.",
+          "button_debounce": "Opóźnienie przed przyjęciem kolejnego naciśnięcia przycisku (sekundy).",
+          "nfc_debounce": "Opóźnienie przed przyjęciem kolejnego odczytu NFC (sekundy).",
+          "custom_font_dirs": "Katalogi z dodatkowymi czcionkami do generowanych obrazów (oddzielone przecinkami)."
+        }
+      }
+    },
+    "abort": {
+      "no_options_ble": "Brak konfigurowalnych opcji dla urządzeń BLE. Urządzenia BLE są zarządzane automatycznie i nie wymagają dodatkowych ustawień."
+    }
+  },
+  "entity": {
+    "switch": {
+      "preview": {
+        "name": "Podgląd obrazów na AP"
+      },
+      "ble": {
+        "name": "Bluetooth LE"
+      },
+      "nightlyreboot": {
+        "name": "Nocny restart"
+      },
+      "showtimestamp": {
+        "name": "Pokaż znacznik czasu"
+      }
+    },
+    "text": {
+      "alias": {
+        "name": "Alias"
+      },
+      "repo": {
+        "name": "Repozytorium"
+      },
+      "tag_alias": {
+        "name": "Alias"
+      }
+    },
+    "select": {
+      "channel": {
+        "name": "Kanał"
+      },
+      "led": {
+        "name": "Jasność diody RGB"
+      },
+      "tft": {
+        "name": "Jasność TFT"
+      },
+      "maxsleep": {
+        "name": "Maksymalny czas uśpienia"
+      },
+      "lock": {
+        "name": "Zablokuj inwentarz tagów"
+      },
+      "wifipower": {
+        "name": "Moc WiFi"
+      },
+      "language": {
+        "name": "Język"
+      },
+      "discovery": {
+        "name": "Metoda wykrywania"
+      },
+      "subghzchannel": {
+        "name": "Kanał Sub-GHz"
+      },
+      "sleeptime1": {
+        "name": "Brak aktualizacji między 1 (od)"
+      },
+      "sleeptime2": {
+        "name": "Brak aktualizacji między 2 (do)"
+      }
+    },
+    "sensor": {
+      "ip": {
+        "name": "Adres IP"
+      },
+      "wifi_ssid": {
+        "name": "SSID WiFi"
+      },
+      "record_count": {
+        "name": "Liczba tagów"
+      },
+      "db_size": {
+        "name": "Rozmiar bazy danych"
+      },
+      "little_fs_free": {
+        "name": "Wolne LittleFS"
+      },
+      "ap_state": {
+        "name": "Stan"
+      },
+      "run_state": {
+        "name": "Stan pracy"
+      },
+      "wifi_rssi": {
+        "name": "RSSI WiFi"
+      },
+      "heap": {
+        "name": "Wolna pamięć sterty"
+      },
+      "sys_time": {
+        "name": "Czas systemowy"
+      },
+      "uptime": {
+        "name": "Czas działania"
+      },
+      "low_battery_tag_count": {
+        "name": "Liczba tagów z niskim poziomem baterii"
+      },
+      "timeout_tag_count": {
+        "name": "Liczba tagów z przekroczonym czasem"
+      },
+      "ps_ram_free": {
+        "name": "Wolny PSRAM"
+      },
+      "temperature": {
+        "name": "Temperatura"
+      },
+      "battery_voltage": {
+        "name": "Napięcie baterii"
+      },
+      "battery_percentage": {
+        "name": "Poziom baterii"
+      },
+      "last_seen": {
+        "name": "Ostatnio widziany"
+      },
+      "next_update": {
+        "name": "Następna aktualizacja"
+      },
+      "next_checkin": {
+        "name": "Następne zameldowanie"
+      },
+      "lqi": {
+        "name": "Wskaźnik jakości łącza"
+      },
+      "rssi": {
+        "name": "RSSI"
+      },
+      "pending_updates": {
+        "name": "Oczekujące aktualizacje"
+      },
+      "content_mode": {
+        "name": "Tryb zawartości"
+      },
+      "wakeup_reason": {
+        "name": "Powód wybudzenia"
+      },
+      "capabilities": {
+        "name": "Możliwości"
+      },
+      "update_count": {
+        "name": "Liczba aktualizacji"
+      },
+      "width": {
+        "name": "Szerokość"
+      },
+      "height": {
+        "name": "Wysokość"
+      },
+      "runtime": {
+        "name": "Czas działania"
+      },
+      "boot_count": {
+        "name": "Liczba uruchomień"
+      },
+      "checkin_count": {
+        "name": "Liczba zameldowań"
+      },
+      "block_requests": {
+        "name": "Żądania transferu blokowego"
+      }
+    },
+    "image": {
+      "content": {
+        "name": "Zawartość"
+      }
+    },
+    "light": {
+      "led": {
+        "name": "LED"
+      }
+    },
+    "button": {
+      "clear_pending": {
+        "name": "Wyczyść oczekujące aktualizacje"
+      },
+      "force_refresh": {
+        "name": "Wymuś odświeżenie treści"
+      },
+      "reboot_tag": {
+        "name": "Uruchom ponownie tag"
+      },
+      "scan_channels": {
+        "name": "Skanuj kanały"
+      },
+      "deep_sleep": {
+        "name": "Głęboki sen"
+      },
+      "reboot_ap": {
+        "name": "Uruchom ponownie AP"
+      },
+      "refresh_tag_types": {
+        "name": "Odśwież typy tagów"
+      },
+      "refresh_config": {
+        "name": "Odśwież konfigurację"
+      }
+    },
+    "update": {
+      "firmware": {
+        "name": "Oprogramowanie układowe"
+      }
+    }
+  },
+  "issues": {
+    "camera_migration_needed": {
+      "title": "Przeniesiono encje kamer",
+      "description": "OpenEPaperLink przeniósł {count} encje kamer do encji obrazów. Zaktualizuj pulpity i automatyzacje, aby używać nowych encji obrazów. Usunięte encje: {entities}"
+    }
+  },
+  "preview_features": {
+    "oepl_ble_updates": {
+      "name": "Aktualizacje firmware OEPL BLE",
+      "description": "Wyświetla encję aktualizacji firmware dla tagów OEPL BLE, porównując z najnowszym wydaniem OEPL_BLE na GitHub. Instalacja jeszcze niedostępna."
+    }
+  },
+  "exceptions": {
+    "ble_device_not_detected": {
+      "message": "Urządzenie BLE {name} ({mac_address}) nie zostało wykryte w zasięgu Bluetooth."
+    },
+    "ap_cannot_connect": {
+      "message": "Nie można połączyć z AP pod adresem {host}: {error}"
+    },
+    "ap_failed_load_tags": {
+      "message": "Nie udało się wczytać tagów z AP pod adresem {host}: {error}"
+    },
+    "ap_timeout_action": {
+      "message": "Przekroczono czas podczas {action}."
+    },
+    "ap_network_error_action": {
+      "message": "Błąd sieci podczas {action}: {error}"
+    },
+    "ap_failed_action_http": {
+      "message": "Nie udało się {action}: HTTP {status_code} - {response_text}"
+    },
+    "device_not_found": {
+      "message": "Urządzenie {device_id} nie znalezione."
+    },
+    "device_no_identifiers": {
+      "message": "Nie znaleziono identyfikatorów dla urządzenia {device_id}."
+    },
+    "device_not_oepl": {
+      "message": "Urządzenie {device_id} nie jest urządzeniem OpenEPaperLink."
+    },
+    "no_targets_specified": {
+      "message": "Nie określono urządzeń docelowych. Podaj device_id, label_id lub area_id."
+    },
+    "ap_offline": {
+      "message": "AP OpenEPaperLink jest offline. Sprawdź połączenie sieciowe i stan AP."
+    },
+    "error_processing_device": {
+      "message": "Nieoczekiwany błąd podczas przetwarzania urządzenia {entity_id}: {error}"
+    },
+    "ble_upload_bt_disabled": {
+      "message": "Nie można wysłać do urządzenia BLE {entity_id}: integracja Bluetooth jest wyłączona lub brak dostępnych skanerów."
+    },
+    "ble_no_metadata": {
+      "message": "Nie znaleziono metadanych dla urządzenia BLE {entity_id}."
+    },
+    "ble_upload_failed": {
+      "message": "Przesłanie obrazu BLE dla {entity_id} nie powiodło się."
+    },
+    "ble_direct_write_failed": {
+      "message": "Przesłanie bezpośrednie BLE dla {entity_id} nie powiodło się."
+    },
+    "ble_direct_write_not_supported": {
+      "message": "Bezpośredni zapis jest obsługiwany tylko dla urządzeń OEPL, a {entity_id} wygląda na urządzenie ATC."
+    },
+    "image_upload_status": {
+      "message": "Przesyłanie obrazu dla {entity_id} nie powiodło się, kod statusu: {status_code}."
+    },
+    "image_upload_timeout": {
+      "message": "Przesyłanie obrazu dla {entity_id} przekroczyło czas po {attempts} próbach."
+    },
+    "image_upload_network": {
+      "message": "Błąd sieci podczas przesyłania obrazu dla {entity_id}: {error}."
+    },
+    "image_upload_failed": {
+      "message": "Nie udało się przesłać obrazu dla {entity_id}: {error}."
+    },
+    "unexpected_upload": {
+      "message": "Nieoczekiwany błąd przesyłania dla {entity_id}: {error}."
+    },
+    "unexpected_ble_upload": {
+      "message": "Nieoczekiwany błąd podczas przesyłania BLE do {entity_id}: {error}."
+    },
+    "unexpected_ble_direct_write": {
+      "message": "Nieoczekiwany błąd podczas bezpośredniego zapisu BLE do {entity_id}: {error}."
+    },
+    "ap_tag_alias_update_failed": {
+      "message": "Nie udało się zaktualizować aliasu tagu {tag_mac}: AP zwrócił HTTP {status_code} - {response_text}."
+    },
+    "ap_tag_alias_timeout": {
+      "message": "Przekroczono czas aktualizacji aliasu dla {tag_mac}. Sprawdź łączność z AP."
+    },
+    "ap_tag_alias_network": {
+      "message": "Błąd sieci podczas aktualizacji aliasu dla {tag_mac}: {error}."
+    },
+    "ap_tag_alias_unexpected": {
+      "message": "Nieoczekiwany błąd podczas aktualizacji aliasu dla {tag_mac}: {error}."
+    },
+    "ap_offline_core": {
+      "message": "AP OpenEPaperLink jest offline."
+    },
+    "invalid_entity_id_format": {
+      "message": "Nieprawidłowy format identyfikatora encji: {entity_id}."
+    },
+    "tag_not_registered": {
+      "message": "Tag {tag_mac} nie jest zarejestrowany w AP. Jeśli tag się zameldował, spróbuj zrestartować Home Assistant."
+    },
+    "tag_blacklisted": {
+      "message": "Tag {tag_mac} jest obecnie na czarnej liście. Usuń go w opcjach integracji, aby używać."
+    },
+    "tag_inconsistent": {
+      "message": "Niespójny stan: Tag {tag_mac} jest znany, ale brak danych. Zgłoś jako błąd."
+    },
+    "tag_no_hw_type": {
+      "message": "Brak typu sprzętu dla tagu {tag_mac}. Poczekaj na kolejny check-in tagu."
+    },
+    "tag_unknown_hw_type": {
+      "message": "Nieznany typ sprzętu {hw_type} dla tagu {tag_mac}. Spróbuj odświeżyć typy tagów w opcjach integracji."
+    },
+    "invalid_canvas_dimensions": {
+      "message": "Nieprawidłowe wymiary płótna {width}x{height} dla {entity_id}. Metadane urządzenia mogą być uszkodzone lub brakujące. Spróbuj przeładować integrację lub dodać urządzenie ponownie."
+    },
+    "ble_tag_info_unexpected": {
+      "message": "Nieoczekiwany błąd podczas pobierania typu tagu dla {entity_id}: {error}."
+    },
+    "ble_tag_info_unexpected_ble": {
+      "message": "Nieoczekiwany błąd podczas pobierania typu tagu BLE dla {entity_id}: {error}."
+    },
+    "qr_generation_failed": {
+      "message": "Nie udało się wygenerować kodu QR: {error}."
+    },
+    "image_entity_not_found": {
+      "message": "Encja obrazu {entity_id} nie została znaleziona."
+    },
+    "image_entity_no_url": {
+      "message": "Nie znaleziono adresu URL obrazu dla encji {entity_id}."
+    },
+    "image_download_failed": {
+      "message": "Nie udało się pobrać obrazu: HTTP {status_code}."
+    },
+    "image_data_uri_invalid": {
+      "message": "Nieprawidłowy identyfikator URI danych: {error}."
+    },
+    "image_process_failed": {
+      "message": "Nie udało się przetworzyć obrazu: {error}."
+    },
+    "font_load_failed": {
+      "message": "Nie można załadować żadnej czcionki. Wskazuje to na problem z instalacją integracji."
+    },
+    "plot_duration_invalid": {
+      "message": "duration musi być większe niż 0 sekund."
+    },
+    "plot_no_data": {
+      "message": "Brak zarejestrowanych danych dla {entity_id}."
+    },
+    "plot_no_valid_points": {
+      "message": "Brak prawidłowych punktów danych."
+    },
+    "plot_yaxis_invalid": {
+      "message": "yaxis.tick_every musi być większe niż 0."
+    },
+    "plot_xlegend_invalid": {
+      "message": "xlegend.interval musi być większe niż 0."
+    },
+    "plot_draw_failed": {
+      "message": "Nie udało się narysować wykresu: {error}."
+    },
+    "plot_bar_invalid": {
+      "message": "Nieprawidłowe dane słupków dla diagramu: {error}."
+    },
+    "mdi_metadata_failed": {
+      "message": "Nie udało się załadować metadanych MDI: {error}."
+    },
+    "icon_name_invalid": {
+      "message": "Nieprawidłowa nazwa ikony: {icon_name}."
+    },
+    "icon_draw_failed": {
+      "message": "Nie udało się narysować ikony: {error}."
+    },
+    "icon_draw_failed_named": {
+      "message": "Nie udało się narysować ikony {icon_name}: {error}."
+    },
+    "led_on_failed": {
+      "message": "Nie udało się włączyć diody LED."
+    },
+    "led_on_error": {
+      "message": "Błąd podczas włączania diody LED: {error}."
+    },
+    "led_off_failed": {
+      "message": "Nie udało się wyłączyć diody LED."
+    },
+    "led_off_error": {
+      "message": "Błąd podczas wyłączania diody LED: {error}."
+    },
+    "tagtypes_load_failed": {
+      "message": "Nie udało się załadować definicji typów tagów. Brak zapisanych danych. Sprawdź łączność sieciową lub dostęp do GitHub."
+    },
+    "tagtypes_refresh_failed": {
+      "message": "Nie udało się odświeżyć definicji typów tagów. Sprawdź łączność sieciową lub dostęp do GitHub."
+    },
+    "no_hub_configured": {
+      "message": "Brak skonfigurowanego huba AP. Znaleziono tylko urządzenia BLE."
+    },
+    "ble_slots_unavailable": {
+      "message": "Brak dostępnych slotów połączeń Bluetooth dla {mac_address}. Dodaj więcej proxy Bluetooth ESPHome w pobliżu lub poczekaj na zwolnienie połączeń. Szczegóły: {error}."
+    },
+    "ble_device_not_found": {
+      "message": "Urządzenie {mac_address} nie zostało znalezione."
+    },
+    "ble_characteristic_not_resolved": {
+      "message": "Nie udało się ustalić charakterystyki dla usługi {service_uuid}."
+    },
+    "ble_connection_failed": {
+      "message": "Nie udało się połączyć z {mac_address}: {error}."
+    },
+    "ble_write_char_missing": {
+      "message": "Brak dostępnej charakterystyki zapisu."
+    },
+    "ble_timeout": {
+      "message": "Brak odpowiedzi od {mac_address} w ciągu {timeout}s."
+    },
+    "ble_operation_failed": {
+      "message": "Operacja BLE {operation} nie powiodła się po {attempts} próbach: {error}."
+    },
+    "ble_operation_retry": {
+      "message": "Operacja BLE {operation} nie powiodła się w próbie {attempt}: {error}. Ponowna próba za {delay}s..."
+    },
+    "ble_protocol_invalid_response_length": {
+      "message": "Nieprawidłowa długość odpowiedzi informacji o wyświetlaczu: {length} (oczekiwano co najmniej {expected_length})."
+    },
+    "ble_protocol_invalid_command_id": {
+      "message": "Nieprawidłowy identyfikator polecenia w odpowiedzi: {command_id}."
+    },
+    "ble_protocol_payload_too_short": {
+      "message": "Ładunek informacji o wyświetlaczu jest zbyt krótki."
+    },
+    "oepl_config_chunk_short": {
+      "message": "Dane fragmentu są zbyt krótkie: {length} bajtów."
+    },
+    "oepl_expected_chunk_zero": {
+      "message": "Oczekiwano fragmentu 0, otrzymano fragment {chunk_num}."
+    },
+    "oepl_config_too_short": {
+      "message": "Dane konfiguracji są zbyt krótkie: {length} bajtów (wymagane co najmniej {minimum})."
+    },
+    "oepl_fw_response_short": {
+      "message": "Odpowiedź wersji firmware jest zbyt krótka: {length} bajtów."
+    },
+    "oepl_fw_version_format": {
+      "message": "Długość SHA wersji firmware {sha_length} przekracza ładunek ({payload_length} bajtów)."
+    },
+    "tlv_section_too_short": {
+      "message": "{section} wymaga {expected} bajtów, otrzymano {actual}."
+    },
+    "tlv_data_too_short": {
+      "message": "Dane konfiguracji są zbyt krótkie: {length} bajtów (minimum 2)."
+    },
+    "tlv_crc_mismatch": {
+      "message": "Niezgodność CRC32: oczekiwano {expected_crc32}, otrzymano {actual_crc32}."
+    },
+    "tlv_unknown_packet": {
+      "message": "Nieznany identyfikator pakietu: {packet_id} przy przesunięciu {offset}."
+    },
+    "tlv_packet_too_short": {
+      "message": "Pakiet o ID {packet_id} wymaga {packet_size} bajtów, ale pozostało tylko {remaining_bytes} bajtów przy przesunięciu {offset}."
+    },
+    "tlv_packet_parse_failed": {
+      "message": "Nie udało się przetworzyć pakietu {packet_id} przy przesunięciu {offset}: {error}."
+    },
+    "tlv_no_display_config": {
+      "message": "Brak konfiguracji wyświetlacza w danych urządzenia."
+    },
+    "tlv_invalid_dimensions": {
+      "message": "Nieprawidłowe wymiary pikseli: {width}x{height}."
+    },
+    "config_flow_invalid_config": {
+      "message": "Urządzenie zwróciło nieprawidłowe dane konfiguracyjne."
+    },
+    "config_flow_missing_config": {
+      "message": "Urządzenie nie zwróciło danych konfiguracyjnych."
+    },
+    "refresh_config_failed": {
+      "message": "Nie udało się odświeżyć konfiguracji: {error}."
+    },
+    "multiple_errors": {
+      "message": "Wystąpiło wiele błędów:\n{errors}"
+    },
+    "invalid_payload": {
+      "message": "Nieprawidłowy ładunek:\n{errors}"
+    }
+  }
+}

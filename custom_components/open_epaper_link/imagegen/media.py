@@ -13,6 +13,7 @@ from resizeimage import resizeimage
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.network import get_url
 
+from ..const import DOMAIN
 from .registry import element_handler
 from .types import ElementType, DrawingContext
 
@@ -69,7 +70,11 @@ async def draw_qrcode(ctx: DrawingContext, element: dict) -> None:
         ctx.pos_y = y + qr_img.height
 
     except Exception as e:
-        raise HomeAssistantError(f"Failed to generate QR code: {str(e)}")
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="qr_generation_failed",
+            translation_placeholders={ "error": str(e)}
+        )
 
 
 @element_handler(ElementType.DLIMG, requires=["x", "y", "url", "xsize", "ysize"])
@@ -99,12 +104,20 @@ async def draw_downloaded_image(ctx: DrawingContext, element: dict) -> None:
             # Get state of the image entity
             state = ctx.hass.states.get(element['url'])
             if not state:
-                raise HomeAssistantError(f"Image entity {element['url']} not found")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="image_entity_not_found",
+                    translation_placeholders={"entity_id": element['url']}
+                )
 
             # Get image URL from entity attributes
             image_url = state.attributes.get("entity_picture")
             if not image_url:
-                raise HomeAssistantError(f"No image URL found for entity {element['url']}")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="image_entity_no_url",
+                    translation_placeholders={"entity_id": element['url']}
+                )
 
             # If the URL is relative, make it absolute using HA's base URL
             if image_url.startswith("/"):
@@ -120,7 +133,11 @@ async def draw_downloaded_image(ctx: DrawingContext, element: dict) -> None:
             response = await ctx.hass.async_add_executor_job(
                 requests.get, element['url'])
             if response.status_code != 200:
-                raise HomeAssistantError(f"Failed to download image: HTTP {response.status_code}")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="image_download_failed",
+                    translation_placeholders={ "status_code": response.status_code}
+                )
             source_img = Image.open(io.BytesIO(response.content))
 
         elif element['url'].startswith('data:'):
@@ -133,7 +150,11 @@ async def draw_downloaded_image(ctx: DrawingContext, element: dict) -> None:
                     decoded = urllib.parse.unquote_to_bytes(encoded)
                 source_img = Image.open(io.BytesIO(decoded))
             except Exception as e:
-                raise HomeAssistantError(f"Invalid data URI: {str(e)}")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="image_data_uri_invalid",
+                    translation_placeholders={ "error": str(e)}
+                )
 
         else:
             # Handle local file
@@ -172,4 +193,8 @@ async def draw_downloaded_image(ctx: DrawingContext, element: dict) -> None:
         ctx.pos_y = pos_y + target_size[1]
 
     except Exception as e:
-        raise HomeAssistantError(f"Failed to process image: {str(e)}")
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="image_process_failed",
+            translation_placeholders={ "error": str(e)}
+        )
