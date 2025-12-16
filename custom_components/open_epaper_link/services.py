@@ -144,7 +144,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         """Decorator to handle device_id, label_id, and area_id targeting."""
         @wraps(func)
         async def wrapper(service: ServiceCall, *args, **kwargs):
-            device_ids = list(service.data.get("device_id", []))
+            device_ids = service.data.get("device_id", [])
             label_ids = service.data.get("label_id", [])
             area_ids = service.data.get("area_id", [])
 

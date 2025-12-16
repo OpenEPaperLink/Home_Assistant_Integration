@@ -792,7 +792,7 @@ class Hub:
         _LOGGER.info("Rebooted OEPL AP")
         return True
 
-    async def set_ap_config_item(self, key: str, value: str | int) -> bool:
+    async def set_ap_config_item(self, key: str, value: str | int) -> bool: # TODO listen to apitem for changes?
         if key in ("sleeptime1", "sleeptime2"):
             data = {"sleeptime1": self.ap_config.get("sleeptime1", 0),
                     "sleeptime2": self.ap_config.get("sleeptime2", 0), key: value}
