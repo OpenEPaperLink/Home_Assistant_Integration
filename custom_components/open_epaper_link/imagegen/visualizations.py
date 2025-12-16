@@ -93,33 +93,70 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
                 "last_changed": str(state_obj.last_changed)
             }
 
-            # Convert states to points
-            points = []
+            # Convert states to segments (breaking at gaps)
+            segments = []
+            current_segment = []
+            span_gaps = plot.get("span_gaps", False)
             value_scale = plot.get("value_scale", 1.0)
+            prev_timestamp = None
+            prev_was_valid = True
+
             for state in states:
                 try:
                     value = float(state["state"]) * value_scale
                     timestamp = datetime.fromisoformat(state["last_changed"])
-                    points.append((timestamp, value))
+
+                    # Check for gap conditions
+                    should_break = False
+
+                    if isinstance(span_gaps, (int, float)) and span_gaps is not True and span_gaps is not False:
+                        # Time-based gap detection
+                        if prev_timestamp:
+                            gap_seconds = (timestamp - prev_timestamp).total_seconds()
+                            if gap_seconds > span_gaps:
+                                should_break = True
+                    elif span_gaps is False and not prev_was_valid:
+                        # Previous was invalid/null, start new segment
+                        should_break = True
+
+                    # Start new segment if needed
+                    if should_break and current_segment:
+                        segments.append(current_segment)
+                        current_segment = []
+
+                    current_segment.append((timestamp, value))
+                    prev_timestamp = timestamp
+                    prev_was_valid = True
+
                 except (ValueError, TypeError):
+                    # Invalid value (null, unavailable, etc.)
+                    if span_gaps is False and current_segment:
+                        # Close current segment before null
+                        segments.append(current_segment)
+                        current_segment = []
+                    prev_was_valid = False
                     continue
 
-            if not points:
+            # Add final segment
+            if current_segment:
+                segments.append(current_segment)
+
+            if not segments:
                 continue
 
-            # Update min/max
-            values = [p[1] for p in points]
+            # Update min/max from all segments
+            all_values = [p[1] for segment in segments for p in segment]
             if min_v is None:
-                min_v = min(values) if values else None
+                min_v = min(all_values) if all_values else None
             else:
-                min_v = min(min_v, min(values))
+                min_v = min(min_v, min(all_values))
 
             if max_v is None:
-                max_v = max(values) if values else None
+                max_v = max(all_values) if all_values else None
             else:
-                max_v = max(max_v, max(values))
+                max_v = max(max_v, max(all_values))
 
-            raw_data.append(points)
+            raw_data.append(segments)
 
         if not raw_data:
             raise ServiceValidationError(
@@ -574,109 +611,116 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
                             anchor="mt"
                         )
                 curr_time += timedelta(seconds=time_interval)
+
         # Draw data
-        for plot_data, plot_config in zip(raw_data, element["data"]):
-            # Convert data points to screen coordinates
-            points = []
-            for timestamp, value in plot_data:
-                rel_time = (timestamp - start) / duration
-                rel_value = (value - min_v) / spread
-                x = round(diag_x + rel_time * (diag_width - 1))
-                y = round(diag_y + (1 - rel_value) * (diag_height - 1))
-                points.append((x, y))
+        for plot_segments, plot_config in zip(raw_data, element["data"]):
+            # Get line style (once per entity)
+            line_color = ctx.colors.resolve(plot_config.get("color", "black"))
+            line_width = plot_config.get("width", 1)
+            smooth = plot_config.get("smooth", False)
+            steps = plot_config.get("smooth_steps", 10)
 
-            # Draw line
-            if len(points) > 1:
-                # Get line style
-                line_color = ctx.colors.resolve(plot_config.get("color", "black"))
-                line_width = plot_config.get("width", 1)
-                smooth = plot_config.get("smooth", False)
-                steps = plot_config.get("smooth_steps", 10)
+            # Catmull-Rom interpolation function
+            def catmull_rom(p0, p1, p2, p3, t):
+                t2 = t * t
+                t3 = t2 * t
 
-                if smooth and len(points) > 2:
-                    # Create a smoothed line using quadratic Bézier curves
-                    smooth_coords = []
+                return (
+                    int(0.5 * (
+                            (-t3 + 2 * t2 - t) * p0[0] +
+                            (3 * t3 - 5 * t2 + 2) * p1[0] +
+                            (-3 * t3 + 4 * t2 + t) * p2[0] +
+                            (t3 - t2) * p3[0]
+                    )),
+                    int(0.5 * (
+                            (-t3 + 2 * t2 - t) * p0[1] +
+                            (3 * t3 - 5 * t2 + 2) * p1[1] +
+                            (-3 * t3 + 4 * t2 + t) * p2[1] +
+                            (t3 - t2) * p3[1]
+                    ))
+                )
 
-                    def catmull_rom(p0, p1, p2, p3, t):
-                        t2 = t * t
-                        t3 = t2 * t
+            # Process each segment independently
+            all_screen_points = []  # For show_points later
+            for segment_data in plot_segments:
+                # Convert segment to screen coordinates
+                points = []
+                for timestamp, value in segment_data:
+                    rel_time = (timestamp - start) / duration
+                    rel_value = (value - min_v) / spread
+                    x = round(diag_x + rel_time * (diag_width - 1))
+                    y = round(diag_y + (1 - rel_value) * (diag_height - 1))
+                    points.append((x, y))
+                    all_screen_points.append((x, y))
 
-                        return (
-                            int(0.5 * (
-                                    (-t3 + 2 * t2 - t) * p0[0] +
-                                    (3 * t3 - 5 * t2 + 2) * p1[0] +
-                                    (-3 * t3 + 4 * t2 + t) * p2[0] +
-                                    (t3 - t2) * p3[0]
-                            )),
-                            int(0.5 * (
-                                    (-t3 + 2 * t2 - t) * p0[1] +
-                                    (3 * t3 - 5 * t2 + 2) * p1[1] +
-                                    (-3 * t3 + 4 * t2 + t) * p2[1] +
-                                    (t3 - t2) * p3[1]
-                            ))
+                # Draw line for this segment (only if 2+ points)
+                if len(points) > 1:
+                    if smooth and len(points) > 2:
+                        # Create smoothed line using Catmull-Rom splines
+                        smooth_coords = []
+
+                        smooth_coords.append(points[0])
+                        # Handle first segment specially (duplicate first point)
+                        if len(points) > 3:
+                            p0 = points[0]
+                            p1 = points[0]
+                            p2 = points[1]
+                            p3 = points[2]
+
+                            for i in range(1, steps):
+                                t = i / steps
+                                point = catmull_rom(p0, p1, p2, p3, t)
+                                smooth_coords.append(point)
+
+                        # Handle middle segments
+                        for i in range(len(points) - 3):
+                            p0 = points[i]
+                            p1 = points[i + 1]
+                            p2 = points[i + 2]
+                            p3 = points[i + 3]
+
+                            for j in range(steps):
+                                t = j / steps
+                                point = catmull_rom(p0, p1, p2, p3, t)
+                                smooth_coords.append(point)
+
+                        # Handle last segment specially (duplicate last point)
+                        if len(points) > 3:
+                            p0 = points[-3]
+                            p1 = points[-2]
+                            p2 = points[-1]
+                            p3 = points[-1]
+
+                            for i in range(1, steps):
+                                t = i / steps
+                                point = catmull_rom(p0, p1, p2, p3, t)
+                                smooth_coords.append(point)
+
+                        # Add last point
+                        smooth_coords.append(points[-1])
+
+                        draw.line(
+                            smooth_coords,
+                            fill=line_color,
+                            width=line_width,
+                            joint="curve"
+                        )
+                    else:
+                        draw.line(
+                            points,
+                            fill=line_color,
+                            width=line_width
                         )
 
-                    smooth_coords.append(points[0])
-                    # Handle first segment specially (duplicate first point)
-                    if len(points) > 3:
-                        p0 = points[0]
-                        p1 = points[0]
-                        p2 = points[1]
-                        p3 = points[2]
-
-                        for i in range(1, steps):
-                            t = i / steps
-                            point = catmull_rom(p0, p1, p2, p3, t)
-                            smooth_coords.append(point)
-
-                    # Handle middle segments
-                    for i in range(len(points) - 3):
-                        p0 = points[i]
-                        p1 = points[i + 1]
-                        p2 = points[i + 2]
-                        p3 = points[i + 3]
-
-                        for j in range(steps):
-                            t = j / steps
-                            point = catmull_rom(p0, p1, p2, p3, t)
-                            smooth_coords.append(point)
-
-                    # Handle last segment specially (duplicate last point)
-                    if len(points) > 3:
-                        p0 = points[-3]
-                        p1 = points[-2]
-                        p2 = points[-1]
-                        p3 = points[-1]
-
-                        for i in range(1, steps):
-                            t = i / steps
-                            point = catmull_rom(p0, p1, p2, p3, t)
-                            smooth_coords.append(point)
-
-                    # Add last point
-                    smooth_coords.append(points[-1])
-
-                    draw.line(
-                        smooth_coords,
-                        fill=line_color,
-                        width=line_width,
-                        joint="curve"
+            # Draw points from all segments (if enabled)
+            if plot_config.get("show_points", False):
+                point_size = plot_config.get("point_size", 3)
+                point_color = ctx.colors.resolve(plot_config.get("point_color", "black"))
+                for x, y in all_screen_points:
+                    draw.ellipse(
+                        [(x - point_size, y - point_size), (x + point_size, y + point_size)],
+                        fill=point_color
                     )
-
-                else:
-                    draw.line(
-                        points,
-                        fill=line_color,
-                        width=line_width
-                    )
-                if plot_config.get("show_points", False):
-                    point_size = plot_config.get("point_size", 3)
-                    point_color = ctx.colors.resolve(plot_config.get("point_color", "black"))
-                    for x, y in points:
-                        draw.ellipse(
-                            [(x - point_size, y - point_size), (x + point_size, y + point_size)],
-                            fill=point_color
-                        )
         ctx.pos_y = y_end
 
     except Exception as e:
