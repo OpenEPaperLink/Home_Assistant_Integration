@@ -618,6 +618,7 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
             line_color = ctx.colors.resolve(plot_config.get("color", "black"))
             line_width = plot_config.get("width", 1)
             smooth = plot_config.get("smooth", False)
+            line_style = plot_config.get("line_style", "linear")
             steps = plot_config.get("smooth_steps", 10)
 
             # Catmull-Rom interpolation function
@@ -655,7 +656,18 @@ async def draw_plot(ctx: DrawingContext, element: dict) -> None:
 
                 # Draw line for this segment (only if 2+ points)
                 if len(points) > 1:
-                    if smooth and len(points) > 2:
+                    # Apply step transformation if requested (takes precedence over smooth)
+                    if line_style == "step":
+                        step_points = [points[0]]
+                        for i in range(1, len(points)):
+                            prev_x, prev_y = points[i-1]
+                            curr_x, curr_y = points[i]
+                            # Horizontal to new x at old y
+                            step_points.append((curr_x, prev_y))
+                            # Then vertical to new y
+                            step_points.append((curr_x, curr_y))
+                        points = step_points
+                    if smooth and len(points) > 2 and line_style != "step":
                         # Create smoothed line using Catmull-Rom splines
                         smooth_coords = []
 

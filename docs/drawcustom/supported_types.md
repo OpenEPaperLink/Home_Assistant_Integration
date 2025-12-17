@@ -656,17 +656,18 @@ Each entry in the `data` array can have these options:
   point_color: black
   value_scale: 1.0
 ```
-| Parameter     | Description                   | Required | Default | Notes                       |
-|---------------|-------------------------------|----------|---------|-----------------------------|
-| `entity`      | Entity ID to plot             | Yes      | -       | String                      |
-| `color`       | Line color                    | No       | `black` | Any supported color         |
-| `width`       | Line width                    | No       | `1`     | Pixels                      |
-| `span_gaps`   | Connect lines across gaps     | No       | `false` | `true`, `false`, or seconds |
-| `smooth`      | Curve smoothing               | No       | `false` | `true`, `false`             |
-| `show_points` | Show data points              | No       | `false` | `true`, `false`             |
-| `point_size`  | Data point size               | No       | `3`     | Pixels                      |
-| `point_color` | Data point color              | No       | `black` | Any supported color         |
-| `value_scale` | Scale data points by a factor | No       | `1.0`   | Float                       |
+| Parameter     | Description                                                        | Required | Default | Notes                       |
+|---------------|--------------------------------------------------------------------|----------|---------|-----------------------------|
+| `entity`      | Entity ID to plot                                                  | Yes      | -       | String                      |
+| `color`       | Line color                                                         | No       | `black` | Any supported color         |
+| `width`       | Line width                                                         | No       | `1`     | Pixels                      |
+| `span_gaps`   | Connect lines across gaps                                          | No       | `false` | `true`, `false`, or seconds |
+| `smooth`      | Curve smoothing                                                    | No       | `false` | `true`, `false`             |
+| `line_style`  | `linear`: direct connections between points, `step`: stair pattern | No       | linear  | `linear` or `step`          |
+| `show_points` | Show data points                                                   | No       | `false` | `true`, `false`             |
+| `point_size`  | Data point size                                                    | No       | `3`     | Pixels                      |
+| `point_color` | Data point color                                                   | No       | `black` | Any supported color         |
+| `value_scale` | Scale data points by a factor                                      | No       | `1.0`   | Float                       |
 
 #### Gap Handling
 
