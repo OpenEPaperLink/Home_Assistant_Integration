@@ -656,16 +656,51 @@ Each entry in the `data` array can have these options:
   point_color: black
   value_scale: 1.0
 ```
-| Parameter     | Description                   | Required | Default | Notes               |
-|---------------|-------------------------------|----------|---------|---------------------|
-| `entity`      | Entity ID to plot             | Yes      | -       | String              |
-| `color`       | Line color                    | No       | `black` | Any supported color |
-| `width`       | Line width                    | No       | `1`     | Pixels              |
-| `smooth`      | Curve smoothing               | No       | `false` | `true`, `false`     |
-| `show_points` | Show data points              | No       | `false` | `true`, `false`     |
-| `point_size`  | Data point size               | No       | `3`     | Pixels              |
-| `point_color` | Data point color              | No       | `black` | Any supported color |
-| `value_scale` | Scale data points by a factor | No       | `1.0`   | Float               |
+| Parameter     | Description                                                        | Required | Default | Notes                       |
+|---------------|--------------------------------------------------------------------|----------|---------|-----------------------------|
+| `entity`      | Entity ID to plot                                                  | Yes      | -       | String                      |
+| `color`       | Line color                                                         | No       | `black` | Any supported color         |
+| `width`       | Line width                                                         | No       | `1`     | Pixels                      |
+| `span_gaps`   | Connect lines across gaps                                          | No       | `false` | `true`, `false`, or seconds |
+| `smooth`      | Curve smoothing                                                    | No       | `false` | `true`, `false`             |
+| `line_style`  | `linear`: direct connections between points, `step`: stair pattern | No       | linear  | `linear` or `step`          |
+| `show_points` | Show data points                                                   | No       | `false` | `true`, `false`             |
+| `point_size`  | Data point size                                                    | No       | `3`     | Pixels                      |
+| `point_color` | Data point color                                                   | No       | `black` | Any supported color         |
+| `value_scale` | Scale data points by a factor                                      | No       | `1.0`   | Float                       |
+
+#### Gap Handling
+
+By default, the plot creates visual gaps when sensor data is unavailable or null. This matches Home Assistant's history graph behavior and prevents misleading visual connections across missing data periods.
+
+**`span_gaps` Parameter Options:**
+
+- `false` (default): Break lines at null/unavailable values - creates visual gaps
+- `true`: Connect lines across all gaps
+- `<number>`: Only span time gaps smaller than N seconds
+
+**Examples:**
+
+```yaml
+# Default behavior - break at null values (recommended)
+- type: plot
+  data:
+    - entity: sensor.temperature
+      color: red
+       # span_gaps: false (implicit default)
+
+# Connect across all gaps
+- type: plot
+  data:
+    - entity: sensor.temperature
+      span_gaps: true
+
+# Only break at gaps longer than 1 hour
+- type: plot
+  data:
+    - entity: sensor.temperature
+      span_gaps: 3600  # seconds
+```
 
 #### Y-Legend Options
 ```yaml

@@ -750,7 +750,7 @@ async def _send_welcome_image(
             DOMAIN,
             "drawcustom",
             {
-                "device_id": [device_id],
+                "device_id": device_id,
                 "payload": payload,
                 "background": "white",
                 "rotate": 0,
