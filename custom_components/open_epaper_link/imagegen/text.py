@@ -205,10 +205,13 @@ async def draw_multiline(ctx: DrawingContext, element: dict) -> None:
     stroke_fill = ctx.colors.resolve(element.get('stroke_fill', 'white'))
 
     x = ctx.coords.parse_x(element['x'])
-    if "y" not in element:
-        current_y = ctx.pos_y + element.get('y_padding', 10)
-    else:
+    # Support both 'y' (standard) and 'start_y' (legacy) for backward compatibility
+    if "y" in element:
         current_y = ctx.coords.parse_y(element['y'])
+    elif "start_y" in element:
+        current_y = ctx.coords.parse_y(element['start_y'])
+    else:
+        current_y = ctx.pos_y + element.get('y_padding', 10)
 
     # Split text using delimiter
     lines = element['value'].replace("\n", "").split(element["delimiter"])
