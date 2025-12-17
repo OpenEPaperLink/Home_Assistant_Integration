@@ -87,31 +87,76 @@ async def draw_text(ctx: DrawingContext, element: dict) -> None:
     # Draw the text
     if element.get('parse_colors', False):
         segments = parse_colored_text(final_text)
-        segments, total_width = calculate_segment_positions(
-            segments, font, x, align, anchor
-        )
 
-        max_y = y
-        for segment in segments:
-            color = ctx.colors.resolve(segment.color)
-            bbox = draw.textbbox(
-                (segment.start_x, y),
-                segment.text,
-                font=font,
-                anchor=anchor
+        # Check if text contains newlines
+        has_newlines = '\n' in final_text
+
+        if has_newlines:
+            # Split text into lines
+            lines = split_segments_by_newlines(segments)
+
+            # Calculate vertical positions
+            line_y_positions, total_height = calculate_multiline_positions(lines, font, spacing)
+
+            # Apply vertical anchor offset to the entire block
+            adjusted_y = calculate_anchor_offset_y(y, total_height, anchor)
+
+            # Draw each line
+            max_y = adjusted_y
+            for line_segments, line_y_offset in zip(lines, line_y_positions):
+                # Calculate horizontal positions for this line
+                line_segments, line_width = calculate_segment_positions(line_segments, font, x, align, anchor)
+
+                # Calculate absolute y position for this line
+                line_y = adjusted_y + line_y_offset
+
+                # Draw each segment in the line
+                for segment in line_segments:
+                    color = ctx.colors.resolve(segment.color)
+                    bbox = draw.textbbox(
+                        (segment.start_x, line_y),
+                        segment.text,
+                        font=font,
+                        anchor="lt"
+                    )
+                    draw.text(
+                        (segment.start_x, line_y),
+                        segment.text,
+                        fill=color,
+                        font=font,
+                        anchor="lt",
+                        spacing=spacing,
+                        stroke_width=stroke_width,
+                        stroke_fill=stroke_fill
+                    )
+                    max_y = max(max_y, bbox[3])
+            ctx.pos_y = max_y
+        else:
+            segments, total_width = calculate_segment_positions(
+                segments, font, x, align, anchor
             )
-            draw.text(
-                (segment.start_x, y),
-                segment.text,
-                fill=color,
-                font=font,
-                anchor="lt",
-                spacing=spacing,
-                stroke_width=stroke_width,
-                stroke_fill=stroke_fill
-            )
-            max_y = max(max_y, bbox[3])
-        ctx.pos_y = max_y
+
+            max_y = y
+            for segment in segments:
+                color = ctx.colors.resolve(segment.color)
+                bbox = draw.textbbox(
+                    (segment.start_x, y),
+                    segment.text,
+                    font=font,
+                    anchor="lt",
+                )
+                draw.text(
+                    (segment.start_x, y),
+                    segment.text,
+                    fill=color,
+                    font=font,
+                    anchor="lt",
+                    spacing=spacing,
+                    stroke_width=stroke_width,
+                    stroke_fill=stroke_fill
+                )
+                max_y = max(max_y, bbox[3])
+            ctx.pos_y = max_y
     else:
         bbox = draw.textbbox(
             (x, y),
@@ -159,16 +204,24 @@ async def draw_multiline(ctx: DrawingContext, element: dict) -> None:
     stroke_width = element.get('stroke_width', 0)
     stroke_fill = ctx.colors.resolve(element.get('stroke_fill', 'white'))
 
+    x = ctx.coords.parse_x(element['x'])
+    # Support both 'y' (standard) and 'start_y' (legacy) for backward compatibility
+    if "y" in element:
+        current_y = ctx.coords.parse_y(element['y'])
+    elif "start_y" in element:
+        current_y = ctx.coords.parse_y(element['start_y'])
+    else:
+        current_y = ctx.pos_y + element.get('y_padding', 10)
+
     # Split text using delimiter
     lines = element['value'].replace("\n", "").split(element["delimiter"])
-    current_y = element.get('start_y', ctx.pos_y + element.get('y_padding', 10))
 
     max_y = current_y
     for line in lines:
         if element.get('parse_colors', False):
             segments = parse_colored_text(str(line))
             segments, total_width = calculate_segment_positions(
-                segments, font, element["x"], align, anchor
+                segments, font, x, align, anchor
             )
 
             for segment in segments:
@@ -177,7 +230,7 @@ async def draw_multiline(ctx: DrawingContext, element: dict) -> None:
                     (segment.start_x, current_y),
                     segment.text,
                     font=font,
-                    anchor=anchor
+                    anchor="lt"
                 )
                 draw.text(
                     (segment.start_x, current_y),
@@ -190,14 +243,14 @@ async def draw_multiline(ctx: DrawingContext, element: dict) -> None:
                 )
         else:
             bbox = draw.textbbox(
-                (element['x'], current_y),
+                (x, current_y),
                 str(line),
                 font=font,
                 anchor=anchor,
                 align=align
             )
             draw.text(
-                (element['x'], current_y),
+                (x, current_y),
                 str(line),
                 fill=color,
                 font=font,
@@ -328,3 +381,85 @@ def calculate_segment_positions(
         current_x += font.getlength(segment.text)
 
     return segments, total_width
+
+
+def split_segments_by_newlines(segments: List[TextSegment]) -> List[List[TextSegment]]:
+    """
+    Split text segments by newline characters into separate lines.
+
+    Args:
+        segments: List of text segments (may contain \\n characters)
+
+    Returns:
+        List of lines, where each line is a list of TextSegment objects.
+    """
+    lines = [[]]
+
+    for segment in segments:
+        if '\n' not in segment.text:
+            # No newlines, add to current line
+            lines[-1].append(segment)
+        else:
+            # Split segments by newlines
+            parts = segment.text.split('\n')
+            for i, part in enumerate(parts):
+                if part:
+                    lines[-1].append(TextSegment(text=part, color=segment.color))
+                if i < len(parts) - 1:
+                    lines.append([])
+
+    # Remove empty lines
+    return [line for line in lines if line]
+
+def calculate_multiline_positions(
+        lines: List[List[TextSegment]],
+        font: ImageFont.FreeTypeFont,
+        spacing: int
+) -> Tuple[List[int], int]:
+    """
+    Calculate y positions for each line and total height.
+
+    Args:
+        lines: List of lines, where each line is a list of TextSegment objects.
+        font: Font to measure text height with
+        spacing: Spacing between lines in pixels
+
+    Returns:
+        tuple: (list of y positions for each line, total block height)
+    """
+    # Get line height from font metrics
+    bbox = font.getbbox('Ay') # Use chars with ascenders/descenders
+    line_height = bbox[3] - bbox[1]
+
+    # Calculate y positions
+    line_positions = []
+    current_y = 0
+
+    for i in range(len(lines)):
+        line_positions.append(current_y)
+        current_y += line_height + spacing
+
+    # Total height is position of last line + line height
+    total_height = line_positions[-1] + line_height if line_positions else 0
+
+    return line_positions, total_height
+
+
+def calculate_anchor_offset_y(base_y: int, total_height: int, anchor: str | None) -> int:
+    """
+    Calculate y offset based on the vertical anchor component.
+
+    Args:
+        base_y: Base y coordinate from element
+        total_height: Total height of text block
+        anchor: Anchor string (e.g. 'mm', 'lt', 'rb')
+    """
+    if not anchor or len(anchor) < 2:
+        return base_y
+
+    anchor_vertical = anchor[1]
+    if anchor_vertical == 'm':
+        return base_y - total_height // 2
+    elif anchor_vertical == 'b':
+        return base_y - total_height
+    return base_y

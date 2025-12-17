@@ -288,6 +288,26 @@ Notes:
 - Works with Home Assistant templates
 - The `accent` color automatically adapts to the display type (red or yellow)
 
+#### Multiline Text with parse_colors
+
+When `parse_colors` is enabled, text elements support newline characters (`\n`) for creating multi-line colored text:
+
+```yaml
+- type: text
+  value: "Line 1\n[red]Red Line 2[/red]\n[yellow]Yellow Line 3[/yellow]"
+  x: "50%"
+  y: "50%"
+  font: "ppb.ttf"
+  size: 24
+  parse_colors: true
+  anchor: "mm"
+```
+Anchor Behavior with Multiline Colored Text:
+  - Anchors apply to the entire text block (all lines together)
+  - For example, anchor: "mm" centers the entire block at the specified coordinates
+  - Line spacing is controlled by the spacing parameter
+  - Each line respects the align parameter (left, center, right)
+
 ### Multiline Text
 Splits text into multiple lines based on a delimiter.
 
@@ -308,7 +328,7 @@ Splits text into multiple lines based on a delimiter.
 | `delimiter` | Character to split text        | Yes      | -                         | Single character                            |
 | `x`         | X position                     | Yes      | -                         | Pixels or percentage                        |
 | `offset_y`  | Vertical spacing between lines | Yes      | -                         | Pixels                                      |
-| `start_y`   | Starting Y position            | No       | Last position + y_padding | Pixels or percentage                        |
+| `y`         | Starting Y position            | No       | Last position + y_padding | Pixels or percentage                        |
 | `size`      | Font size                      | No       | `20`                      | Pixels                                      |
 | `font`      | Font file name                 | No       | `ppb.ttf`                 | Available fonts: `ppb.ttf`, `rbm.ttf`       |
 | `color`     | Text color                     | No       | `black`                   | `white`, `black`, `accent`, `red`, `yellow` |
