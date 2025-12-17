@@ -334,11 +334,12 @@ Splits text into multiple lines based on a delimiter.
 | `color`     | Text color                     | No       | `black`                   | `white`, `black`, `accent`, `red`, `yellow` |
 | `spacing`   | Additional line spacing        | No       | `0`                       | Pixels                                      |
 | `visible`   | Show/hide element              | No       | `true`                    | `true`, `false`                             |
+
 ### Inline Color Markup
 
 Multiline elements support inline color markup when `parse_colors` is enabled. This allows different parts of the text to be rendered in different colors without needing to create multiple text elements.
 
-Please take a look at Text element documentation above.
+**Important Limitation:** Color tags must be complete within each delimiter-separated segment. Color tags **cannot span across delimiters**.
 
 ### Line
 Draws a straight line.
