@@ -1,6 +1,6 @@
 {
   "release-type": "simple",
-  "include-v-in-tag": "false",
+  "include-v-in-tag": false,
   "packages": {
     ".": {
       "extra-files": [
