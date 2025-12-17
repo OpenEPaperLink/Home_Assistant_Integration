@@ -204,16 +204,21 @@ async def draw_multiline(ctx: DrawingContext, element: dict) -> None:
     stroke_width = element.get('stroke_width', 0)
     stroke_fill = ctx.colors.resolve(element.get('stroke_fill', 'white'))
 
+    x = ctx.coords.parse_x(element['x'])
+    if "y" not in element:
+        current_y = ctx.pos_y + element.get('y_padding', 10)
+    else:
+        current_y = ctx.coords.parse_y(element['y'])
+
     # Split text using delimiter
     lines = element['value'].replace("\n", "").split(element["delimiter"])
-    current_y = element.get('start_y', ctx.pos_y + element.get('y_padding', 10))
 
     max_y = current_y
     for line in lines:
         if element.get('parse_colors', False):
             segments = parse_colored_text(str(line))
             segments, total_width = calculate_segment_positions(
-                segments, font, element["x"], align, anchor
+                segments, font, x, align, anchor
             )
 
             for segment in segments:
@@ -235,14 +240,14 @@ async def draw_multiline(ctx: DrawingContext, element: dict) -> None:
                 )
         else:
             bbox = draw.textbbox(
-                (element['x'], current_y),
+                (x, current_y),
                 str(line),
                 font=font,
                 anchor=anchor,
                 align=align
             )
             draw.text(
-                (element['x'], current_y),
+                (x, current_y),
                 str(line),
                 fill=color,
                 font=font,
