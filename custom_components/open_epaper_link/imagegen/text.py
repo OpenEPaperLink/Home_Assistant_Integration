@@ -14,7 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 
 @element_handler(ElementType.TEXT, requires=["x", "value"])
 async def draw_text(ctx: DrawingContext, element: dict) -> None:
-    """Draw (coloured) text with optional wrapping or ellipsis.
+    """Draw (colored) text with optional wrapping or ellipsis.
 
     Renders text with support for multiple formatting options:
 
@@ -88,7 +88,7 @@ async def draw_text(ctx: DrawingContext, element: dict) -> None:
     if element.get('parse_colors', False):
         segments = parse_colored_text(final_text)
         segments, total_width = calculate_segment_positions(
-            segments, font, x, align
+            segments, font, x, align, anchor
         )
 
         max_y = y
@@ -105,7 +105,7 @@ async def draw_text(ctx: DrawingContext, element: dict) -> None:
                 segment.text,
                 fill=color,
                 font=font,
-                anchor=anchor,
+                anchor="lt",
                 spacing=spacing,
                 stroke_width=stroke_width,
                 stroke_fill=stroke_fill
@@ -168,7 +168,7 @@ async def draw_multiline(ctx: DrawingContext, element: dict) -> None:
         if element.get('parse_colors', False):
             segments = parse_colored_text(str(line))
             segments, total_width = calculate_segment_positions(
-                segments, font, element["x"], align
+                segments, font, element["x"], align, anchor
             )
 
             for segment in segments:
@@ -184,7 +184,7 @@ async def draw_multiline(ctx: DrawingContext, element: dict) -> None:
                     segment.text,
                     fill=color,
                     font=font,
-                    anchor=anchor,
+                    anchor="lt",
                     stroke_width=stroke_width,
                     stroke_fill=stroke_fill
                 )
@@ -282,7 +282,8 @@ def calculate_segment_positions(
         segments: List[TextSegment],
         font: ImageFont.FreeTypeFont,
         start_x: int,
-        alignment: str = "left"
+        alignment: str = "left",
+        anchor: str | None = None
 ) -> Tuple[List[TextSegment], float]:
     """Calculate x positions for each text segment based on alignment.
 
@@ -294,6 +295,7 @@ def calculate_segment_positions(
         font: Font to measure text width with
         start_x: Base starting x position
         alignment: Text alignment (left, center, right)
+        anchor: Anchor point for text
 
     Returns:
         tuple: (modified segments with positions, total width)
@@ -312,6 +314,14 @@ def calculate_segment_positions(
         case _:
             # Default to left alignment for unknown values
             _LOGGER.warning("Unknown alignment '%s', defaulting to left", alignment)
+    # Apply anchor-based horizontal offset
+    if anchor:
+        anchor_horizontal = anchor[0]  # First char: l/m/r
+        if anchor_horizontal == 'm':  # Middle
+            current_x -= total_width / 2
+        elif anchor_horizontal == 'r':  # Right
+            current_x -= total_width
+        # else: left anchor, no adjustment needed
 
     for segment in segments:
         segment.start_x = int(current_x)

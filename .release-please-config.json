@@ -1,0 +1,15 @@
+{
+  "release-type": "simple",
+  "include-v-in-tag": "false",
+  "packages": {
+    ".": {
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "custom_components/open_epaper_link/manifest.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    }
+  }
+}
