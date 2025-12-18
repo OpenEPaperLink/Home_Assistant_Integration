@@ -213,7 +213,7 @@ class UploadQueueHandler:
 
 
 async def upload_to_hub(hub, entity_id: str, img: bytes, dither: int, ttl: int,
-                       preload_type: int = 0, preload_lut: int = 0) -> None:
+                       preload_type: int = 0, preload_lut: int = 0, lut: int = 1) -> None:
     """Upload image to tag through AP.
 
     Sends an image to the AP for display on a specific tag using
@@ -230,7 +230,7 @@ async def upload_to_hub(hub, entity_id: str, img: bytes, dither: int, ttl: int,
         ttl: Time-to-live in seconds
         preload_type: Type for image preloading (0=disabled)
         preload_lut: Look-up table for preloading
-
+        lut: Display refresh LUT mode (1=full, 3=fast, 2=fast no-reds, 0=no-repeats)
     Raises:
         HomeAssistantError: If upload fails or times out
     """
@@ -238,8 +238,8 @@ async def upload_to_hub(hub, entity_id: str, img: bytes, dither: int, ttl: int,
     mac = entity_id.split(".")[1].upper()
 
     _LOGGER.debug("Preparing upload for %s (MAC: %s)", entity_id, mac)
-    _LOGGER.debug("Upload parameters: dither=%d, ttl=%d, preload_type=%d, preload_lut=%d",
-                  dither, ttl, preload_type, preload_lut)
+    _LOGGER.debug("Upload parameters: dither=%d, ttl=%d, preload_type=%d, preload_lut=%d, lut=%d",
+                  dither, ttl, preload_type, preload_lut, lut)
 
     # Convert TTL fom seconds to minutes for the AP
     ttl_minutes = max(1, ttl // 60)
@@ -255,6 +255,7 @@ async def upload_to_hub(hub, entity_id: str, img: bytes, dither: int, ttl: int,
                 'contentmode': "25",
                 'dither': str(dither),
                 'ttl': str(ttl_minutes),
+                'lut': str(lut),
                 'image': ('image.jpg', img, 'image/jpeg'),
             }
 
@@ -405,7 +406,12 @@ async def upload_to_ble_block(hass: HomeAssistant, entity_id: str, img: bytes, d
 
 
 async def upload_to_ble_direct(
-        hass: HomeAssistant, entity_id: str, img: bytes, compressed: bool = False, dither: int = 2
+        hass: HomeAssistant,
+        entity_id: str,
+        img: bytes,
+        compressed: bool = False,
+        dither: int = 2,
+        refresh_type: int = 0,
 ) -> None:
     """Upload image to BLE tag using direct write protocol (OEPL only).
 
@@ -418,16 +424,17 @@ async def upload_to_ble_direct(
         img: JPEG image data as bytes
         compressed: Whether to compress the image data
         dither: Dithering mode (0=none, 1=Burkes, 2=ordered)
-
+        refresh_type: Display refresh mode (0=full, 1=fast, 2=partial, 3=partial2)
     Raises:
         HomeAssistantError: If BLE direct write upload fails
     """
     mac = entity_id.split(".")[1].upper()
     _LOGGER.debug(
-        "Preparing BLE direct write upload for %s (MAC: %s, compressed=%s)",
+        "Preparing BLE direct write upload for %s (MAC: %s, compressed=%s, refresh_type=%d)",
         entity_id,
         mac,
-        compressed
+        compressed,
+        refresh_type
     )
 
     try:
@@ -467,7 +474,7 @@ async def upload_to_ble_direct(
         # Upload via BLE using direct write protocol
         async with BLEConnection(hass, mac, protocol.service_uuid, protocol) as conn:
             uploader = BLEImageUploader(conn, mac)
-            success, processed_image = await uploader.upload_direct_write(img, metadata, compressed, dither)
+            success, processed_image = await uploader.upload_direct_write(img, metadata, compressed, dither, refresh_type)
 
             if not success:
                 raise HomeAssistantError(

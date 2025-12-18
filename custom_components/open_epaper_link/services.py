@@ -288,6 +288,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             # Upload image
             dither = int(service.data.get("dither", DITHER_DEFAULT))
 
+            refresh_type = int(service.data.get("refresh_type", 0))
+
             if is_ble:
                 from .util import is_bluetooth_available
                 if not is_bluetooth_available(hass):
@@ -315,13 +317,26 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 if upload_method == "block":
                     await ble_upload_queue.add_to_queue(upload_to_ble_block, hass, entity_id, image_data, dither)
                 else:
-                    await ble_upload_queue.add_to_queue(upload_to_ble_direct, hass, entity_id, image_data, upload_method == "direct_write_compressed", dither)
+                    await ble_upload_queue.add_to_queue(
+                        upload_to_ble_direct,
+                        hass,
+                        entity_id,
+                        image_data,
+                        upload_method == "direct_write_compressed",
+                        dither,
+                        refresh_type
+                    )
             else:
+                # Map refresh_type to AP's lut parameter
+                # 0→1 (full), 1→3 (fast), 2→2 (fast no-reds), 3→0 (no-repeats)
+                ap_lut_mapping = {0: 1, 1: 3, 2: 2, 3: 0}
+                ap_lut = ap_lut_mapping.get(refresh_type, 1)  # Default to 1 (full) if invalid
                 await hub_upload_queue.add_to_queue(
                     upload_to_hub, hub, entity_id, image_data, dither,
                     service.data.get("ttl", 60),
                     service.data.get("preload_type", 0),
-                    service.data.get("preload_lut", 0)
+                    service.data.get("preload_lut", 0),
+                    ap_lut
                 )
 
         except ServiceValidationError:
