@@ -2,7 +2,7 @@ PARALLEL_UPDATES = 1
 
 from dataclasses import dataclass
 
-from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
+from homeassistant.components.button import ButtonEntity, ButtonEntityDescription, ButtonDeviceClass
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -308,6 +308,7 @@ TAG_BUTTON_TYPES: tuple[OpenEPaperLinkTagButtonDescription, ...] = (
     OpenEPaperLinkTagButtonDescription(
         key="reboot_tag",
         translation_key="reboot_tag",
+        device_class=ButtonDeviceClass.RESTART,
         entity_category=EntityCategory.DIAGNOSTIC,
         command="reboot",
     ),
@@ -349,6 +350,7 @@ class RebootAPButton(OpenEPaperLinkAPEntity, ButtonEntity):
 
     _attr_entity_registry_enabled_default = True
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = ButtonDeviceClass.RESTART
 
     def __init__(self, hass: HomeAssistant, hub) -> None:
         """Initialize the button entity."""
