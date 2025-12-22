@@ -78,17 +78,20 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
     OpenEPaperLinkSensorEntityDescription(
         key="ip",
         name="IP Address",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("ip"),
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="wifi_ssid",
         name="WiFi SSID",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("wifi_ssid"),
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="record_count",
         name="Tag count",
         state_class=SensorStateClass.TOTAL,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("record_count"),
         entity_registry_enabled_default=True,
     ),
@@ -117,11 +120,13 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
     OpenEPaperLinkSensorEntityDescription(
         key="ap_state",
         name="State",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("ap_state"),
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="run_state",
         name="Run State",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("run_state"),
     ),
     OpenEPaperLinkSensorEntityDescription(
@@ -164,6 +169,7 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         key="low_battery_tag_count",
         name="Low Battery Tags",
         state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("low_battery_count"),
         entity_registry_enabled_default=True,
     ),
@@ -172,6 +178,7 @@ AP_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         name="Timed out Tags",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=None,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.get("timeout_count"),
         entity_registry_enabled_default=True,
     ),
@@ -235,18 +242,21 @@ TAG_SENSOR_TYPES: tuple[OpenEPaperLinkSensorEntityDescription, ...] = (
         key="last_seen",
         name="Last Seen",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: datetime.fromtimestamp(data.get("last_seen", 0), tz=timezone.utc),
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="next_update",
         name="Next Update",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: datetime.fromtimestamp(data.get("next_update", 0), tz=timezone.utc),
     ),
     OpenEPaperLinkSensorEntityDescription(
         key="next_checkin",
         name="Next Checkin",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: datetime.fromtimestamp(data.get("next_checkin", 0), tz=timezone.utc),
     ),
     OpenEPaperLinkSensorEntityDescription(

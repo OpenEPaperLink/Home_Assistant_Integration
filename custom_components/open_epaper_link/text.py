@@ -113,6 +113,7 @@ class TagNameText(OpenEPaperLinkTagEntity, TextEntity):
     """Text entity for tag name/alias."""
 
     _attr_entity_registry_enabled_default = True
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, hub, tag_mac: str) -> None:
         """Initialize the text entity."""

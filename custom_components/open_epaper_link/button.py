@@ -348,6 +348,7 @@ class RebootAPButton(OpenEPaperLinkAPEntity, ButtonEntity):
     """Button to reboot the Access Point."""
 
     _attr_entity_registry_enabled_default = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, hass: HomeAssistant, hub) -> None:
         """Initialize the button entity."""
