@@ -136,8 +136,8 @@ After setup, you can configure additional options through the integration's opti
 #### Device Discovery
 
 **AP Device Configuration:**
-- Manual setup required via Settings → Integrations → Add Integration
-- Enter your AP's IP address when prompted
+- **Automatic Discovery** (recommended): APs are automatically discovered via DHCP when connected to the network
+- **Manual Setup** (fallback): Go to Settings → Integrations → Add Integration and enter your AP's IP address
 - ⚠️ **Single Hub Limitation**: Only one AP hub allowed per Home Assistant instance
 - All tags connected to the AP are automatically discovered
 
