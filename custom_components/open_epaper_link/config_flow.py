@@ -227,6 +227,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         }
         _LOGGER.debug("Discovered device info: %s", self._discovered_device)
 
+        # Set discovery context for proper display in UI
+        self.context["title_placeholders"] = {
+            "name": self._discovered_device["name"],
+        }
+
         return await self.async_step_bluetooth_confirm()
 
     async def async_step_bluetooth_confirm(
