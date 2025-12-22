@@ -8,10 +8,11 @@ import aiohttp
 import voluptuous as vol
 from habluetooth.models import BluetoothServiceInfoBleak
 from homeassistant import config_entries
-from homeassistant.config_entries import ConfigEntry, OptionsFlow
+from homeassistant.config_entries import ConfigEntry, OptionsFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import TextSelectorType
@@ -56,6 +57,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._host: str | None = None
         self._discovery_info: BluetoothServiceInfoBleak | None = None
         self._discovered_device: dict[str, Any] | None = {}
+        self._dhcp_discovery_info: DhcpServiceInfo | None = None
 
     async def _validate_input(self, host: str) -> tuple[dict[str, str], str | None]:
         """Validate the user input allows us to connect.
@@ -429,6 +431,79 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="bluetooth_confirm",
             description_placeholders=description_placeholders,
         )
+
+    async def async_step_dhcp(
+            self, discovery_info: DhcpServiceInfo
+    ):
+        """Handle DHCP discovery of OpenEPaperLink AP."""
+        _LOGGER.debug(
+            "DHCP Discovery - Hostname: '%s', IP: %s, MAC: %s",
+            discovery_info.hostname,
+            discovery_info.ip,
+            discovery_info.macaddress,
+        )
+
+        # Extract host IP from discovery info
+        host = discovery_info.ip
+
+        # Check for existing AP entries in config entries
+        # AP entries have CONF_HOST in data, BLE entries have device_type
+        for entry in self._async_current_entries():
+            if CONF_HOST in entry.data:
+                return self.async_abort(reason="single_instance_allowed")
+
+        # Set unique_id to IP address (same as manual setup)
+        # This ensures DHCP and manual discoveries are treated as the same entry
+        await self.async_set_unique_id(host)
+
+        # Check if this IP was already configured
+        self._abort_if_unique_id_configured()
+
+        # Store discovery info for confirmation step
+        self._dhcp_discovery_info = discovery_info
+        self._host = host
+
+        # Validate connectivity before showing confirmation
+        info, error = await self._validate_input(host)
+
+        if error:
+            _LOGGER.warning(
+                "DHCP discovered AP at %s failed validation: %s",
+                host,
+                error,
+            )
+            return self.async_abort(reason="cannot_connect")
+
+        # Set discovery context for proper display in UI
+        self.context["title_placeholders"] = {
+            "name": f"OEPL AP ({host})",
+        }
+
+        return await self.async_step_dhcp_confirm()
+
+    async def async_step_dhcp_confirm(
+            self, user_input: dict[str, Any] | None = None
+    ):
+        """Confirm DHCP discovery of OpenEPaperLink AP."""
+        if user_input is not None:
+            # User confirmed - create the config entry
+            return self.async_create_entry(
+                title=f"OpenEPaperLink AP ({self._host})",
+                data={CONF_HOST: self._host},
+            )
+
+        # Build description placeholders for the confirmation form
+        description_placeholders = {
+            "hostname": self._dhcp_discovery_info.hostname,
+            "ip": self._host,
+            "mac": self._dhcp_discovery_info.macaddress,
+        }
+
+        return self.async_show_form(
+            step_id="dhcp_confirm",
+            description_placeholders=description_placeholders,
+        )
+
 
     @staticmethod
     @callback

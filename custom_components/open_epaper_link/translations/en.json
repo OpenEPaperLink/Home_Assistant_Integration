@@ -5,6 +5,10 @@
             "title": "Set up BLE Tag",
             "description": "Set up **{name}**?\n\n**Details:**\n- Address: {address}\n- Signal: {rssi} dBm\n- Battery: {battery}\n- Firmware: {fw_version}\n- Config Version: {config_version}"
           },
+          "dhcp_confirm": {
+            "title": "Set up {hostname} ({ip})",
+            "description": "An OpenEPaperLink access point was discovered on the network.\n\n**Device Details:**\n- Hostname: {hostname}\n- IP Address: {ip}\n- MAC Address: {mac}\n\nShould this access point be added to Home Assistant?"
+          },
           "reconfigure": {
             "title": "Update Access Point",
             "description": "Update the OpenEPaperLink access point address.",
@@ -32,7 +36,8 @@
             "single_instance_allowed": "Only one OpenEPaperLink hub can be configured. Multiple BLE devices are supported, but only one AP hub is allowed.",
             "unsupported_protocol": "Unsupported BLE firmware protocol. Only ATC and OEPL firmware are supported.",
             "invalid_advertising_data": "Could not parse device advertising data. Please ensure the device is using compatible firmware.",
-            "no_reconfigure_ble": "BLE devices do not support reconfiguration. Remove and re-add the device if you need to change its settings."
+            "no_reconfigure_ble": "BLE devices do not support reconfiguration. Remove and re-add the device if you need to change its settings.",
+            "cannot_connect": "Failed to connect to the discovered access point. Please check the device is online and reachable on the network."
         }
     },
     "options": {

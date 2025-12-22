@@ -5,6 +5,10 @@
         "title": "Konfiguracja tagu BLE",
         "description": "Skonfigurować **{name}**?\n\n**Szczegóły:**\n- Adres: {address}\n- Sygnał: {rssi} dBm\n- Bateria: {battery}\n- Firmware: {fw_version}\n- Wersja konfiguracji: {config_version}"
       },
+      "dhcp_confirm": {
+        "title": "Skonfiguruj {hostname} ({ip})",
+        "description": "Punkt dostępowy OpenEPaperLink został wykryty w sieci.\n\n**Szczegóły urządzenia:**\n- Nazwa hosta: {hostname}\n- Adres IP: {ip}\n- Adres MAC: {mac}\n\nCzy ten punkt dostępowy powinien zostać dodany do Home Assistant?"
+      },
       "reconfigure": {
         "title": "Zaktualizuj punkt dostępowy",
         "description": "Zaktualizuj adres punktu dostępowego OpenEPaperLink.",
@@ -32,7 +36,8 @@
       "single_instance_allowed": "Tylko jeden hub OpenEPaperLink może być skonfigurowany. Obsługiwanych jest wiele urządzeń BLE, ale tylko jeden hub AP.",
       "unsupported_protocol": "Nieobsługiwany protokół firmware BLE. Obsługiwane są tylko ATC i OEPL.",
       "invalid_advertising_data": "Nie można przetworzyć danych reklamowych urządzenia. Upewnij się, że urządzenie używa kompatybilnego firmware.",
-      "no_reconfigure_ble": "Urządzenia BLE nie obsługują rekonfiguracji. Usuń i dodaj urządzenie ponownie, jeśli potrzebna jest zmiana ustawień."
+      "no_reconfigure_ble": "Urządzenia BLE nie obsługują rekonfiguracji. Usuń i dodaj urządzenie ponownie, jeśli potrzebna jest zmiana ustawień.",
+      "cannot_connect": "Nie udało się połączyć z wykrytym punktem dostępowym. Sprawdź, czy urządzenie jest online i dostępne w sieci."
     }
   },
   "options": {
