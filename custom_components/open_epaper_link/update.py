@@ -25,7 +25,7 @@ _LOGGER = logging.getLogger(__name__)
 
 GITHUB_LATEST_URL = "https://api.github.com/repos/OpenEPaperLink/OEPL_BLE/releases/latest"
 DEFAULT_RELEASE_URL = "https://github.com/OpenEPaperLink/OEPL_BLE/releases"
-CACHE_DURATION = timedelta(hours=6)
+SCAN_INTERVAL = timedelta(hours=6)
 
 
 async def async_setup_entry(
@@ -173,7 +173,7 @@ class OeplBleUpdateEntity(OpenEPaperLinkBLEEntity, UpdateEntity):
         self._attr_installed_version = self._compute_installed_version()
 
         now = datetime.utcnow()
-        if self._last_checked and now - self._last_checked < CACHE_DURATION:
+        if self._last_checked and now - self._last_checked < SCAN_INTERVAL:
             return
 
         try:
