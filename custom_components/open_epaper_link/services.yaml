@@ -63,6 +63,33 @@ drawcustom:
           min: 0
           max: 86400
           unit_of_measurement: seconds
+    refresh_type:
+      name: Refresh type
+      description: >
+        E-paper display refresh mode.
+        
+        - Full: Best quality (~2s), full screen refresh.
+        
+        - Fast: Moderate quality (~1s), quick update.
+        
+        - Partial: Fastest (~0.3s), may show ghosting.
+        
+        - Partial2: Alternative partial mode.
+        
+        Note: ATC BLE tags do not support this parameter.
+      required: false
+      default: "0"
+      selector:
+        select:
+          options:
+            - label: "Full (best quality)"
+              value: "0"
+            - label: "Fast (moderate quality)"
+              value: "1"
+            - label: "Partial (fastest)"
+              value: "2"
+            - label: "Partial2 (alternative partial)"
+              value: "3"
     dry-run:
       name: Dry run
       description: Generate image but don't send to device

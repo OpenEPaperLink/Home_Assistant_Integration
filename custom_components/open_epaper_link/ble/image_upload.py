@@ -57,6 +57,14 @@ class BLEDataType(Enum):
     COMPRESSED = 0x30  # Compressed image
 
 
+class RefreshMode(Enum):
+    """Epaper display refresh modes."""
+    FULL = 0
+    FAST = 1
+    PARTIAL = 2
+    PARTIAL2 = 3
+
+
 def _create_data_info(
     checksum: int,
     data_ver: int,
@@ -495,6 +503,7 @@ class BLEImageUploader:
         self._direct_write_pending_acks = 0
         self._direct_write_compressed = False
         self._direct_write_uncompressed_size = 0
+        self.refresh_type: int = 0
 
     async def _handle_response(self, data: bytes) -> bool:
         """Handle upload responses from notification queue.
@@ -723,7 +732,8 @@ class BLEImageUploader:
         image_data: bytes,
         metadata: BLEDeviceMetadata,
         compressed: bool = False,
-        dither: int = 2
+        dither: int = 2,
+        refresh_type: int = 0
     ) -> tuple[bool, Image.Image | None]:
         """Upload image using direct write protocol (OEPL only).
         
@@ -732,6 +742,7 @@ class BLEImageUploader:
             metadata: Device metadata with dimensions and color scheme
             compressed: Whether to compress the data
             dither: 0=none, 1=ordered, 2=floyd-steinberg
+            refresh_type: Display refresh mode (0=full, 1=fast, 2=partial, 3=partial2)
             
         Returns:
             bool: True if upload succeeded, False otherwise
@@ -739,6 +750,8 @@ class BLEImageUploader:
         # Reset upload state
         self._upload_complete.clear()
         self._upload_error = None
+
+        self.refresh_type = refresh_type
         
         try:
             # Convert JPEG to PIL Image
@@ -769,10 +782,11 @@ class BLEImageUploader:
                 uncompressed_size = 0
             
             _LOGGER.info(
-                "Starting direct write upload to %s (%d bytes%s)",
+                "Starting direct write upload to %s (%d bytes%s, refresh type %d)",
                 self.mac_address,
                 len(data_to_send),
-                " compressed" if compressed else ""
+                " compressed" if compressed else "",
+                refresh_type
             )
             
             # Initialize direct write state
@@ -914,5 +928,5 @@ class BLEImageUploader:
             self._direct_write_pending_acks == 0):
             _LOGGER.debug("All chunks sent, ending direct write")
             await self.connection._write_raw(
-                bytes.fromhex(BLECommand.DIRECT_WRITE_END.value)
+                bytes.fromhex(BLECommand.DIRECT_WRITE_END.value) + bytes([self.refresh_type])
             )
