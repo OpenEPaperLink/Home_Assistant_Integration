@@ -6,6 +6,10 @@ RED = (255, 0, 0, 255)
 HALF_RED = (255, 127, 127, 255)
 YELLOW = (255, 255, 0, 255)
 HALF_YELLOW = (255, 255, 127, 255)
+GREEN = (0, 255, 0, 255)
+HALF_GREEN = (127, 255, 127, 255)
+BLUE = (0, 0, 255, 255)
+HALF_BLUE = (127, 127, 255, 255)
 
 
 class ColorResolver:
@@ -61,4 +65,12 @@ class ColorResolver:
             return YELLOW
         if color_str in ("half_yellow", "hy"):
             return HALF_YELLOW
+        if color_str in ("green", "g"):
+            return GREEN
+        if color_str in ("half_green", "hg"):
+            return HALF_GREEN
+        if color_str in ("blue", "bl"):
+            return BLUE
+        if color_str in ("half_blue", "hbl"):
+            return HALF_BLUE
         return WHITE
