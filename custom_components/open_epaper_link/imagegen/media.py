@@ -3,19 +3,19 @@ from __future__ import annotations
 import base64
 import io
 import logging
-import os
 import urllib
+from pathlib import Path
 
-import requests
 import qrcode
-from PIL import Image
-from resizeimage import resizeimage
+import requests
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.network import get_url
+from PIL import Image
+from resizeimage import resizeimage
 
 from ..const import DOMAIN
 from .registry import element_handler
-from .types import ElementType, DrawingContext
+from .types import DrawingContext, ElementType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ async def draw_qrcode(ctx: DrawingContext, element: dict) -> None:
             translation_domain=DOMAIN,
             translation_key="qr_generation_failed",
             translation_placeholders={ "error": str(e)}
-        )
+        ) from e
 
 
 @element_handler(ElementType.DLIMG, requires=["x", "y", "url", "xsize", "ysize"])
@@ -154,13 +154,25 @@ async def draw_downloaded_image(ctx: DrawingContext, element: dict) -> None:
                     translation_domain=DOMAIN,
                     translation_key="image_data_uri_invalid",
                     translation_placeholders={ "error": str(e)}
-                )
+                ) from e
 
         else:
             # Handle local file
             if not element['url'].startswith('/'):
-                media_path = ctx.hass.config.path('media')
-                full_path = os.path.join(media_path, element['url'])
+                if not ctx.hass.config.is_allowed_path(element['url']):
+                    raise HomeAssistantError(
+                        translation_domain=DOMAIN,
+                        translation_key="image_local_path_not_allowed",
+                        translation_placeholders={ "path": element['url']}
+                    )
+                full_path = Path(element['url'])
+                if not full_path.exists():
+                    raise HomeAssistantError(
+                        translation_domain=DOMAIN,
+                        translation_key="image_local_path_not_found",
+                        translation_placeholders={ "path": str(full_path)}
+                    )
+                
             else:
                 full_path = element['url']
             source_img = await ctx.hass.async_add_executor_job(Image.open, full_path)
@@ -174,7 +186,7 @@ async def draw_downloaded_image(ctx: DrawingContext, element: dict) -> None:
             if resize_method in ['crop', 'cover', 'contain']:
                 source_img = resizeimage.resize(resize_method, source_img, target_size)
             elif resize_method != 'stretch':
-                _LOGGER.warning(f"Warning: resize_method is set to unsupported method '{resize_method}', this will result in simple stretch resizing")
+                _LOGGER.warning("Warning: resize_method is set to unsupported method %s, this will result in simple stretch resizing", resize_method)
 
             if source_img.size != target_size:
                 source_img = source_img.resize(target_size)
@@ -197,4 +209,4 @@ async def draw_downloaded_image(ctx: DrawingContext, element: dict) -> None:
             translation_domain=DOMAIN,
             translation_key="image_process_failed",
             translation_placeholders={ "error": str(e)}
-        )
+        ) from e

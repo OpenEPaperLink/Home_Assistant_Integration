@@ -297,6 +297,8 @@
     "ble_upload_failed": { "message": "BLE image upload failed for {entity_id}." },
     "ble_direct_write_failed": { "message": "BLE direct write upload failed for {entity_id}." },
     "ble_direct_write_not_supported": { "message": "Direct write is only supported for OEPL devices, but {entity_id} appears to be an ATC device." },
+    "image_local_path_not_allowed": { "message": "Cannot read {path}, no access to path; `allowlist_external_dirs` may need to be adjusted in `configuration.yaml`" },
+    "image_local_path_not_found": { "message": "Local image path {path} not found." },
     "image_upload_status": { "message": "Image upload failed for {entity_id} with status code: {status_code}." },
     "image_upload_timeout": { "message": "Image upload timed out for {entity_id} after {attempts} attempts." },
     "image_upload_network": { "message": "Network error uploading image for {entity_id}: {error}." },
