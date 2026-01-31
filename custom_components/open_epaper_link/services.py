@@ -2,23 +2,53 @@ from __future__ import annotations
 
 import logging
 from functools import wraps
-from typing import Final, Any, Callable
+from typing import Any, Callable, Final
 
+import voluptuous as vol
+from homeassistant.components.media_source import async_resolve_media
+from homeassistant.const import CONF_DEVICE_ID, CONF_FILENAME
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ServiceValidationError, HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from .coordinator import Hub
-from .ble import BLEConnectionError, BLETimeoutError, BLEProtocolError, BLEDeviceMetadata
+from homeassistant.helpers.selector import MediaSelector
+
+from .ble import (
+    BLEConnectionError,
+    BLEDeviceMetadata,
+    BLEProtocolError,
+    BLETimeoutError,
+)
 from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
+from .coordinator import Hub
 from .imagegen import ImageGen
 from .tag_types import get_tag_types_manager
-from .upload import create_upload_queues, DITHER_DEFAULT, upload_to_ble_direct, upload_to_ble_block, upload_to_hub
-from .util import is_ble_entry, get_hub_from_hass, rgb_to_rgb332, int_to_hex_string, \
-    is_ble_device, get_mac_from_entity_id
+from .upload import (
+    DITHER_DEFAULT,
+    create_upload_queues,
+    upload_to_ble_block,
+    upload_to_ble_direct,
+    upload_to_hub,
+)
+from .util import (
+    get_hub_from_hass,
+    get_mac_from_entity_id,
+    int_to_hex_string,
+    is_ble_device,
+    is_ble_entry,
+    rgb_to_rgb332,
+)
 
 _LOGGER: Final = logging.getLogger(__name__)
 
+CONF_ROTATE: Final = "rotate"
+
+SCHEMA_SELECT_DRAW_IMAGE: Final = vol.Schema(
+    {
+        vol.Required(CONF_FILENAME): MediaSelector({"accept": ["image/*"]}),
+        vol.Optional(CONF_ROTATE, default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=270)),
+    }
+)
 
 
 async def async_setup_services(hass: HomeAssistant) -> None:
@@ -90,7 +120,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         return f"{DOMAIN}.{mac_address.lower()}"
 
-
     def _build_led_pattern(service_data: dict[str, Any]) -> str:
         """Build LED pattern hex string from service data."""
         mode = service_data.get("mode", "")
@@ -111,24 +140,24 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 flash_count = 0
 
             return (
-                    rgb_to_rgb332(color)
-                    + hex(int(flash_speed * 10))[2:]
-                    + hex(flash_count)[2:]
-                    + int_to_hex_string(int(delay * 10))
+                rgb_to_rgb332(color)
+                + hex(int(flash_speed * 10))[2:]
+                + hex(flash_count)[2:]
+                + int_to_hex_string(int(delay * 10))
             )
 
         return (
-                modebyte +
-                _color_segment(1) +
-                _color_segment(2) +
-                _color_segment(3) +
-                int_to_hex_string(service_data.get("repeats", 2) - 1) +
-                "00"
+            modebyte
+            + _color_segment(1)
+            + _color_segment(2)
+            + _color_segment(3)
+            + int_to_hex_string(service_data.get("repeats", 2) - 1)
+            + "00"
         )
-
 
     def require_hub_online(func: Callable) -> Callable:
         """Decorator to require the AP to be online before executing a service."""
+
         @wraps(func)
         async def wrapper(service: ServiceCall, *args, **kwargs) -> None:
             hub = get_hub_from_hass(hass)
@@ -138,10 +167,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     translation_key="ap_offline",
                 )
             return await func(service, *args, hub=hub, **kwargs)
+
         return wrapper
 
     def handle_targets(func: Callable) -> Callable:
         """Decorator to handle device_id, label_id, and area_id targeting."""
+
         @wraps(func)
         async def wrapper(service: ServiceCall, *args, **kwargs):
             device_ids = service.data.get("device_id", [])
@@ -203,12 +234,15 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
             # If ANY errors occurred across all targets, raise them
             if errors:
-                errors_str = "\n".join(f"{entity}: {message}" for entity, message in errors)
+                errors_str = "\n".join(
+                    f"{entity}: {message}" for entity, message in errors
+                )
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
                     translation_key="multiple_errors",
                     translation_placeholders={"errors": errors_str},
                 )
+
         return wrapper
 
     @handle_targets
@@ -271,7 +305,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 _LOGGER.warning(
                     "Completed with warnings for device %s:\n%s",
                     entity_id,
-                    "\n".join(device_errors)
+                    "\n".join(device_errors),
                 )
 
             # Handle dry-run mode
@@ -279,9 +313,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 _LOGGER.info("Dry run completed for %s", entity_id)
                 tag_mac = get_mac_from_entity_id(entity_id)
                 async_dispatcher_send(
-                    hass,
-                    f"{SIGNAL_TAG_IMAGE_UPDATE}_{tag_mac}",
-                    image_data
+                    hass, f"{SIGNAL_TAG_IMAGE_UPDATE}_{tag_mac}", image_data
                 )
                 return
 
@@ -292,6 +324,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
             if is_ble:
                 from .util import is_bluetooth_available
+
                 if not is_bluetooth_available(hass):
                     raise ServiceValidationError(
                         translation_domain=DOMAIN,
@@ -305,7 +338,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 # Find device metadata
                 device_metadata = {}
                 for entry in hass.config_entries.async_entries(DOMAIN):
-                    runtime_data = getattr(entry, 'runtime_data', None)
+                    runtime_data = getattr(entry, "runtime_data", None)
                     if runtime_data is not None and is_ble_entry(runtime_data):
                         if runtime_data.mac_address.upper() == mac:
                             device_metadata = runtime_data.device_metadata
@@ -315,7 +348,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 upload_method = metadata.get_best_upload_method(len(image_data))
 
                 if upload_method == "block":
-                    await ble_upload_queue.add_to_queue(upload_to_ble_block, hass, entity_id, image_data, dither)
+                    await ble_upload_queue.add_to_queue(
+                        upload_to_ble_block, hass, entity_id, image_data, dither
+                    )
                 else:
                     await ble_upload_queue.add_to_queue(
                         upload_to_ble_direct,
@@ -324,34 +359,69 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         image_data,
                         upload_method == "direct_write_compressed",
                         dither,
-                        refresh_type
+                        refresh_type,
                     )
             else:
                 # Map refresh_type to AP's lut parameter
                 # 0→1 (full), 1→3 (fast), 2→2 (fast no-reds), 3→0 (no-repeats)
                 ap_lut_mapping = {0: 1, 1: 3, 2: 2, 3: 0}
-                ap_lut = ap_lut_mapping.get(refresh_type, 1)  # Default to 1 (full) if invalid
+                ap_lut = ap_lut_mapping.get(
+                    refresh_type, 1
+                )  # Default to 1 (full) if invalid
                 await hub_upload_queue.add_to_queue(
-                    upload_to_hub, hub, entity_id, image_data, dither,
+                    upload_to_hub,
+                    hub,
+                    entity_id,
+                    image_data,
+                    dither,
                     service.data.get("ttl", 60),
                     service.data.get("preload_type", 0),
                     service.data.get("preload_lut", 0),
-                    ap_lut
+                    ap_lut,
                 )
 
         except ServiceValidationError:
             raise  # User input errors - propagate unchanged
-        except (HomeAssistantError, BLEConnectionError, BLETimeoutError, BLEProtocolError):
+        except (
+            HomeAssistantError,
+            BLEConnectionError,
+            BLETimeoutError,
+            BLEProtocolError,
+        ):
             raise  # Operational errors - propagate unchanged
         except Exception as err:
             # Unexpected errors - wrap as operational error
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="error_processing_device",
-                translation_placeholders={"entity_id": entity_id, "error": str(err)}
+                translation_placeholders={"entity_id": entity_id, "error": str(err)},
             ) from err
 
+    async def select_draw_image(service: ServiceCall, entity_id: str) -> None:
+        """Service to draw a custom image on target devices based on selected media."""
+        source_media_id = service.data[CONF_FILENAME]["media_content_id"]
+        media = await async_resolve_media(hass, source_media_id, None)
+        path = media.path or media.url
+        new_service = ServiceCall(
+            hass=service.hass,
+            domain=service.domain,
+            service=service.service,
+            data={
+                **service.data,
+                "dry-run": False,
+                "dither": "1",
+                "ttl": 60,
+                "refresh_type": "0",
+                "payload": {
+                    "type": "dlimg",
+                    "file": path,
+                }
+            },
+            context=service.context,
+            return_response=service.return_response,
+        )
 
+        await drawcustom_service(new_service, entity_id)
 
     @require_hub_online
     @handle_targets
@@ -362,25 +432,33 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     @require_hub_online
     @handle_targets
-    async def clear_pending_service(service: ServiceCall, entity_id: str, hub: Hub) -> None:
+    async def clear_pending_service(
+        service: ServiceCall, entity_id: str, hub: Hub
+    ) -> None:
         """Clear pending updates for target devices."""
         await hub.send_tag_cmd(entity_id, "clear")
 
     @require_hub_online
     @handle_targets
-    async def force_refresh_service(service: ServiceCall, entity_id: str, hub: Hub) -> None:
+    async def force_refresh_service(
+        service: ServiceCall, entity_id: str, hub: Hub
+    ) -> None:
         """Force refresh target devices."""
         await hub.send_tag_cmd(entity_id, "refresh")
 
     @require_hub_online
     @handle_targets
-    async def reboot_tag_service(service: ServiceCall,entity_id: str, hub: Hub) -> None:
+    async def reboot_tag_service(
+        service: ServiceCall, entity_id: str, hub: Hub
+    ) -> None:
         """Reboot target devices."""
         await hub.send_tag_cmd(entity_id, "reboot")
 
     @require_hub_online
     @handle_targets
-    async def scan_channels_service(service: ServiceCall, entity_id: str, hub: Hub) -> None:
+    async def scan_channels_service(
+        service: ServiceCall, entity_id: str, hub: Hub
+    ) -> None:
         """Trigger channel scan on target devices."""
         await hub.send_tag_cmd(entity_id, "scan")
 
@@ -398,7 +476,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         await manager.ensure_types_loaded()
 
         tag_types_len = len(manager.get_all_types())
-        message = f"Successfully refreshed {tag_types_len} tag type definitions from GitHub"
+        message = (
+            f"Successfully refreshed {tag_types_len} tag type definitions from GitHub"
+        )
 
         await hass.services.async_call(
             "persistent_notification",
@@ -419,3 +499,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, "scan_channels", scan_channels_service)
     hass.services.async_register(DOMAIN, "reboot_ap", reboot_ap_service)
     hass.services.async_register(DOMAIN, "refresh_tag_types", refresh_tag_types_service)
+    hass.services.async_register(
+        DOMAIN, "select_draw_image", select_draw_image, SCHEMA_SELECT_DRAW_IMAGE
+    )

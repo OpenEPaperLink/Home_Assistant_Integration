@@ -98,6 +98,28 @@ drawcustom:
       selector:
         boolean:
 
+select_draw_image:
+  name: Select an image to draw
+  description: Draws a custom image from a media browser
+  target:
+  fields:
+    filename:
+      required: true
+      selector:
+        media:
+          accept:
+            - image/*
+    rotate:
+      name: Rotation
+      description: Rotation in degrees (0, 90, 180, 270)
+      required: true
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 270
+          step: 90
+
 setled:
   name: Set LED Pattern
   description: >
