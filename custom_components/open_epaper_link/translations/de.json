@@ -399,6 +399,8 @@
         "ble_no_metadata": "Keine Metadaten für BLE-Gerät {entity_id} gefunden.",
         "ble_upload_failed": "BLE-Bildupload für {entity_id} fehlgeschlagen.",
         "ble_direct_write_not_supported": "Direktes Schreiben wird nur für OEPL-Geräte unterstützt, aber {entity_id} scheint ein ATC-Gerät zu sein.",
+        "image_local_path_not_allowed": { "message": "Konnte {path} nicht lesen, kein Zugriff auf Pfad; `allowlist_external_dirs` muss möglicherweise in `configuration.yaml` angepasst werden" },
+        "image_local_path_not_found": { "message": "Lokaler Pfad {path} nicht gefunden." },
         "image_upload_status": "Bild-Upload für {entity_id} fehlgeschlagen mit Statuscode: {status_code}.",
         "image_upload_timeout": "Bild-Upload für {entity_id} nach {attempts} Versuchen wegen Zeitüberschreitung fehlgeschlagen.",
         "image_upload_network": "Netzwerkfehler beim Bild-Upload für {entity_id}: {error}.",
