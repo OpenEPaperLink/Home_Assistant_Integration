@@ -253,7 +253,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 "OpenEPaperLink because OpenDisplay now has its own dedicated integration:\n\n"
                 + "\n".join(f"- {name}" for name in removed_names)
                 + "\n\nTo continue using these devices:\n"
-                "- Use the **official core** integration to send images to the display via the `upload_image` action.\n"
+                "- Use the [**official core**](https://www.home-assistant.io/integrations/opendisplay) integration to send images to the display via the `upload_image` action.\n"
                 "- Use the [**Custom integration**](https://github.com/OpenDisplay/Home_Assistant_Integration) if you need to use the `drawcustom` action."
             ),
             title="OpenDisplay devices removed",
