@@ -9,11 +9,11 @@ from homeassistant.exceptions import ServiceValidationError, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from .coordinator import Hub
-from .ble import BLEConnectionError, BLETimeoutError, BLEProtocolError, BLEDeviceMetadata
+from .ble import BLEConnectionError, BLETimeoutError, BLEProtocolError
 from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
 from .imagegen import ImageGen
 from .tag_types import get_tag_types_manager
-from .upload import create_upload_queues, DITHER_DEFAULT, upload_to_ble_direct, upload_to_ble_block, upload_to_hub
+from .upload import create_upload_queues, DITHER_DEFAULT, upload_to_ble_block, upload_to_hub
 from .util import is_ble_entry, get_hub_from_hass, rgb_to_rgb332, int_to_hex_string, \
     is_ble_device, get_mac_from_entity_id
 
@@ -300,32 +300,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     )
 
                 # Determine upload method
-                mac = get_mac_from_entity_id(entity_id)
-
-                # Find device metadata
-                device_metadata = {}
-                for entry in hass.config_entries.async_entries(DOMAIN):
-                    runtime_data = getattr(entry, 'runtime_data', None)
-                    if runtime_data is not None and is_ble_entry(runtime_data):
-                        if runtime_data.mac_address.upper() == mac:
-                            device_metadata = runtime_data.device_metadata
-                            break
-
-                metadata = BLEDeviceMetadata(device_metadata)
-                upload_method = metadata.get_best_upload_method(len(image_data))
-
-                if upload_method == "block":
-                    await ble_upload_queue.add_to_queue(upload_to_ble_block, hass, entity_id, image_data, dither)
-                else:
-                    await ble_upload_queue.add_to_queue(
-                        upload_to_ble_direct,
-                        hass,
-                        entity_id,
-                        image_data,
-                        upload_method == "direct_write_compressed",
-                        dither,
-                        refresh_type
-                    )
+                await ble_upload_queue.add_to_queue(upload_to_ble_block, hass, entity_id, image_data, dither)
             else:
                 # Map refresh_type to AP's lut parameter
                 # 0→1 (full), 1→3 (fast), 2→2 (fast no-reds), 3→0 (no-repeats)

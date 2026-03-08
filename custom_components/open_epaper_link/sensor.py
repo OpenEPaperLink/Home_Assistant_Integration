@@ -625,23 +625,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
         mac_address = entry_data.mac_address
         name = entry_data.name
         device_metadata = entry_data.device_metadata
-        protocol_type = entry_data.protocol_type  # Default to ATC for backward compatibility
-
         # Create sensors for each description
-        from .ble import BLEDeviceMetadata
-        metadata = BLEDeviceMetadata(device_metadata)
         sensors = []
         for description in BLE_SENSOR_TYPES:
-            # Handle battery sensors based on device protocol
-            if description.key in ("battery_percentage", "battery_voltage"):
-                if protocol_type == "atc":
-                    # ATC devices always have batteries
-                    pass  # Continue to create sensor
-                elif protocol_type == "oepl":
-                    # OEPL devices: only create battery sensors for battery/solar power
-                    if metadata.power_mode not in (1, 3):  # Not battery (1) or solar (3)
-                        continue  # Skip battery sensors
-
             sensor = OpenEPaperLinkBLESensor(
                 hass=hass,
                 mac_address=mac_address,

@@ -34,7 +34,7 @@
     },
     "abort": {
       "single_instance_allowed": "Only one OpenEPaperLink hub can be configured. Multiple BLE devices are supported, but only one AP hub is allowed.",
-      "unsupported_protocol": "Unsupported BLE firmware protocol. Only ATC and OEPL firmware are supported.",
+      "unsupported_protocol": "Unsupported BLE firmware protocol. Only ATC firmware is supported.",
       "invalid_advertising_data": "Could not parse device advertising data. Please ensure the device is using compatible firmware.",
       "no_reconfigure_ble": "BLE devices do not support reconfiguration. Remove and re-add the device if you need to change its settings.",
       "cannot_connect": "Failed to connect to the discovered access point. Please check the device is online and reachable on the network."
@@ -273,12 +273,6 @@
       "description": "OpenEPaperLink migrated {count} camera entities to image entities. Update your dashboards and automations to use the new image entities. Removed entities: {entities}"
     }
   },
-  "preview_features": {
-    "oepl_ble_updates": {
-      "name": "OEPL BLE firmware updates",
-      "description": "Shows a firmware update entity for OEPL BLE tags that compares the installed firmware to the latest OEPL_BLE GitHub release. Install is not available yet."
-    }
-  },
   "exceptions": {
     "ble_device_not_detected": { "message": "BLE device {name} ({mac_address}) not detected in Bluetooth range." },
     "ap_cannot_connect": { "message": "Cannot connect to AP at {host}: {error}" },
@@ -296,7 +290,7 @@
     "ble_no_metadata": { "message": "No metadata found for BLE device {entity_id}." },
     "ble_upload_failed": { "message": "BLE image upload failed for {entity_id}." },
     "ble_direct_write_failed": { "message": "BLE direct write upload failed for {entity_id}." },
-    "ble_direct_write_not_supported": { "message": "Direct write is only supported for OEPL devices, but {entity_id} appears to be an ATC device." },
+    "ble_direct_write_not_supported": { "message": "Direct write is not supported." },
     "image_upload_status": { "message": "Image upload failed for {entity_id} with status code: {status_code}." },
     "image_upload_timeout": { "message": "Image upload timed out for {entity_id} after {attempts} attempts." },
     "image_upload_network": { "message": "Network error uploading image for {entity_id}: {error}." },
@@ -354,19 +348,6 @@
     "ble_protocol_invalid_response_length": { "message": "Invalid display info response length: {length} (expected at least {expected_length})." },
     "ble_protocol_invalid_command_id": { "message": "Invalid command ID in response: {command_id}." },
     "ble_protocol_payload_too_short": { "message": "Display info payload too short." },
-    "oepl_config_chunk_short": { "message": "Chunk data too short: {length} bytes." },
-    "oepl_expected_chunk_zero": { "message": "Expected chunk 0, got chunk {chunk_num}." },
-    "oepl_config_too_short": { "message": "Config data too short: {length} bytes (need at least {minimum})." },
-    "oepl_fw_response_short": { "message": "Firmware version response too short: {length} bytes." },
-    "oepl_fw_version_format": { "message": "Firmware version SHA length {sha_length} exceeds payload ({payload_length} bytes)." },
-    "tlv_section_too_short": { "message": "{section} requires {expected} bytes, got {actual}." },
-    "tlv_data_too_short": { "message": "Config data too short: {length} bytes (minimum 2)." },
-    "tlv_crc_mismatch": { "message": "CRC32 mismatch: expected {expected_crc32}, got {actual_crc32}." },
-    "tlv_unknown_packet": { "message": "Unknown packet ID: {packet_id} at offset {offset}." },
-    "tlv_packet_too_short": { "message": "Packet ID {packet_id} requires {packet_size} bytes, but only {remaining_bytes} bytes remaining at offset {offset}." },
-    "tlv_packet_parse_failed": { "message": "Failed to parse packet type {packet_id} at offset {offset}: {error}." },
-    "tlv_no_display_config": { "message": "No display configuration found in device config." },
-    "tlv_invalid_dimensions": { "message": "Invalid pixel dimensions: {width}x{height}." },
     "config_flow_invalid_config": { "message": "Device returned invalid configuration data." },
     "config_flow_missing_config": { "message": "Device returned no configuration data." },
     "refresh_config_failed": { "message": "Failed to refresh configuration: {error}." },

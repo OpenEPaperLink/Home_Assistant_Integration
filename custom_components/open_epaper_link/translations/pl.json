@@ -273,12 +273,6 @@
       "description": "OpenEPaperLink przeniósł {count} encje kamer do encji obrazów. Zaktualizuj pulpity i automatyzacje, aby używać nowych encji obrazów. Usunięte encje: {entities}"
     }
   },
-  "preview_features": {
-    "oepl_ble_updates": {
-      "name": "Aktualizacje firmware OEPL BLE",
-      "description": "Wyświetla encję aktualizacji firmware dla tagów OEPL BLE, porównując z najnowszym wydaniem OEPL_BLE na GitHub. Instalacja jeszcze niedostępna."
-    }
-  },
   "exceptions": {
     "ble_device_not_detected": {
       "message": "Urządzenie BLE {name} ({mac_address}) nie zostało wykryte w zasięgu Bluetooth."
@@ -501,45 +495,6 @@
     },
     "ble_protocol_payload_too_short": {
       "message": "Ładunek informacji o wyświetlaczu jest zbyt krótki."
-    },
-    "oepl_config_chunk_short": {
-      "message": "Dane fragmentu są zbyt krótkie: {length} bajtów."
-    },
-    "oepl_expected_chunk_zero": {
-      "message": "Oczekiwano fragmentu 0, otrzymano fragment {chunk_num}."
-    },
-    "oepl_config_too_short": {
-      "message": "Dane konfiguracji są zbyt krótkie: {length} bajtów (wymagane co najmniej {minimum})."
-    },
-    "oepl_fw_response_short": {
-      "message": "Odpowiedź wersji firmware jest zbyt krótka: {length} bajtów."
-    },
-    "oepl_fw_version_format": {
-      "message": "Długość SHA wersji firmware {sha_length} przekracza ładunek ({payload_length} bajtów)."
-    },
-    "tlv_section_too_short": {
-      "message": "{section} wymaga {expected} bajtów, otrzymano {actual}."
-    },
-    "tlv_data_too_short": {
-      "message": "Dane konfiguracji są zbyt krótkie: {length} bajtów (minimum 2)."
-    },
-    "tlv_crc_mismatch": {
-      "message": "Niezgodność CRC32: oczekiwano {expected_crc32}, otrzymano {actual_crc32}."
-    },
-    "tlv_unknown_packet": {
-      "message": "Nieznany identyfikator pakietu: {packet_id} przy przesunięciu {offset}."
-    },
-    "tlv_packet_too_short": {
-      "message": "Pakiet o ID {packet_id} wymaga {packet_size} bajtów, ale pozostało tylko {remaining_bytes} bajtów przy przesunięciu {offset}."
-    },
-    "tlv_packet_parse_failed": {
-      "message": "Nie udało się przetworzyć pakietu {packet_id} przy przesunięciu {offset}: {error}."
-    },
-    "tlv_no_display_config": {
-      "message": "Brak konfiguracji wyświetlacza w danych urządzenia."
-    },
-    "tlv_invalid_dimensions": {
-      "message": "Nieprawidłowe wymiary pikseli: {width}x{height}."
     },
     "config_flow_invalid_config": {
       "message": "Urządzenie zwróciło nieprawidłowe dane konfiguracyjne."
