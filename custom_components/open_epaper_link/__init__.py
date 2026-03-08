@@ -252,9 +252,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 "The following OpenDisplay (OEPL BLE) devices were removed from "
                 "OpenEPaperLink because OpenDisplay now has its own dedicated integration:\n\n"
                 + "\n".join(f"- {name}" for name in removed_names)
-                + "\n\nTo continue using these devices, install the dedicated OpenDisplay integration:\n"
-                "- **Official (HA core)**: Available via the HA integrations page once released\n"
-                "- **Custom integration**: https://github.com/OpenDisplay/Home_Assistant_Integration"
+                + "\n\nTo continue using these devices:\n"
+                "- Use the **official core** integration to send images to the display via the `upload_image` action.\n"
+                "- Use the [**Custom integration**](https://github.com/OpenDisplay/Home_Assistant_Integration) if you need to use the `drawcustom` action."
             ),
             title="OpenDisplay devices removed",
             notification_id="open_epaper_link_opendisplay_removed",
