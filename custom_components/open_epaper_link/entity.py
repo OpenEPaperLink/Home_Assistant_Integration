@@ -8,7 +8,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from .ble import BLEDeviceMetadata
 
-from .const import DOMAIN, OEPL_CONFIG_URL, ATC_CONFIG_URL
+from .const import DOMAIN, ATC_CONFIG_URL
 from .tag_types import get_hw_string, get_hw_dimensions
 
 if TYPE_CHECKING:
@@ -194,10 +194,7 @@ class OpenEPaperLinkBLEEntity(Entity):
             "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
         }
 
-        if metadata.is_oepl:
-            device_info["configuration_url"] = OEPL_CONFIG_URL
-        else:
-            device_info["configuration_url"] = ATC_CONFIG_URL
+        device_info["configuration_url"] = ATC_CONFIG_URL
 
         return DeviceInfo(**device_info)
 

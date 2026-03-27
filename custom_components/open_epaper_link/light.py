@@ -37,18 +37,12 @@ async def async_setup_entry(
     mac_address = entry_data.mac_address
     name = entry_data.name
     device_metadata = entry_data.device_metadata
-    protocol_type = entry_data.protocol_type  # Default to ATC for backward compatibility
-
-    # Skip LED entity for OEPL devices - LED config not yet implemented
-    if protocol_type == "oepl":
-        return
 
     light = OpenEPaperLinkBLELight(
         hass=hass,
         mac_address=mac_address,
         name=name,
         device_metadata=device_metadata,
-        protocol_type=protocol_type,
         entry=entry,
     )
 
@@ -66,7 +60,6 @@ class OpenEPaperLinkBLELight(OpenEPaperLinkBLEEntity, LightEntity):
             mac_address: str,
             name: str,
             device_metadata: dict,
-            protocol_type: str,
             entry: OpenEPaperLinkConfigEntry,
     ) -> None:
         """Initialize the BLE light entity."""
@@ -75,7 +68,7 @@ class OpenEPaperLinkBLELight(OpenEPaperLinkBLEEntity, LightEntity):
         self._device_metadata = device_metadata
         self._is_on = False
         self._auto_off_task = None
-        self._protocol = get_protocol_by_name(protocol_type)
+        self._protocol = get_protocol_by_name("atc")
         self._service_uuid = self._protocol.service_uuid
         self._attr_translation_key = "led"
 

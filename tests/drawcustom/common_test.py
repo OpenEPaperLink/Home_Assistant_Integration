@@ -87,7 +87,7 @@ async def test_overlapping_elements(image_gen, mock_tag_info):
         "rotate": 0,
         "payload": [
             {'type': 'rectangle', 'x_start': 0, 'y_start': 0, 'x_end': 100, 'y_end': 100, 'fill': 'red'},
-            {'type': 'circle', 'x': 50, 'y': 50, 'radius': 30, 'fill': 'blue'},
+            {'type': 'circle', 'x': 50, 'y': 50, 'radius': 30, 'fill': 'white'},
             {'type': 'text', 'x': 20, 'y': 20, 'value': 'Overlapping', 'size': 20}
         ]
     }

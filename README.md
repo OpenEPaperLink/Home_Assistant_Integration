@@ -19,13 +19,17 @@ Home Assistant Integration for the [OpenEPaperLink](https://github.com/jjwbruijn
 - OpenEPaperLink Access Point (ESP32-based)
 - Compatible Electronic Shelf Labels connected to AP
 
-**BLE-Based Setup:**
+**BLE-Based Setup (ATC firmware):**
 - BLE-compatible Electronic Shelf Labels with ATC BLE firmware
 - Home Assistant with Bluetooth adapter or proxy (e.g., ESPHome)
 - No separate AP required - direct device communication
 
 **Mixed Setup:**
 - Both AP and BLE devices can coexist in the same Home Assistant instance
+
+> **OpenDisplay users:** OpenDisplay (OEPL BLE) devices are no longer supported by this integration. OpenDisplay now has dedicated integrations:
+> - [**Core integration**](https://www.home-assistant.io/integrations/opendisplay) — send images to the display via the `upload_image` action
+> - [**Custom integration**](https://github.com/OpenDisplay/Home_Assistant_Integration) — full support including the `drawcustom` action
 
 ## Features
 

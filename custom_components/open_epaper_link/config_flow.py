@@ -186,9 +186,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         manufacturer_id = None
         manufacturer_data = b''
 
-        # Check for known manufacturer IDs (ATC: 4919, OEPL: 9286)
+        # Check for ATC manufacturer ID (4919)
         for mfg_id, mfg_data in discovery_info.manufacturer_data.items():
-            if mfg_id in (4919, 9286):
+            if mfg_id == 4919:
                 manufacturer_id = mfg_id
                 manufacturer_data = mfg_data
                 break
@@ -215,7 +215,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.error("Failed to parse advertising data: %s", e)
             return self.async_abort(reason="invalid_advertising_data")
 
-        device_name = discovery_info.name or f"OEPL_BLE_{discovery_info.address[-8:].replace(':', '')}"
+        device_name = discovery_info.name or f"ATC_BLE_{discovery_info.address[-8:].replace(':', '')}"
 
         self._discovered_device = {
             "address": discovery_info.address,
@@ -247,12 +247,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             try:
                 # Get protocol handler for this device
-                protocol = get_protocol_by_manufacturer_id(
-                    9286 if self._discovered_device["protocol_type"] == "oepl" else 4919
-                )
-
-                # Interrogate device using protocol-specific method
-                fw_info: dict[str, Any] | None = None
+                protocol = get_protocol_by_manufacturer_id(4919)
 
                 async with BLEConnection(
                     self.hass,
@@ -261,16 +256,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     protocol
                 ) as conn:
                     capabilities = await protocol.interrogate_device(conn)
-                    # OEPL devices expose firmware version via 0x0043
-                    if self._discovered_device["protocol_type"] == "oepl":
-                        try:
-                            fw_info = await protocol.read_firmware_version(conn)
-                        except Exception as fw_err:
-                            _LOGGER.warning(
-                                "Failed to read firmware version for %s: %s",
-                                self._discovered_device["address"],
-                                fw_err,
-                            )
 
                 _LOGGER.debug("Device capabilities: %s", capabilities)
 
@@ -281,82 +266,44 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         translation_key="config_flow_invalid_config"
                     )
 
-                # Generate model name based on protocol type
                 hw_type = self._discovered_device["hw_type"]
 
-                if self._discovered_device["protocol_type"] == "oepl":
-                    # OEPL devices: Store complete config, generate model name from DisplayConfig
-                    from .ble.tlv_parser import config_to_dict, generate_model_name
+                # Use tagtypes.json lookup to build device metadata
+                tag_types_manager = await get_tag_types_manager(self.hass)
+                model_name = get_hw_string(hw_type) if hw_type else "Unknown"
+                _LOGGER.debug("Resolved hw_type %s to model: %s", hw_type, model_name)
 
-                    if hasattr(protocol, '_last_config') and protocol._last_config:
-                        # Store complete OEPL config for future use
-                        device_metadata = {
-                            "oepl_config": config_to_dict(protocol._last_config),
-                        }
-                        if fw_info:
-                            device_metadata["fw_version"] = fw_info.get("version")
-                            device_metadata["fw_version_raw"] = fw_info.get("raw")
-                            if fw_info.get("sha"):
-                                device_metadata["fw_sha"] = fw_info["sha"]
+                # Refine color_scheme using TagTypes db
+                if tag_types_manager.is_in_hw_map(hw_type):
+                    tag_type = await tag_types_manager.get_tag_info(hw_type)
+                    color_table = tag_type.color_table
 
-                        # Generate model name from display config
-                        if protocol._last_config.displays:
-                            model_name = generate_model_name(protocol._last_config.displays[0])
-                            device_metadata["model_name"] = model_name
-                            _LOGGER.debug("Generated model name from config: %s", model_name)
-                        else:
-                            _LOGGER.warning("OEPL config has no display config")
+                    if 'yellow' in color_table and 'red' in color_table:
+                        color_scheme = 3 # BWRY
+                    elif 'yellow' in color_table:
+                        color_scheme = 2 # BWY
+                    elif 'red' in color_table:
+                        color_scheme = 1 # BWR
                     else:
-                        # Fallback if config unavailable (shouldn't happen for OEPL)
-                        model_name = get_hw_string(hw_type) if hw_type else "Unknown"
-                        _LOGGER.warning("OEPL config unavailable, using tagtypes fallback: %s", model_name)
-                        # Store individual fields as fallback
-                        device_metadata = {
-                            "hw_type": hw_type,
-                            "fw_version": self._discovered_device["fw_version"],
-                            "width": capabilities.width,
-                            "height": capabilities.height,
-                            "rotatebuffer": capabilities.rotatebuffer,
-                            "color_scheme": capabilities.color_scheme,
-                            "model_name": model_name,
-                        }
+                        color_scheme = 0 # BW
                 else:
-                    # ATC devices: Use tagtypes.json lookup and store individual fields
-                    tag_types_manager = await get_tag_types_manager(self.hass)
-                    model_name = get_hw_string(hw_type) if hw_type else "Unknown"
-                    _LOGGER.debug("Resolved hw_type %s to model: %s", hw_type, model_name)
+                    # Fallback to protocol detection
+                    color_scheme = capabilities.color_scheme
+                    _LOGGER.warning(
+                        "hw_type %s not in TagTypes, using protocol color_scheme: %d",
+                        hw_type, color_scheme
+                    )
 
-                    # Refine color_scheme using TagTypes db
-                    if tag_types_manager.is_in_hw_map(hw_type):
-                        tag_type = await tag_types_manager.get_tag_info(hw_type)
-                        color_table = tag_type.color_table
-
-                        if 'yellow' in color_table and 'red' in color_table:
-                            color_scheme = 3 # BWRY
-                        elif 'yellow' in color_table:
-                            color_scheme = 2 # BWY
-                        elif 'red' in color_table:
-                            color_scheme = 1 # BWR
-                        else:
-                            color_scheme = 0 # BW
-                    else:
-                        # Fallback to protocol detection
-                        color_scheme = capabilities.color_scheme
-                        _LOGGER.warning(
-                            "hw_type %s not in TagTypes, using protocol color_scheme: %d",
-                            hw_type, color_scheme
-                        )
-
-                    # Build device metadata from capabilities
-                    device_metadata = {
-                        "hw_type": hw_type,
-                        "fw_version": self._discovered_device["fw_version"],
-                        "width": capabilities.width,
-                        "height": capabilities.height,
-                        "rotatebuffer": capabilities.rotatebuffer,
-                        "color_scheme": color_scheme,
-                        "model_name": model_name,
-                    }
+                # Build device metadata from capabilities
+                device_metadata = {
+                    "hw_type": hw_type,
+                    "fw_version": self._discovered_device["fw_version"],
+                    "width": capabilities.width,
+                    "height": capabilities.height,
+                    "rotatebuffer": capabilities.rotatebuffer,
+                    "color_scheme": color_scheme,
+                    "model_name": model_name,
+                }
 
                 return self.async_create_entry(
                     title=self._discovered_device['name'],

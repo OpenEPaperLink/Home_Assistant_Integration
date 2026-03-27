@@ -29,13 +29,6 @@ class BLEResponse(Enum):
     BLOCK_PART_CONTINUE = "00C5"
     UPLOAD_COMPLETE = "00C7"
     IMAGE_ALREADY_DISPLAYED = "00C8"
-    # Direct write responses
-    DIRECT_WRITE_START_ACK = "0070"
-    DIRECT_WRITE_START_ACK_ALT = "7000"  # Alternative format
-    DIRECT_WRITE_DATA_ACK = "0071"
-    DIRECT_WRITE_DATA_ACK_ALT = "7100"  # Alternative format
-    DIRECT_WRITE_END_ACK = "0072"
-    DIRECT_WRITE_END_ACK_ALT = "7200"  # Alternative format
 
 
 class BLECommand(Enum):
@@ -43,10 +36,6 @@ class BLECommand(Enum):
 
     DATA_INFO = "0064"
     BLOCK_PART = "0065"
-    # Direct write commands
-    DIRECT_WRITE_START = "0070"
-    DIRECT_WRITE_DATA = "0071"
-    DIRECT_WRITE_END = "0072"
 
 
 class BLEDataType(Enum):
@@ -238,247 +227,8 @@ def _detect_color(r: int, g: int, b: int, color_scheme: int) -> str:
     return 'white' if (r + g + b) / 3 > 128 else 'black'
 
 
-def _encode_direct_write_1bpp(image: Image.Image) -> bytes:
-    """Encode image as 1BPP for direct write (monochrome).
-    
-    Args:
-        image: PIL Image to encode
-        
-    Returns:
-        bytes: 1BPP encoded data (white=1, black=0, NOT inverted)
-    """
-    pixel_array = np.array(image.convert("RGB"))
-    height, width, _ = pixel_array.shape
-    
-    byte_data = bytearray()
-    current_byte = 0
-    bit_position = 7
-    
-    for y in range(height):
-        for x in range(width):
-            r, g, b = pixel_array[y, x]
-            # Convert to int to avoid numpy overflow warnings
-            gray = (int(r) + int(g) + int(b)) / 3.0
-            
-            # White (>128) = 1, Black (<=128) = 0
-            if gray > 128:
-                current_byte |= (1 << bit_position)
-            
-            bit_position -= 1
-            if bit_position < 0:
-                byte_data.append(current_byte)
-                current_byte = 0
-                bit_position = 7
-    
-    # Handle remaining bits
-    if bit_position != 7:
-        byte_data.append(current_byte)
-    
-    return bytes(byte_data)
-
-
-def _encode_direct_write_bitplanes(image: Image.Image, color_scheme: int) -> bytes:
-    """Encode image as bitplanes for direct write (BWR/BWY).
-    
-    Args:
-        image: PIL Image to encode
-        color_scheme: Color scheme (1=BWR, 2=BWY)
-        
-    Returns:
-        bytes: Plane 1 (B/W, NOT inverted) + Plane 2 (R/Y)
-    """
-    pixel_array = np.array(image.convert("RGB"))
-    height, width, _ = pixel_array.shape
-    
-    byte_data_plane1 = bytearray()
-    byte_data_plane2 = bytearray()
-    current_byte1 = 0
-    current_byte2 = 0
-    bit_position = 7
-    
-    for y in range(height):
-        for x in range(width):
-            r, g, b = pixel_array[y, x]
-            color = _detect_color(int(r), int(g), int(b), color_scheme)
-            
-            # Plane 1: B/W (1=white, 0=black, NOT inverted)
-            # Plane 2: R/Y (1=red when plane1=1, 1=yellow when plane1=0)
-            if color == 'white':
-                current_byte1 |= (1 << bit_position)  # plane1 = 1
-                # plane2 = 0
-            elif color == 'red':
-                current_byte1 |= (1 << bit_position)  # plane1 = 1
-                current_byte2 |= (1 << bit_position)  # plane2 = 1
-            elif color == 'yellow':
-                # plane1 = 0
-                current_byte2 |= (1 << bit_position)  # plane2 = 1
-            # black: both bits stay 0
-            
-            bit_position -= 1
-            if bit_position < 0:
-                byte_data_plane1.append(current_byte1)
-                byte_data_plane2.append(current_byte2)
-                current_byte1 = 0
-                current_byte2 = 0
-                bit_position = 7
-    
-    # Handle remaining bits
-    if bit_position != 7:
-        byte_data_plane1.append(current_byte1)
-        byte_data_plane2.append(current_byte2)
-    
-    # Concatenate: plane1 + plane2 (NOT inverted for direct write)
-    return bytes(byte_data_plane1) + bytes(byte_data_plane2)
-
-
-def _encode_direct_write_2bpp(image: Image.Image, color_scheme: int) -> bytes:
-    """Encode image as 2BPP for direct write (BWRY or 4 grayscale).
-    
-    Args:
-        image: PIL Image to encode
-        color_scheme: Color scheme (3=BWRY, 5=4 grayscale)
-        
-    Returns:
-        bytes: 2BPP encoded data (4 pixels per byte)
-    """
-    pixel_array = np.array(image.convert("RGB"))
-    height, width, _ = pixel_array.shape
-    
-    byte_data = bytearray()
-    current_byte = 0
-    pixel_in_byte = 0
-    
-    for y in range(height):
-        for x in range(width):
-            r, g, b = pixel_array[y, x]
-            
-            if color_scheme == 5:
-                # 4 grayscale: 00=Black, 01=DarkGray, 10=LightGray, 11=White
-                gray = (int(r) + int(g) + int(b)) / 3.0
-                if gray < 64:
-                    gray_level = 0  # GRAY0 (Black)
-                elif gray < 128:
-                    gray_level = 1  # GRAY1 (Dark Gray)
-                elif gray < 192:
-                    gray_level = 2  # GRAY2 (Light Gray)
-                else:
-                    gray_level = 3  # GRAY3 (White)
-                color_value = gray_level
-            else:
-                # BWRY: 00=Black, 01=White, 10=Yellow, 11=Red
-                color = _detect_color(int(r), int(g), int(b), color_scheme)
-                if color == 'black':
-                    color_value = 0  # 00
-                elif color == 'white':
-                    color_value = 1  # 01
-                elif color == 'yellow':
-                    color_value = 2  # 10
-                elif color == 'red':
-                    color_value = 3  # 11
-                else:
-                    color_value = 0  # Fallback to black
-            
-            # Pack 2 bits into byte (4 pixels per byte)
-            # Bits are packed from MSB: pixel0 at bits 7-6, pixel1 at bits 5-4, etc.
-            current_byte |= (color_value << (6 - pixel_in_byte * 2))
-            pixel_in_byte += 1
-            
-            if pixel_in_byte >= 4:
-                byte_data.append(current_byte)
-                current_byte = 0
-                pixel_in_byte = 0
-    
-    # Handle remaining pixels if not a multiple of 4
-    if pixel_in_byte > 0:
-        byte_data.append(current_byte)
-    
-    return bytes(byte_data)
-
-
-def _encode_direct_write_4bpp(image: Image.Image) -> bytes:
-    """Encode image as 4BPP for direct write (6-color).
-    
-    Args:
-        image: PIL Image to encode
-        
-    Returns:
-        bytes: 4BPP encoded data (2 pixels per byte)
-    """
-    pixel_array = np.array(image.convert("RGB"))
-    height, width, _ = pixel_array.shape
-    
-    byte_data = bytearray()
-    current_byte = 0
-    nibble_position = 1  # Start with high nibble (1 = high, 0 = low)
-    
-    for y in range(height):
-        for x in range(width):
-            r, g, b = pixel_array[y, x]
-            color = _detect_color(int(r), int(g), int(b), 4)
-            
-            # Firmware expects: black=0, white=1, yellow=2, red=3, blue=5, green=6
-            if color == 'black':
-                color_value = 0
-            elif color == 'white':
-                color_value = 1
-            elif color == 'yellow':
-                color_value = 2
-            elif color == 'red':
-                color_value = 3
-            elif color == 'green':
-                color_value = 6
-            elif color == 'blue':
-                color_value = 5
-            else:
-                color_value = 0  # Fallback to black
-            
-            if nibble_position == 1:
-                # High nibble
-                current_byte = (color_value << 4)
-                nibble_position = 0
-            else:
-                # Low nibble
-                current_byte |= color_value
-                byte_data.append(current_byte)
-                current_byte = 0
-                nibble_position = 1
-    
-    # Handle remaining nibble if odd number of pixels
-    if nibble_position == 0:
-        byte_data.append(current_byte)
-    
-    return bytes(byte_data)
-
-
-def _encode_direct_write(image: Image.Image, color_scheme: int) -> bytes:
-    """Encode image for direct write based on color scheme.
-    
-    Args:
-        image: PIL Image to encode
-        color_scheme: Color scheme (0=b/w, 1=bwr, 2=bwy, 3=bwry, 4=bwgbry, 5=bw4)
-        
-    Returns:
-        bytes: Encoded image data
-    """
-    if color_scheme == 0:
-        return _encode_direct_write_1bpp(image)
-    elif color_scheme in (1, 2):
-        return _encode_direct_write_bitplanes(image, color_scheme)
-    elif color_scheme == 3:
-        return _encode_direct_write_2bpp(image, color_scheme)
-    elif color_scheme == 4:
-        return _encode_direct_write_4bpp(image)
-    elif color_scheme == 5:
-        return _encode_direct_write_2bpp(image, color_scheme)
-    else:
-        # Fallback to 1BPP
-        return _encode_direct_write_1bpp(image)
-
-
 class BLEImageUploader:
-    """Handles BLE image upload with block-based protocol.
-
-    This class is protocol-agnostic and works with both ATC and OEPL firmware.
+    """Handles BLE image upload with block-based protocol for ATC firmware.
     """
 
     def __init__(self, connection, mac_address: str):
@@ -571,7 +321,6 @@ class BLEImageUploader:
             self,
             image_data: bytes,
             metadata: BLEDeviceMetadata,
-            protocol_type: str = "atc",
             dither: int = 2
     ) -> tuple[bool, Image.Image | None]:
         """Upload image using block-based protocol.
@@ -579,7 +328,6 @@ class BLEImageUploader:
         Args:
             image_data: JPEG image data
             metadata: Device metadata with dimensions and color support
-            protocol_type: Protocol type ("atc" or "oepl")
             dither: 0=none, 1=ordered, 2=floyd-steinberg
 
         Returns:
@@ -590,13 +338,12 @@ class BLEImageUploader:
             image = Image.open(io.BytesIO(image_data))
             _LOGGER.debug("Before transpose: image size %dx%d", image.width, image.height)
 
-            # Apply rotation for ATC devices only (OEPL handles rotation firmware-side)
-            if protocol_type == "atc" and metadata.rotatebuffer == 1:
+            if metadata.rotatebuffer == 1:
                 image = image.transpose(Image.Transpose.ROTATE_90)
-                _LOGGER.debug("Applied 90° rotation for ATC device: %dx%d", image.width, image.height)
+                _LOGGER.debug("Applied 90° rotation: %dx%d", image.width, image.height)
             else:
-                _LOGGER.debug("No client-side rotation (protocol=%s, rotatebuffer=%d): %dx%d",
-                             protocol_type, metadata.rotatebuffer, image.width, image.height)
+                _LOGGER.debug("No client-side rotation (rotatebuffer=%d): %dx%d",
+                             metadata.rotatebuffer, image.width, image.height)
 
 
             processed_image = process_image_for_device(
@@ -726,207 +473,3 @@ class BLEImageUploader:
         await self.connection._write_raw(
             bytes.fromhex(BLECommand.BLOCK_PART.value) + self._packets[self._packet_index]
         )
-
-    async def upload_direct_write(
-        self,
-        image_data: bytes,
-        metadata: BLEDeviceMetadata,
-        compressed: bool = False,
-        dither: int = 2,
-        refresh_type: int = 0
-    ) -> tuple[bool, Image.Image | None]:
-        """Upload image using direct write protocol (OEPL only).
-        
-        Args:
-            image_data: JPEG image data
-            metadata: Device metadata with dimensions and color scheme
-            compressed: Whether to compress the data
-            dither: 0=none, 1=ordered, 2=floyd-steinberg
-            refresh_type: Display refresh mode (0=full, 1=fast, 2=partial, 3=partial2)
-            
-        Returns:
-            bool: True if upload succeeded, False otherwise
-        """
-        # Reset upload state
-        self._upload_complete.clear()
-        self._upload_error = None
-
-        self.refresh_type = refresh_type
-        
-        try:
-            # Convert JPEG to PIL Image
-            image = Image.open(io.BytesIO(image_data))
-            _LOGGER.debug("Direct write: image size %dx%d", image.width, image.height)
-
-            processed_image = process_image_for_device(
-                image,
-                metadata.color_scheme.value,
-                dither
-            )
-            
-            # Encode image based on color scheme
-            encoded_data = _encode_direct_write(processed_image, metadata.color_scheme.value)
-            
-            # Compress if requested
-            if compressed:
-                compressed_data = zlib.compress(encoded_data, level=9)
-                _LOGGER.debug(
-                    "Direct write compressed: %d bytes -> %d bytes",
-                    len(encoded_data),
-                    len(compressed_data)
-                )
-                data_to_send = compressed_data
-                uncompressed_size = len(encoded_data)
-            else:
-                data_to_send = encoded_data
-                uncompressed_size = 0
-            
-            _LOGGER.info(
-                "Starting direct write upload to %s (%d bytes%s, refresh type %d)",
-                self.mac_address,
-                len(data_to_send),
-                " compressed" if compressed else "",
-                refresh_type
-            )
-            
-            # Initialize direct write state
-            self._direct_write_chunks = []
-            self._direct_write_chunk_index = 0
-            self._direct_write_pending_acks = 0
-            self._direct_write_compressed = compressed
-            self._direct_write_uncompressed_size = uncompressed_size
-            
-            # Split into chunks (max 230 bytes per chunk)
-            chunk_size = BLE_MAX_PACKET_DATA_SIZE
-            for i in range(0, len(data_to_send), chunk_size):
-                chunk = data_to_send[i:i + chunk_size]
-                self._direct_write_chunks.append(chunk)
-            
-            _LOGGER.debug("Split into %d chunks", len(self._direct_write_chunks))
-            
-            # Send start command
-            if compressed:
-                # Compressed: send 4-byte header + initial data if it fits
-                header = struct.pack("<I", uncompressed_size)
-                max_start_payload = 200  # Leave room for command bytes
-                
-                if len(header) + len(data_to_send) <= max_start_payload:
-                    # Small payload - send everything in start command
-                    start_payload = header + data_to_send
-                    await self.connection._write_raw(
-                        bytes.fromhex(BLECommand.DIRECT_WRITE_START.value) + start_payload
-                    )
-                    # Mark all chunks as sent
-                    self._direct_write_chunk_index = len(self._direct_write_chunks)
-                else:
-                    # Large payload - send header + first chunk
-                    first_chunk_size = min(max_start_payload - len(header), chunk_size)
-                    first_chunk = data_to_send[:first_chunk_size]
-                    start_payload = header + first_chunk
-                    await self.connection._write_raw(
-                        bytes.fromhex(BLECommand.DIRECT_WRITE_START.value) + start_payload
-                    )
-                    # Adjust chunks - remove first chunk data that was sent
-                    if self._direct_write_chunks and len(self._direct_write_chunks[0]) <= first_chunk_size:
-                        self._direct_write_chunks.pop(0)
-                    else:
-                        self._direct_write_chunks[0] = self._direct_write_chunks[0][first_chunk_size:]
-            else:
-                # Uncompressed: just send start command
-                await self.connection._write_raw(
-                    bytes.fromhex(BLECommand.DIRECT_WRITE_START.value)
-                )
-            
-            # Wait for responses
-            while not self._upload_complete.is_set():
-                response = await self._wait_for_response(timeout=30.0)
-                if response and await self._handle_direct_write_response(response):
-                    continue
-                elif response is None:
-                    _LOGGER.error("Direct write failed for %s: timeout", self.mac_address)
-                    return False, None
-            
-            if self._upload_error:
-                raise BLEError(f"Direct write failed: {self._upload_error}")
-            
-            _LOGGER.info("Direct write upload completed successfully for %s", self.mac_address)
-            return True, processed_image
-            
-        except Exception as e:
-            _LOGGER.error("Direct write upload failed for %s: %s", self.mac_address, e)
-            return False, None
-
-    async def _handle_direct_write_response(self, data: bytes) -> bool:
-        """Handle direct write responses.
-        
-        Args:
-            data: Response data from device
-            
-        Returns:
-            bool: True if response was handled successfully
-        """
-        if len(data) < 2:
-            return False
-        
-        response_code = data[:2].hex().upper()
-        _LOGGER.debug("Direct write response for %s: %s", self.mac_address, response_code)
-        
-        try:
-            # Handle both formats: "0070" and "7000"
-            if response_code in ("0070", "7000"):
-                # Start ACK
-                _LOGGER.debug("Direct write start acknowledged")
-                self._direct_write_pending_acks = 0
-                await self._send_next_direct_write_chunks()
-                return True
-            elif response_code in ("0071", "7100"):
-                # Data ACK
-                self._direct_write_pending_acks = max(0, self._direct_write_pending_acks - 1)
-                await self._send_next_direct_write_chunks()
-                return True
-            elif response_code in ("0072", "7200"):
-                # End ACK
-                _LOGGER.debug("Direct write end acknowledged")
-                self._upload_complete.set()
-                return True
-            elif response_code == "FFFF":
-                # Error
-                _LOGGER.error("Direct write error response (FFFF)")
-                self._upload_error = "Device returned error (FFFF)"
-                self._upload_complete.set()
-                return True
-        except Exception as e:
-            _LOGGER.error("Error handling direct write response: %s", e)
-            return False
-        
-        return False  # Unknown response code
-
-    async def _send_next_direct_write_chunks(self):
-        """Send next direct write data chunks with pipelining."""
-        DIRECT_WRITE_PIPELINE_SIZE = 3  # Send up to 3 chunks without waiting for ACK
-        
-        while (self._direct_write_chunk_index < len(self._direct_write_chunks) and
-               self._direct_write_pending_acks < DIRECT_WRITE_PIPELINE_SIZE):
-            
-            chunk = self._direct_write_chunks[self._direct_write_chunk_index]
-            _LOGGER.debug(
-                "Sending direct write chunk %d/%d (%d bytes)",
-                self._direct_write_chunk_index + 1,
-                len(self._direct_write_chunks),
-                len(chunk)
-            )
-            
-            await self.connection._write_raw(
-                bytes.fromhex(BLECommand.DIRECT_WRITE_DATA.value) + chunk
-            )
-            
-            self._direct_write_chunk_index += 1
-            self._direct_write_pending_acks += 1
-        
-        # If all chunks sent and no pending ACKs, send end command
-        if (self._direct_write_chunk_index >= len(self._direct_write_chunks) and
-            self._direct_write_pending_acks == 0):
-            _LOGGER.debug("All chunks sent, ending direct write")
-            await self.connection._write_raw(
-                bytes.fromhex(BLECommand.DIRECT_WRITE_END.value) + bytes([self.refresh_type])
-            )

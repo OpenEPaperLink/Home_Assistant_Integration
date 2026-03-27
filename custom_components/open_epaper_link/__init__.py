@@ -36,7 +36,6 @@ BLE_PLATFORMS = [
     Platform.LIGHT,  # LED control
     Platform.BUTTON,  # Clock mode controls
     Platform.IMAGE, # Display content (captured from drawcustom)
-    Platform.UPDATE
 ]
 
 
@@ -95,41 +94,10 @@ async def async_remove_invalid_ble_entities(
 ) -> list[str]:
     """Remove BLE entities that are invalid for current device config.
 
-    Checks device configuration and removes entities that shouldn't exist based on
-    current hardware/firmware capabilities:
-    - Battery sensors when power_mode == 2 (USB powered)
-    - Future: LED entities when LED config missing
-    - Future: Sensor entities based on sensor config
-
-    Args:
-        hass: Home Assistant instance
-        entry: Configuration entry
-        device_metadata: Current device metadata with OEPL config
-
     Returns:
         list[str]: List of removed entity IDs
     """
-    entity_registry = er.async_get(hass)
-    removed_entities = []
-    mac_address = entry.data.get("mac_address", "")
-
-    # Check power mode - remove battery sensors if not battery/solar powered
-    from .ble import BLEDeviceMetadata
-    metadata = BLEDeviceMetadata(device_metadata)
-    if metadata.power_mode not in (1, 3):  # Not battery (1) or solar (3)
-        for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
-            if entity.unique_id and (
-                    f"oepl_ble_{mac_address}_battery_percentage" in entity.unique_id or
-                    f"oepl_ble_{mac_address}_battery_voltage" in entity.unique_id
-            ):
-                _LOGGER.info("Removing battery sensor (power_mode=%s): %s", metadata.power_mode, entity.entity_id)
-                entity_registry.async_remove(entity.entity_id)
-                removed_entities.append(entity.entity_id)
-
-    # Future: Check LED config presence and remove LED entity if not present
-    # Future: Check sensor configs and remove/add sensor entities accordingly
-
-    return removed_entities
+    return []
 
 
 async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
@@ -170,7 +138,7 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
             if "device_metadata" in new_data:
                 device_metadata = new_data["device_metadata"]
 
-                if "oepl_config" not in device_metadata and "rotatebuffer" in device_metadata:
+                if "rotatebuffer" in device_metadata:
                     rotatebuffer_value = device_metadata["rotatebuffer"]
 
                     if isinstance(rotatebuffer_value, bool):
@@ -200,10 +168,7 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
         if "mac_address" in config_entry.data:
             device_metadata = dict(new_data.get("device_metadata", {}))
 
-            # OEPL: No migration needed - color scheme is already in oepl_config.displays[0]
-            # ATC: Need to add color_scheme at root level
-
-            if "oepl_config" not in device_metadata and "color_scheme" not in device_metadata:
+            if "color_scheme" not in device_metadata:
                 hw_type = device_metadata.get("hw_type", 0)
                 tag_types_manager = await get_tag_types_manager(hass)
 
@@ -264,6 +229,36 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the OpenEPaperLink integration."""
+
+    # Remove any OpenDisplay (OEPL BLE) config entries — support has been removed.
+    # OpenDisplay now has its own dedicated HA integration.
+    oepl_entries = [
+        entry for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.data.get("protocol_type") == "oepl"
+    ]
+    if oepl_entries:
+        removed_names = [
+            entry.data.get("name", entry.data.get("mac_address", entry.entry_id))
+            for entry in oepl_entries
+        ]
+        for entry in oepl_entries:
+            await hass.config_entries.async_remove(entry.entry_id)
+        _LOGGER.info("Removed %d OpenDisplay (OEPL BLE) config entries: %s", len(removed_names), removed_names)
+
+        from homeassistant.components import persistent_notification
+        persistent_notification.async_create(
+            hass,
+            message=(
+                "The following OpenDisplay (OEPL BLE) devices were removed from "
+                "OpenEPaperLink because OpenDisplay now has its own dedicated integration:\n\n"
+                + "\n".join(f"- {name}" for name in removed_names)
+                + "\n\nTo continue using these devices:\n"
+                "- Use the [**official core**](https://www.home-assistant.io/integrations/opendisplay) integration to send images to the display via the `upload_image` action.\n"
+                "- Use the [**Custom integration**](https://github.com/OpenDisplay/Home_Assistant_Integration) if you need to use the `drawcustom` action."
+            ),
+            title="OpenDisplay devices removed",
+            notification_id="open_epaper_link_opendisplay_removed",
+        )
 
     # Services should be set up unconditionally
     await async_setup_services(hass)
@@ -367,8 +362,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
                 _LOGGER.debug("Failed to parse advertising data for %s: %s", mac_address, err, exc_info=True)
                 return
 
-            # Dynamically update device attributes (skip OEPL fw to avoid incorrect value)
-            if advertising_data.fw_version and protocol_type != "oepl":
+            # Dynamically update device firmware version from advertising data
+            if advertising_data.fw_version:
                 device_registry = dr.async_get(hass)
                 device_entry = device_registry.async_get_device(
                     identifiers={(DOMAIN, f"ble_{mac_address}")}

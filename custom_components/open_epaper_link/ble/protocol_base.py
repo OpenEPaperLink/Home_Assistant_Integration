@@ -30,11 +30,7 @@ class DeviceCapabilities:
 
 
 class BLEProtocol(ABC):
-    """Abstract base class for BLE firmware protocols.
-
-    Each firmware type (ATC, OEPL) implements this interface to provide
-    protocol-specific behavior while sharing common infrastructure.
-    """
+    """Abstract base class for BLE firmware protocols."""
 
     @staticmethod
     def _calculate_battery_percentage(voltage_mv: int) -> int:
@@ -69,7 +65,7 @@ class BLEProtocol(ABC):
     @property
     @abstractmethod
     def protocol_name(self) -> str:
-        """Protocol identifier: 'atc' or 'oepl'."""
+        """Protocol identifier (e.g. 'atc')."""
 
     @abstractmethod
     def parse_advertising_data(self, data: bytes) -> AdvertisingData:
@@ -93,8 +89,7 @@ class BLEProtocol(ABC):
 
         Returns minimal information needed for Home Assistant entity creation.
 
-        For OEPL: Reads full config via 0x0040, extracts display dimensions.
-        For ATC: Uses legacy 0x0005 command.
+        ATC: Uses 0x0005 command to query display info.
 
         Args:
             connection: Active BLE connection to device

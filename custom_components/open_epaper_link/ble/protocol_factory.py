@@ -1,14 +1,12 @@
 """Protocol factory for detecting and managing BLE firmware protocols."""
 from .protocol_base import BLEProtocol
 from .protocol_atc import ATCProtocol
-from .protocol_oepl import OEPLProtocol
 from .exceptions import UnsupportedProtocolError
 
 
 # Singleton protocol instances
 _PROTOCOLS: dict[int, BLEProtocol] = {
     0x1337: ATCProtocol(),  # ATC firmware (4919 decimal)
-    0x2446: OEPLProtocol(),  # OEPL firmware (9286 decimal)
 }
 
 
@@ -38,7 +36,7 @@ def get_protocol_by_name(name: str) -> BLEProtocol:
     """Get protocol instance by protocol name.
 
     Args:
-        name: Protocol name ('atc' or 'oepl')
+        name: Protocol name ('atc')
 
     Returns:
         BLEProtocol: Protocol instance for the given name

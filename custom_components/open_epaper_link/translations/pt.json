@@ -34,7 +34,7 @@
     },
     "abort": {
       "single_instance_allowed": "Apenas um hub OpenEPaperLink pode ser configurado. Múltiplos dispositivos BLE são suportados, mas apenas um hub AP é permitido.",
-      "unsupported_protocol": "Protocolo de firmware BLE não suportado. Apenas firmware ATC e OEPL são suportados.",
+      "unsupported_protocol": "Protocolo de firmware BLE não suportado. Apenas firmware ATC são suportados.",
       "invalid_advertising_data": "Não foi possível analisar os dados de advertising do dispositivo. Por favor, certifique-se de que o dispositivo está usando firmware compatível.",
       "no_reconfigure_ble": "Dispositivos BLE não suportam reconfiguração. Remova e adicione o dispositivo novamente se precisar alterar suas definições.",
       "cannot_connect": "Falha ao conectar ao ponto de acesso descoberto. Verifique se o dispositivo está online e acessível na rede."
@@ -54,8 +54,8 @@
         "data_description": {
           "blacklisted_tags": "Tags para ocultar; tags na lista negra não serão atualizadas nem disparam serviços.",
           "button_debounce": "Atraso antes de aceitar outro acionamento do botão (segundos).",
-          "nfc_debounce":  "Atraso antes de aceitar outro toque NFC (segundos).",
-          "custom_font_dirs":  "Diretórios separados por vírgula com fontes adicionais para imagens geradas."
+          "nfc_debounce": "Atraso antes de aceitar outro toque NFC (segundos).",
+          "custom_font_dirs": "Diretórios separados por vírgula com fontes adicionais para imagens geradas."
         }
       }
     },
@@ -74,9 +74,9 @@
       "nightlyreboot": {
         "name": "Reinício Noturno"
       },
-        "showtimestamp": {
-            "name": "Mostrar carimbo de tempo"
-        }
+      "showtimestamp": {
+        "name": "Mostrar carimbo de tempo"
+      }
     },
     "text": {
       "alias": {
@@ -273,12 +273,6 @@
       "description": "OpenEPaperLink migrou {count} entidades de câmera para entidades de imagem. Atualize os seus dashboards e automações para usar as novas entidades de imagem. Entidades removidas: {entities}"
     }
   },
-  "preview_features": {
-    "oepl_ble_updates": {
-      "name": "Atualizações de firmware OEPL BLE",
-      "description": "Mostra uma entidade de atualização de firmware para tags OEPL BLE comparando a versão instalada com o último release do OEPL_BLE no GitHub. Instalação ainda não disponível."
-    }
-  },
   "exceptions": {
     "ble_device_not_detected": "Dispositivo BLE {name} ({mac_address}) não detectado no alcance do Bluetooth.",
     "ap_cannot_connect": "Não foi possível conectar ao AP em {host}: {error}.",
@@ -349,26 +343,17 @@
     "ble_timeout": "Nenhuma resposta recebida de {mac_address} em {timeout}s.",
     "ble_operation_failed": "Operação BLE {operation} falhou após {attempts} tentativas: {error}.",
     "ble_operation_retry": "Operação BLE {operation} falhou na tentativa {attempt}: {error}. Nova tentativa em {delay}s...",
-    "oepl_config_chunk_short": "Dados do chunk curtos demais: {length} bytes.",
-    "oepl_expected_chunk_zero": "Esperado o chunk 0, recebido o chunk {chunk_num}.",
-    "oepl_config_too_short": "Dados de configuração curtos demais: {length} bytes (mínimo {minimum}).",
-    "oepl_fw_response_short": "Resposta de firmware curta demais: {length} bytes.",
-    "oepl_fw_version_format": "Tamanho do SHA de firmware {sha_length} excede o payload ({payload_length} bytes).",
-    "tlv_section_too_short": "{section} requer {expected} bytes, recebido {actual}.",
-    "tlv_data_too_short": "Dados de configuração curtos demais: {length} bytes (mínimo 2).",
-    "tlv_crc_mismatch": "CRC32 não confere: esperado {expected_crc32}, obtido {actual_crc32}.",
-    "tlv_unknown_packet": "ID de pacote desconhecida: {packet_id} no deslocamento {offset}.",
-    "tlv_packet_too_short": "ID de pacote {packet_id} requer {packet_size} bytes, mas restam apenas {remaining_bytes} bytes no deslocamento {offset}.",
-    "tlv_packet_parse_failed": "Falha ao analisar o pacote {packet_id} no deslocamento {offset}: {error}.",
-    "tlv_no_display_config": "Nenhuma configuração de display encontrada nos dados do dispositivo.",
-    "tlv_invalid_dimensions": "Dimensões de pixels inválidas: {width}x{height}.",
     "config_flow_invalid_config": "O dispositivo retornou dados de configuração inválidos.",
     "config_flow_missing_config": "O dispositivo não retornou dados de configuração.",
     "refresh_config_failed": "Falha ao atualizar a configuração: {error}.",
     "ble_protocol_invalid_response_length": "Comprimento inválido da resposta de informações do display: {length} (mínimo {expected_length}).",
     "ble_protocol_invalid_command_id": "ID de comando inválida na resposta: {command_id}.",
     "ble_protocol_payload_too_short": "Payload de informações do display curto demais.",
-    "multiple_errors": { "message": "Ocorreram vários erros:\n{errors}" },
-    "invalid_payload": { "message": "Payload inválido:\n{errors}" }
+    "multiple_errors": {
+      "message": "Ocorreram vários erros:\n{errors}"
+    },
+    "invalid_payload": {
+      "message": "Payload inválido:\n{errors}"
+    }
   }
 }
