@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.0.0](https://github.com/OpenEPaperLink/Home_Assistant_Integration/compare/2.8.0...3.0.0) (2026-03-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove OpenDisplay (OEPL BLE) support
+
+### Features
+
+* remove OpenDisplay (OEPL BLE) support ([96af68a](https://github.com/OpenEPaperLink/Home_Assistant_Integration/commit/96af68a600d205fdab59a2212e094495414779fe))
+
+
+### Bug Fixes
+
+* add green and blue to named colors ([00c33fb](https://github.com/OpenEPaperLink/Home_Assistant_Integration/commit/00c33fba79dfbcfb23b716161e61af485c62d597))
+
 ## [2.8.0](https://github.com/OpenEPaperLink/Home_Assistant_Integration/compare/v2.7.0...2.8.0) (2025-12-22)
 
 
