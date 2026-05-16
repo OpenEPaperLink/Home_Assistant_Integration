@@ -483,7 +483,6 @@ class OpenEPaperLinkTagSensor(OpenEPaperLinkTagEntity, SensorEntity):
         self.entity_description = description
         self._attr_translation_key = description.key
         self._attr_unique_id = f"{tag_mac}_{description.key}"
-        self.entity_id = f"{DOMAIN}.{tag_mac.lower()}_{description.key}"
         self._attr_entity_registry_enabled_default = description.entity_registry_enabled_default
 
     @property
