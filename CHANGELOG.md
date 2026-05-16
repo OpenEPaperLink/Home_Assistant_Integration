@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/OpenEPaperLink/Home_Assistant_Integration/compare/3.0.0...3.0.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* for ""Detected that custom integration 'open_epaper_link' sets an… ([f28c217](https://github.com/OpenEPaperLink/Home_Assistant_Integration/commit/f28c21761365181cfaf203030678f1c29433baf3))
+
 ## [3.0.0](https://github.com/OpenEPaperLink/Home_Assistant_Integration/compare/2.8.0...3.0.0) (2026-03-27)
 
 
