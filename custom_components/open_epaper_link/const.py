@@ -11,7 +11,14 @@ CONF_HOST: Final = "host"
 CONF_AP_MAC: Final = "ap_mac"
 CONF_DEVICE_TYPE: Final = "device_type"
 DEVICE_TYPE_AP: Final = "ap"
-DEVICE_TYPE_BLE: Final = "ble"
+
+# Tags reached over Bluetooth run ATC firmware. "BLE" names the radio; ATC
+# names the device and its protocol, and matches py-atc-ble-oepl. It used to be
+# one of two Bluetooth protocols, which is why the old entries carried both a
+# device_type of "ble" and a separate protocol_type; the other protocol was
+# removed in 3.0.0, so a single discriminator now suffices.
+DEVICE_TYPE_ATC: Final = "atc"
+LEGACY_DEVICE_TYPE_ATC: Final = "ble"
 
 OPT_BLACKLISTED_TAGS: Final = "blacklisted_tags"
 OPT_BUTTON_DEBOUNCE: Final = "button_debounce"

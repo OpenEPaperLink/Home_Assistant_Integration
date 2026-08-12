@@ -10,19 +10,19 @@ from homeassistant.config_entries import ConfigEntry
 if TYPE_CHECKING:
     from py_atc_ble_oepl import AdvertisingData
 
-    from .ble_coordinator import BLECoordinator
+    from .atc_coordinator import ATCCoordinator
     from .coordinator import APCoordinator
 
 
 @dataclass(slots=True)
-class BLERuntimeData:
-    """Runtime data for a BLE tag entry."""
+class ATCRuntimeData:
+    """Runtime data for a tag running ATC firmware, reached over Bluetooth."""
 
     mac_address: str
     name: str
-    coordinator: BLECoordinator
+    coordinator: ATCCoordinator
     advertising: AdvertisingData | None = None
     extra: dict[str, object] = field(default_factory=dict)
 
 
-type OpenEPaperLinkConfigEntry = ConfigEntry[APCoordinator | BLERuntimeData]
+type OpenEPaperLinkConfigEntry = ConfigEntry[APCoordinator | ATCRuntimeData]
