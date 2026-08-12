@@ -1,6 +1,10 @@
 {
   "domain": "open_epaper_link",
   "name": "OpenEPaperLink",
+  "after_dependencies": [
+    "bluetooth",
+    "recorder"
+  ],
   "bluetooth": [
     {
       "manufacturer_id": 4919
@@ -11,10 +15,6 @@
     "@g4bri3lDev"
   ],
   "config_flow": true,
-  "dependencies": [
-    "bluetooth",
-    "recorder"
-  ],
   "dhcp": [
     {
       "hostname": "openepaperlink-*"
@@ -24,16 +24,15 @@
   "integration_type": "hub",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/OpenEPaperLink/Home_Assistant_Integration/issues",
+  "loggers": [
+    "odl_renderer",
+    "oepl",
+    "py_atc_ble_oepl"
+  ],
   "requirements": [
-    "qrcode[pil]==7.4.2",
-    "requests_toolbelt==1.0.0",
-    "websocket-client==1.7.0",
-    "websockets>=14.2",
-    "python-resize-image==1.1.20",
-    "bleak>=1.0.1",
-    "bleak-retry-connector>=3.4.0",
-    "numpy>=1.26.4",
-    "Pillow>=10.4.0"
+    "odl-renderer==0.5.12",
+    "py-atc-ble-oepl==0.5.1",
+    "py-oepl[dither]==0.3.0"
   ],
   "version": "3.0.0"
 }
