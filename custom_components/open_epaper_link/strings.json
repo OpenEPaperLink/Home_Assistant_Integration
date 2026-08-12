@@ -21,6 +21,10 @@
         "data": {
           "host": "Host"
         }
+      },
+      "bluetooth_confirm": {
+        "title": "Add tag",
+        "description": "Do you want to add the tag {name} ({address})?"
       }
     },
     "error": {
@@ -30,7 +34,8 @@
       "already_configured": "This Access Point is already configured",
       "cannot_connect": "Failed to connect",
       "reconfigure_successful": "Address updated",
-      "wrong_ap": "That address belongs to a different Access Point. Add it as a new entry instead."
+      "wrong_ap": "That address belongs to a different Access Point. Add it as a new entry instead.",
+      "not_supported": "This Bluetooth device is not an OpenEPaperLink tag"
     }
   },
   "options": {

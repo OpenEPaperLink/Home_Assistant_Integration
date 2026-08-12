@@ -46,7 +46,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-type OpenEPaperLinkConfigEntry = ConfigEntry[APCoordinator]
+type APConfigEntry = ConfigEntry[APCoordinator]
 
 # Wake-up reasons surfaced as event entity events. The firmware defines exactly
 # two button reasons, so this is the complete set; the pre-4.0 integration
@@ -71,9 +71,9 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
     :meth:`owns_tag`.
     """
 
-    config_entry: OpenEPaperLinkConfigEntry
+    config_entry: APConfigEntry
 
-    def __init__(self, hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry) -> None:
+    def __init__(self, hass: HomeAssistant, entry: APConfigEntry) -> None:
         """Set up the coordinator without contacting the AP."""
         super().__init__(
             hass,

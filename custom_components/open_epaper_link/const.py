@@ -9,6 +9,7 @@ DOMAIN: Final = "open_epaper_link"
 # Config entry data / options keys
 CONF_HOST: Final = "host"
 CONF_AP_MAC: Final = "ap_mac"
+CONF_MAC_ADDRESS: Final = "mac_address"
 # Obsolete entry-data keys, stripped by migration. An AP entry has a host and
 # an ATC entry does not, which already distinguishes them, and after setup the
 # runtime data type does so with real type information.

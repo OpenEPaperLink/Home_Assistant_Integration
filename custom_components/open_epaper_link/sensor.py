@@ -25,7 +25,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from oepl import APStatus, Tag
 from oepl.enums import enum_label
 
-from .coordinator import APCoordinator, OpenEPaperLinkConfigEntry
+from .atc_coordinator import ATCConfigEntry, ATCRuntimeData
+from .atc_sensor import ATC_SENSORS, ATCSensor
+from .coordinator import APConfigEntry, APCoordinator
 from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
 
 PARALLEL_UPDATES = 0
@@ -257,10 +259,17 @@ AP_SENSORS: tuple[APSensorDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,  # noqa: ARG001  (signature fixed by Home Assistant)
-    entry: OpenEPaperLinkConfigEntry,
+    entry: APConfigEntry | ATCConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up sensors for an Access Point and its tags."""
+    """Set up sensors for an Access Point and its tags, or for an ATC tag."""
+    if isinstance(entry.runtime_data, ATCRuntimeData):
+        async_add_entities(
+            ATCSensor(entry.runtime_data.coordinator, entry.entry_id, description)
+            for description in ATC_SENSORS
+        )
+        return
+
     coordinator = entry.runtime_data
 
     async_add_entities(APSensor(coordinator, description) for description in AP_SENSORS)

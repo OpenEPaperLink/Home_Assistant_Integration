@@ -28,7 +28,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from oepl import TagCapability
 
 from .const import SIGNAL_TAG_INTERACTION
-from .coordinator import APCoordinator, OpenEPaperLinkConfigEntry
+from .coordinator import APConfigEntry, APCoordinator
 from .entity import OpenEPaperLinkTagEntity
 
 PARALLEL_UPDATES = 0
@@ -71,7 +71,7 @@ def _supported(coordinator: APCoordinator, mac: str, key: str) -> bool:
 
 async def async_setup_entry(
     hass: HomeAssistant,  # noqa: ARG001  (signature fixed by Home Assistant)
-    entry: OpenEPaperLinkConfigEntry,
+    entry: APConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up event entities per tag."""

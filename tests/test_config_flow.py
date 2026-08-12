@@ -9,17 +9,26 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from homeassistant.config_entries import SOURCE_DHCP, SOURCE_USER
+from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
+from homeassistant.config_entries import SOURCE_BLUETOOTH, SOURCE_DHCP, SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from oepl import OEPLConnectionError
+from py_atc_ble_oepl import MANUFACTURER_ID
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.open_epaper_link.const import CONF_AP_MAC, CONF_HOST, DOMAIN
+from custom_components.open_epaper_link.const import (
+    CONF_AP_MAC,
+    CONF_HOST,
+    CONF_MAC_ADDRESS,
+    DOMAIN,
+)
 
 from .conftest import AP_HOST, AP_MAC
+
+ATC_ADDRESS = "AA:BB:CC:DD:EE:01"
 
 DHCP_INFO = DhcpServiceInfo(
     ip=AP_HOST,
@@ -202,3 +211,84 @@ async def test_integration_discovery_of_peer_ap(
 
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
+
+
+# ---------------------------------------------------------------------------
+# Bluetooth (ATC tags)
+# ---------------------------------------------------------------------------
+
+
+def _atc_service_info(name: str = "") -> BluetoothServiceInfoBleak:
+    """A discovery for a tag running ATC firmware."""
+    return BluetoothServiceInfoBleak(
+        name=name or ATC_ADDRESS,
+        address=ATC_ADDRESS,
+        rssi=-60,
+        manufacturer_data={
+            # Version 2 advertisement: hw_type 0x11, fw 0x1234, 2828 mV, -8 C.
+            MANUFACTURER_ID: bytes(
+                [2, 0x11, 0x00, 0x34, 0x12, 0, 0, 0x0C, 0x0B, 0xF8, 0]
+            )
+        },
+        service_data={},
+        service_uuids=[],
+        source="local",
+        device=None,
+        advertisement=None,
+        connectable=True,
+        time=0,
+        tx_power=None,
+    )
+
+
+async def test_bluetooth_discovery(
+    hass: HomeAssistant, mock_setup_entry: AsyncMock
+) -> None:
+    """A discovered ATC tag is added without connecting to it."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=_atc_service_info()
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "bluetooth_confirm"
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"] == {CONF_MAC_ADDRESS: ATC_ADDRESS}
+
+
+async def test_bluetooth_discovery_names_unnamed_tags(
+    hass: HomeAssistant, mock_setup_entry: AsyncMock
+) -> None:
+    """Tags advertising no name get something better than a bare address.
+
+    Home Assistant reports the address as the name in that case.
+    """
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=_atc_service_info()
+    )
+    assert result["description_placeholders"]["name"] == "ATC 11 (EE01)"
+
+
+async def test_bluetooth_discovery_prefers_the_advertised_name(
+    hass: HomeAssistant, mock_setup_entry: AsyncMock
+) -> None:
+    """A tag that does advertise a name keeps it."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_BLUETOOTH},
+        data=_atc_service_info(name="Kitchen Label"),
+    )
+    assert result["description_placeholders"]["name"] == "Kitchen Label"
+
+
+async def test_bluetooth_rejects_non_atc_devices(hass: HomeAssistant) -> None:
+    """Another manufacturer's device is not one of ours."""
+    info = _atc_service_info()
+    info.manufacturer_data.clear()
+    info.manufacturer_data[0x1234] = b"\x00"
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=info
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "not_supported"

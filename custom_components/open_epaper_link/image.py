@@ -8,7 +8,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 from oepl import OEPLError
 
-from .coordinator import APCoordinator, OpenEPaperLinkConfigEntry
+from .coordinator import APConfigEntry, APCoordinator
 from .entity import OpenEPaperLinkTagEntity
 
 PARALLEL_UPDATES = 0
@@ -16,7 +16,7 @@ PARALLEL_UPDATES = 0
 
 async def async_setup_entry(
     hass: HomeAssistant,  # noqa: ARG001  (signature fixed by Home Assistant)
-    entry: OpenEPaperLinkConfigEntry,
+    entry: APConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up an image entity per tag."""

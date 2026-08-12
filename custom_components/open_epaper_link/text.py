@@ -16,7 +16,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from oepl import OEPLError
 
 from .const import DOMAIN
-from .coordinator import APCoordinator, OpenEPaperLinkConfigEntry
+from .coordinator import APConfigEntry, APCoordinator
 from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
 
 PARALLEL_UPDATES = 1
@@ -24,7 +24,7 @@ PARALLEL_UPDATES = 1
 
 async def async_setup_entry(
     hass: HomeAssistant,  # noqa: ARG001  (signature fixed by Home Assistant)
-    entry: OpenEPaperLinkConfigEntry,
+    entry: APConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up text entities for an Access Point and its tags."""

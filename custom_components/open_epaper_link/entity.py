@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.components.bluetooth.passive_update_coordinator import (
+    PassiveBluetoothCoordinatorEntity,
+)
+from homeassistant.helpers.device_registry import CONNECTION_BLUETOOTH, DeviceInfo
+from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from oepl import Tag
+from py_atc_ble_oepl import AdvertisingData
 
+from .atc_coordinator import ATCCoordinator
 from .const import DOMAIN
 from .coordinator import APCoordinator
 
@@ -81,3 +87,37 @@ class OpenEPaperLinkTagEntity(OpenEPaperLinkEntity):
     def available(self) -> bool:
         """Whether the Access Point is connected and still knows this tag."""
         return self.coordinator.online and self.tag is not None
+
+
+class ATCEntity(PassiveBluetoothCoordinatorEntity[ATCCoordinator]):
+    """Base class for entities of a tag running ATC firmware.
+
+    Unlike the Access Point entities these are not backed by a polling or
+    push coordinator over the network; state arrives in Bluetooth
+    advertisements, which is what PassiveBluetoothCoordinatorEntity models.
+    """
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: ATCCoordinator,
+        entry_id: str,
+        description: EntityDescription,
+    ) -> None:
+        """Set up the entity."""
+        super().__init__(coordinator)
+        self.entity_description = description
+        # Entry-scoped, matching the Access Point entities and what the
+        # registry migration rewrites the old oepl_ble_ ids to.
+        self._attr_unique_id = f"{entry_id}_{description.key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_{coordinator.address}")},
+            connections={(CONNECTION_BLUETOOTH, coordinator.address)},
+            manufacturer="OpenEPaperLink",
+        )
+
+    @property
+    def advertisement(self) -> AdvertisingData | None:
+        """The most recent advertisement, if one has been seen."""
+        return self.coordinator.data.advertisement if self.coordinator.data else None

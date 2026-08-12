@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from oepl import TagCommand
 
-from .coordinator import APCoordinator, OpenEPaperLinkConfigEntry
+from .coordinator import APConfigEntry, APCoordinator
 from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
 
 PARALLEL_UPDATES = 1
@@ -68,7 +68,7 @@ AP_BUTTONS: tuple[APButtonDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,  # noqa: ARG001  (signature fixed by Home Assistant)
-    entry: OpenEPaperLinkConfigEntry,
+    entry: APConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up buttons for an Access Point and its tags."""

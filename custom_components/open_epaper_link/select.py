@@ -15,7 +15,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import APCoordinator, OpenEPaperLinkConfigEntry
+from .coordinator import APConfigEntry, APCoordinator
 from .entity import OpenEPaperLinkAPEntity
 
 PARALLEL_UPDATES = 1
@@ -107,7 +107,7 @@ AP_SELECTS: tuple[APSelectDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,  # noqa: ARG001  (signature fixed by Home Assistant)
-    entry: OpenEPaperLinkConfigEntry,
+    entry: APConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Access Point selects the hardware actually supports."""

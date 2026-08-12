@@ -6,12 +6,15 @@ from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from oepl import APConfig, APInfo, OEPLConnectionError, Tag, TagType
+from py_atc_ble_oepl import MANUFACTURER_ID
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.open_epaper_link.const import (
     CONF_AP_MAC,
     CONF_HOST,
+    CONF_MAC_ADDRESS,
     DOMAIN,
 )
 
@@ -214,3 +217,62 @@ def peer_config_entry() -> MockConfigEntry:
         data={CONF_HOST: PEER_HOST, CONF_AP_MAC: PEER_MAC},
         version=5,
     )
+
+
+ATC_ADDRESS = "AA:BB:CC:DD:EE:01"
+
+
+def atc_service_info(name: str = "") -> BluetoothServiceInfoBleak:
+    """A Bluetooth advertisement from a tag running ATC firmware."""
+    return BluetoothServiceInfoBleak(
+        name=name or ATC_ADDRESS,
+        address=ATC_ADDRESS,
+        rssi=-60,
+        manufacturer_data={
+            # Version 2: hw_type 0x11, fw 0x1234, 2828 mV, -8 C.
+            MANUFACTURER_ID: bytes(
+                [2, 0x11, 0x00, 0x34, 0x12, 0, 0, 0x0C, 0x0B, 0xF8, 0]
+            )
+        },
+        service_data={},
+        service_uuids=[],
+        source="local",
+        device=None,
+        advertisement=None,
+        connectable=True,
+        time=0,
+        tx_power=None,
+    )
+
+
+@pytest.fixture
+def atc_config_entry() -> MockConfigEntry:
+    """A configured ATC tag entry.
+
+    It has no host, which is what distinguishes it from an Access Point.
+    """
+    return MockConfigEntry(
+        domain=DOMAIN,
+        title="Kitchen Label",
+        unique_id=ATC_ADDRESS,
+        data={CONF_MAC_ADDRESS: ATC_ADDRESS},
+        version=5,
+    )
+
+
+@pytest.fixture(autouse=True)
+def mock_bluetooth_registration() -> Generator[None]:
+    """Stand in for Home Assistant's Bluetooth manager.
+
+    p-h-c-c ships no Bluetooth fixtures, and starting the real manager needs
+    adapters that do not exist in CI. Only the two registration calls the
+    passive coordinator makes are stubbed, so our own parsing and wiring still
+    run for real; tests drive advertisements in directly.
+    """
+    module = "homeassistant.components.bluetooth.update_coordinator"
+    with (
+        patch(f"{module}.async_register_callback", return_value=lambda: None),
+        patch(f"{module}.async_track_unavailable", return_value=lambda: None),
+        patch(f"{module}.async_address_present", return_value=True),
+    ):
+        yield

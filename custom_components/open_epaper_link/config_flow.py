@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 import voluptuous as vol
+from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
@@ -23,10 +24,12 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from oepl import OEPLClient, OEPLError
+from py_atc_ble_oepl import MANUFACTURER_ID, AdvertisingData, ATCProtocol
 
 from .const import (
     CONF_AP_MAC,
     CONF_HOST,
+    CONF_MAC_ADDRESS,
     DEFAULT_BUTTON_DEBOUNCE,
     DEFAULT_NFC_DEBOUNCE,
     DOMAIN,
@@ -34,7 +37,7 @@ from .const import (
     OPT_BUTTON_DEBOUNCE,
     OPT_NFC_DEBOUNCE,
 )
-from .coordinator import OpenEPaperLinkConfigEntry
+from .coordinator import APConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,6 +51,8 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         """Initialise the flow."""
         self._host: str | None = None
         self._alias: str | None = None
+        self._atc_address: str | None = None
+        self._atc_name: str | None = None
 
     # ------------------------------------------------------------------
     # Probing
@@ -198,10 +203,60 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    # ------------------------------------------------------------------
+    # Bluetooth discovery (ATC tags)
+    # ------------------------------------------------------------------
+
+    async def async_step_bluetooth(
+        self, discovery_info: BluetoothServiceInfoBleak
+    ) -> ConfigFlowResult:
+        """Handle a tag running ATC firmware seen over Bluetooth."""
+        await self.async_set_unique_id(dr.format_mac(discovery_info.address))
+        self._abort_if_unique_id_configured()
+
+        raw = discovery_info.manufacturer_data.get(MANUFACTURER_ID)
+        if not raw:
+            return self.async_abort(reason="not_supported")
+        try:
+            advertisement = ATCProtocol.parse_advertising_data(raw)
+        except ValueError:
+            _LOGGER.debug("Unparseable advertisement from %s", discovery_info.address)
+            return self.async_abort(reason="not_supported")
+
+        self._atc_address = discovery_info.address
+        self._atc_name = _atc_name(discovery_info, advertisement)
+        self.context["title_placeholders"] = {"name": self._atc_name}
+        return await self.async_step_bluetooth_confirm()
+
+    async def async_step_bluetooth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Confirm adding a discovered tag.
+
+        No interrogation happens here. These are battery devices that are
+        usually asleep, so connecting would often fail and would cost the tag
+        a wake-up just to add it.
+        """
+        assert self._atc_address is not None
+        if user_input is not None:
+            return self.async_create_entry(
+                title=self._atc_name or self._atc_address,
+                data={CONF_MAC_ADDRESS: self._atc_address},
+            )
+
+        self._set_confirm_only()
+        return self.async_show_form(
+            step_id="bluetooth_confirm",
+            description_placeholders={
+                "name": self._atc_name or self._atc_address,
+                "address": self._atc_address,
+            },
+        )
+
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: OpenEPaperLinkConfigEntry,  # noqa: ARG004
+        config_entry: APConfigEntry,  # noqa: ARG004
     ) -> OpenEPaperLinkOptionsFlow:
         """Return the options flow."""
         return OpenEPaperLinkOptionsFlow()
@@ -251,3 +306,19 @@ def _normalise_host(host: str) -> str:
         if host.startswith(scheme):
             host = host[len(scheme) :]
     return host.rstrip("/")
+
+
+def _atc_name(
+    discovery_info: BluetoothServiceInfoBleak, advertisement: AdvertisingData
+) -> str:
+    """Return a human-readable name for a discovered tag.
+
+    Home Assistant reports the address as the name when a device advertises
+    none, which is common for these tags. Falling back to the hardware type
+    plus the last two address octets is more use than a bare MAC.
+    """
+    name = discovery_info.name
+    if name and name != discovery_info.address:
+        return name
+    suffix = discovery_info.address.replace(":", "")[-4:]
+    return f"ATC {advertisement.hw_type:02X} ({suffix})"
