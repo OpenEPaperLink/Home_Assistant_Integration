@@ -23,7 +23,7 @@ from .conftest import AP_HOST, AP_MAC
 
 ENTRY_ID = "01JABCDEF0123456789"
 TAG = "00000335042F3E10"
-BLE_MAC = "AA:BB:CC:DD:EE:01"
+ATC_MAC = "AA:BB:CC:DD:EE:01"
 
 
 # ---------------------------------------------------------------------------
@@ -45,9 +45,9 @@ BLE_MAC = "AA:BB:CC:DD:EE:01"
         (f"{ENTRY_ID}_reboot_ap", f"{ENTRY_ID}_reboot_ap"),
         (f"{ENTRY_ID}_channel", f"{ENTRY_ID}_channel"),
         # BLE entities carried an oepl_ble_ prefix.
-        (f"oepl_ble_{BLE_MAC}_light", f"{ENTRY_ID}_light"),
-        (f"oepl_ble_{BLE_MAC}_display_content", f"{ENTRY_ID}_display_content"),
-        (f"oepl_ble_{BLE_MAC}_battery", f"{ENTRY_ID}_battery"),
+        (f"oepl_ble_{ATC_MAC}_light", f"{ENTRY_ID}_light"),
+        (f"oepl_ble_{ATC_MAC}_display_content", f"{ENTRY_ID}_display_content"),
+        (f"oepl_ble_{ATC_MAC}_battery", f"{ENTRY_ID}_battery"),
     ],
 )
 def test_migrate_unique_id(old: str, expected: str) -> None:
@@ -67,7 +67,7 @@ def test_migrate_unique_id_never_collides() -> None:
         f"{TAG}_temperature",
         f"{TAG}_alias",
         f"{ENTRY_ID}_ap_state",
-        f"oepl_ble_{BLE_MAC}_light",
+        f"oepl_ble_{ATC_MAC}_light",
     ]
     news = [migrate_unique_id(o, ENTRY_ID) for o in olds]
     assert len(set(news)) == len(news)
@@ -100,43 +100,44 @@ async def test_entry_rekeyed_from_host_to_mac(hass: HomeAssistant) -> None:
     assert entry.data["ap_mac"] == dr.format_mac(AP_MAC)
 
 
-async def test_atc_entry_discriminator_is_renamed(hass: HomeAssistant) -> None:
-    """device_type "ble" becomes "atc", and protocol_type is dropped.
+async def test_obsolete_discriminators_are_dropped(hass: HomeAssistant) -> None:
+    """device_type and protocol_type are redundant and get stripped.
 
-    Bluetooth tags run ATC firmware; "BLE" named the radio, not the device.
-    The separate protocol_type existed only because there were once two
-    Bluetooth protocols, and the other was removed in 3.0.0.
+    An AP entry has a host and an ATC entry does not, which already tells them
+    apart; protocol_type existed only to choose between two Bluetooth
+    protocols, and the other was removed in 3.0.0.
     """
     entry = MockConfigEntry(
         domain=DOMAIN,
         entry_id=ENTRY_ID,
-        unique_id=BLE_MAC,
-        data={"mac_address": BLE_MAC, "device_type": "ble", "protocol_type": "atc"},
+        unique_id=ATC_MAC,
+        data={"mac_address": ATC_MAC, "device_type": "ble", "protocol_type": "atc"},
         version=4,
     )
     entry.add_to_hass(hass)
 
     await async_migrate_entry_data(hass, entry, ap_mac=None)
 
-    assert entry.data["device_type"] == "atc"
+    assert "device_type" not in entry.data
     assert "protocol_type" not in entry.data
-    assert entry.data["mac_address"] == BLE_MAC
+    assert entry.data["mac_address"] == ATC_MAC
 
 
-async def test_ap_entry_discriminator_untouched(hass: HomeAssistant) -> None:
-    """An AP entry's device_type must not be rewritten to atc."""
+async def test_atc_entry_keeps_its_own_identity(hass: HomeAssistant) -> None:
+    """An ATC entry has no host, so it must not be re-keyed onto an AP MAC."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         entry_id=ENTRY_ID,
-        unique_id=AP_HOST,
-        data={"host": AP_HOST, "device_type": "ap"},
+        unique_id=ATC_MAC,
+        data={"mac_address": ATC_MAC, "device_type": "ble"},
         version=4,
     )
     entry.add_to_hass(hass)
 
     await async_migrate_entry_data(hass, entry, ap_mac=AP_MAC)
 
-    assert entry.data["device_type"] == "ap"
+    assert entry.unique_id == ATC_MAC
+    assert "ap_mac" not in entry.data
 
 
 async def test_entry_rekey_is_idempotent(hass: HomeAssistant) -> None:

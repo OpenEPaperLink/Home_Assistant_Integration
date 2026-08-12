@@ -33,9 +33,8 @@ from homeassistant.helpers import entity_registry as er
 from .const import (
     CONF_AP_MAC,
     CONF_DEVICE_TYPE,
-    DEVICE_TYPE_ATC,
+    CONF_HOST,
     DOMAIN,
-    LEGACY_DEVICE_TYPE_ATC,
     REMOVED_SENSOR_KEYS,
 )
 
@@ -80,20 +79,20 @@ async def async_migrate_entry_data(
     unique_id = entry.unique_id
     changed = False
 
-    # Bluetooth tags run ATC firmware; "ble" named the radio rather than the
-    # device. protocol_type existed only to pick between two Bluetooth
-    # protocols, and the other was removed in 3.0.0, so one field now does.
-    if data.get(CONF_DEVICE_TYPE) == LEGACY_DEVICE_TYPE_ATC:
-        data[CONF_DEVICE_TYPE] = DEVICE_TYPE_ATC
-        changed = True
-    if data.pop("protocol_type", None) is not None:
-        changed = True
+    # Drop both stored discriminators. An AP entry has a host and an ATC entry
+    # does not, which already tells them apart, and after setup the runtime data
+    # type says so with real type information. protocol_type existed only to
+    # choose between two Bluetooth protocols; the other went in 3.0.0.
+    is_ap = CONF_HOST in data
+    for obsolete in (CONF_DEVICE_TYPE, "protocol_type"):
+        if data.pop(obsolete, None) is not None:
+            changed = True
 
     # The host is mutable -- DHCP moves it -- so it was never a valid identity.
     # The MAC comes from the AP's own wifi config and is stable, and DHCP
     # discovery reports the same value, letting a discovery match an entry that
     # was originally added by hand.
-    if ap_mac and data.get(CONF_DEVICE_TYPE) != DEVICE_TYPE_ATC:
+    if ap_mac and is_ap:
         formatted = dr.format_mac(ap_mac)
         if unique_id != formatted or data.get(CONF_AP_MAC) != formatted:
             unique_id = formatted

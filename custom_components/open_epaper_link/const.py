@@ -9,16 +9,10 @@ DOMAIN: Final = "open_epaper_link"
 # Config entry data / options keys
 CONF_HOST: Final = "host"
 CONF_AP_MAC: Final = "ap_mac"
+# Obsolete entry-data keys, stripped by migration. An AP entry has a host and
+# an ATC entry does not, which already distinguishes them, and after setup the
+# runtime data type does so with real type information.
 CONF_DEVICE_TYPE: Final = "device_type"
-DEVICE_TYPE_AP: Final = "ap"
-
-# Tags reached over Bluetooth run ATC firmware. "BLE" names the radio; ATC
-# names the device and its protocol, and matches py-atc-ble-oepl. It used to be
-# one of two Bluetooth protocols, which is why the old entries carried both a
-# device_type of "ble" and a separate protocol_type; the other protocol was
-# removed in 3.0.0, so a single discriminator now suffices.
-DEVICE_TYPE_ATC: Final = "atc"
-LEGACY_DEVICE_TYPE_ATC: Final = "ble"
 
 OPT_BLACKLISTED_TAGS: Final = "blacklisted_tags"
 OPT_BUTTON_DEBOUNCE: Final = "button_debounce"
@@ -28,8 +22,10 @@ OPT_CUSTOM_FONT_DIRS: Final = "custom_font_dirs"
 DEFAULT_BUTTON_DEBOUNCE: Final = 0.5
 DEFAULT_NFC_DEBOUNCE: Final = 1.0
 
-# Bus event fired for tag interactions; consumed by device_trigger.
-EVENT_TAG_INTERACTION: Final = f"{DOMAIN}_event"
+# Dispatched when a tag reports a button, NFC or GPIO wake-up. Consumed by the
+# event platform. The pre-4.0 integration fired a custom bus event for device
+# triggers instead; event entities replace both.
+SIGNAL_TAG_INTERACTION: Final = f"{DOMAIN}_tag_interaction"
 
 # Dispatcher signal fired when any config entry loads or unloads, so sibling
 # entries can re-evaluate which of them owns each mesh tag.

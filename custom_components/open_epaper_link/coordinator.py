@@ -27,11 +27,11 @@ from .const import (
     CONF_AP_MAC,
     CONF_HOST,
     DOMAIN,
-    EVENT_TAG_INTERACTION,
     OPT_BLACKLISTED_TAGS,
     OPT_BUTTON_DEBOUNCE,
     OPT_NFC_DEBOUNCE,
     SIGNAL_ENTRIES_CHANGED,
+    SIGNAL_TAG_INTERACTION,
 )
 
 if TYPE_CHECKING:
@@ -39,18 +39,15 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-# Wake-up reasons that should raise a bus event for device triggers. Buttons are
-# BUTTON1/BUTTON2 in the firmware; the trigger schema exposes BUTTON1-10 so the
-# names stay stable if more are added.
-_TRIGGER_WAKEUP_REASONS: dict[int, str] = {
-    WakeupReason.GPIO: "GPIO",
-    WakeupReason.NFC: "NFC",
-    WakeupReason.BUTTON1: "BUTTON1",
-    WakeupReason.BUTTON2: "BUTTON2",
+# Wake-up reasons surfaced as event entity events. The firmware defines exactly
+# two button reasons, so this is the complete set; the pre-4.0 integration
+# advertised BUTTON1-10, which had no basis in the protocol.
+_INTERACTION_WAKEUP_REASONS: dict[int, str] = {
+    WakeupReason.GPIO: "gpio",
+    WakeupReason.NFC: "nfc",
+    WakeupReason.BUTTON1: "button1",
+    WakeupReason.BUTTON2: "button2",
 }
-
-# Wake-up reasons debounced as NFC scans rather than button presses.
-_NFC_REASONS = frozenset({WakeupReason.NFC})
 
 
 class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
@@ -104,7 +101,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
     def _debounce_for(self, trigger_type: str) -> timedelta:
         """Return the debounce window for a trigger type."""
         options = self.config_entry.options
-        if trigger_type == "NFC":
+        if trigger_type == "nfc":
             seconds = options.get(OPT_NFC_DEBOUNCE, 1.0)
         else:
             seconds = options.get(OPT_BUTTON_DEBOUNCE, 0.5)
@@ -260,7 +257,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         The AP resends the same wake-up reason on repeated check-ins, so
         without debouncing a single button press can fire several times.
         """
-        trigger_type = _TRIGGER_WAKEUP_REASONS.get(tag.wakeup_reason)
+        trigger_type = _INTERACTION_WAKEUP_REASONS.get(tag.wakeup_reason)
         if trigger_type is None:
             return
 
@@ -271,15 +268,10 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
             return
         self._last_trigger[key] = now
 
-        device = dr.async_get(self.hass).async_get_device(
-            identifiers={(DOMAIN, f"{self.config_entry.entry_id}_{tag.mac}")}
-        )
-        if device is None:
-            return
-
-        self.hass.bus.async_fire(
-            EVENT_TAG_INTERACTION,
-            {"device_id": device.id, "type": trigger_type, "mac": tag.mac},
+        async_dispatcher_send(
+            self.hass,
+            f"{SIGNAL_TAG_INTERACTION}_{self.config_entry.entry_id}_{tag.mac}",
+            trigger_type,
         )
 
     @callback
