@@ -1,12 +1,38 @@
+[project]
+name = "open-epaper-link"
+version = "0.0.0"
+description = "Home Assistant integration for OpenEPaperLink"
+requires-python = ">=3.14.2"
+dependencies = []
+
+[dependency-groups]
+# The test environment. pytest-homeassistant-custom-component pins a compatible
+# homeassistant, pytest and pytest-asyncio itself; pinning those separately is
+# what causes the usual resolution conflicts, so it is the only pin here.
+#
+# Home Assistant itself is run from a separate HA core checkout with this
+# integration symlinked into its custom_components, because p-h-c-c and a real
+# HA install cannot share an environment.
+dev = [
+    "pytest-homeassistant-custom-component==0.13.355",
+    "ruff==0.16.2",
+    # Runtime requirements, kept in sync with custom_components/open_epaper_link/manifest.json
+    "odl-renderer==0.5.12",
+    "py-atc-ble-oepl==0.5.1",
+    "py-oepl[dither]==0.3.0",
+]
+
+[tool.uv]
+# A Home Assistant integration is not an installable package.
+package = false
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = [
-    "tests"
-]
+testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
 line-length = 88
 
 [tool.ruff.lint]
@@ -30,7 +56,7 @@ select = [
 "tests/*" = ["ARG001"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 strict = true
 warn_unreachable = true
 # Home Assistant and the protocol libraries are not fully typed at the seams we
