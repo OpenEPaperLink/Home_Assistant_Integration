@@ -9,8 +9,9 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import (
     async_dispatcher_connect,
@@ -19,11 +20,13 @@ from homeassistant.helpers.dispatcher import (
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 from oepl import (
+    APConfig,
     APInfo,
     APStatus,
     OEPLClient,
     OEPLError,
     Tag,
+    TagCommand,
     TagType,
     WakeupReason,
 )
@@ -85,6 +88,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         self.client = OEPLClient(self.host, session=async_get_clientsession(hass))
 
         self.ap_info: APInfo | None = None
+        self.ap_config: APConfig | None = None
         self.ap_status: APStatus | None = None
         self.online = False
 
@@ -123,6 +127,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         """
         try:
             self.ap_info = await self.client.get_sysinfo()
+            self.ap_config = await self.client.get_ap_config()
             tags = await self.client.get_tags()
         except OEPLError as err:
             raise ConfigEntryNotReady(
@@ -271,6 +276,54 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         )
 
     # ------------------------------------------------------------------
+    # Access Point configuration
+    # ------------------------------------------------------------------
+
+    async def async_set_ap_config_item(self, key: str, value: str | int | bool) -> None:
+        """Change one Access Point setting and refresh the cached config."""
+        try:
+            await self.client.set_ap_config_item(key, value)
+            self.ap_config = await self.client.get_ap_config()
+        except OEPLError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="ap_command_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+        self.async_update_listeners()
+
+    async def async_send_tag_command(self, mac: str, command: TagCommand) -> None:
+        """Send a command to a tag, surfacing failures to the user."""
+        try:
+            await self.client.send_tag_cmd(mac, command)
+        except OEPLError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="tag_command_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+
+    async def async_reboot_ap(self) -> None:
+        """Reboot the Access Point."""
+        try:
+            await self.client.reboot_ap()
+        except OEPLError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="ap_command_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+
+    async def async_refresh_ap_config(self) -> None:
+        """Re-read the Access Point configuration."""
+        try:
+            self.ap_config = await self.client.get_ap_config()
+        except OEPLError as err:
+            _LOGGER.warning("Could not refresh AP config: %s", err)
+            return
+        self.async_update_listeners()
+
+    # ------------------------------------------------------------------
     # Events
     # ------------------------------------------------------------------
 
@@ -292,11 +345,48 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
             return
         self._last_trigger[key] = now
 
+        # A speculative entity only exists disabled until something proves the
+        # hardware is really there, so enable it before dispatching.
+        self._async_enable_speculative_entity(tag.mac, trigger_type)
         async_dispatcher_send(
             self.hass,
             f"{SIGNAL_TAG_INTERACTION}_{self.config_entry.entry_id}_{tag.mac}",
             trigger_type,
         )
+
+    @callback
+    def _async_enable_speculative_entity(self, mac: str, event_type: str) -> None:
+        """Enable a disabled event entity once it fires for real.
+
+        Button and GPIO entities are created disabled, because a tag type
+        declaring button support describes the model rather than the unit in
+        hand. A real event proves the hardware is there.
+
+        Only entities this integration disabled are touched, so a user who
+        deliberately turned one off is never overridden. This mirrors the
+        precedent in Home Assistant's own device_tracker component.
+        """
+        entry = self.config_entry
+        if entry.pref_disable_new_entities:
+            return
+
+        key = "button" if event_type.startswith("button") else event_type
+        registry = er.async_get(self.hass)
+        entity_id = registry.async_get_entity_id(
+            "event", DOMAIN, f"{entry.entry_id}_{mac}_{key}"
+        )
+        if entity_id is None:
+            return
+
+        record = registry.async_get(entity_id)
+        if (
+            record is None
+            or record.disabled_by is not er.RegistryEntryDisabler.INTEGRATION
+        ):
+            return
+
+        _LOGGER.debug("Enabling %s after a real %s event", entity_id, event_type)
+        registry.async_update_entity(entity_id, disabled_by=None)
 
     @callback
     def _async_sync_device_name(self, tag: Tag) -> None:

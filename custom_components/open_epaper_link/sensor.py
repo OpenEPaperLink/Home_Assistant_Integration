@@ -22,7 +22,6 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.util import dt as dt_util
 from oepl import APStatus, Tag
 from oepl.enums import enum_label
 
@@ -253,17 +252,6 @@ AP_SENSORS: tuple[APSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda status: status.timeout_count,
-    ),
-    APSensorDescription(
-        key="sys_time",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-        value_fn=lambda status: (
-            dt_util.utc_from_timestamp(status.current_time)
-            if status.current_time
-            else None
-        ),
     ),
 )
 

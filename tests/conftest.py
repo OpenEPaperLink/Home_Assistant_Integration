@@ -6,7 +6,7 @@ from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from oepl import APInfo, OEPLConnectionError, Tag, TagType
+from oepl import APConfig, APInfo, OEPLConnectionError, Tag, TagType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.open_epaper_link.const import (
@@ -89,6 +89,34 @@ def make_tag(mac: str, **overrides: object) -> Tag:
 _WIRE_KEYS = {"is_external": "isexternal", "ap_ip": "apip", "hw_type": "hwType"}
 
 
+def make_ap_config(**extra: object) -> APConfig:
+    """Build an Access Point configuration as served by /get_ap_config."""
+    return APConfig.from_dict(
+        {
+            "alias": "Kitchen AP",
+            "channel": 11,
+            "led": 127,
+            "tft": 128,
+            "language": 0,
+            "maxsleep": 60,
+            "nightlyreboot": 0,
+            "preview": 1,
+            "lock": 0,
+            "ble": 1,
+            "showtimestamp": 0,
+            "discovery": 1,
+            "wifipower": 3,
+            "sleeptime1": 0,
+            "sleeptime2": 0,
+            "subghzchannel": 0,
+            "repo": "",
+            "timezone": "UTC",
+            "apstate": 1,
+        }
+        | extra
+    )
+
+
 def make_tag_type(width: int = 296, height: int = 128, **extra: object) -> TagType:
     """Build a tag type definition as served by the Access Point."""
     return TagType.from_dict(
@@ -126,12 +154,17 @@ def mock_client() -> Generator[AsyncMock]:
                 "get_tags",
                 "get_tag_type",
                 "get_wifi_config",
+                "get_ap_config",
+                "set_ap_config_item",
+                "send_tag_cmd",
+                "reboot_ap",
             ):
                 setattr(instance, name, AsyncMock())
             instance.get_sysinfo.return_value = APInfo.from_dict(
                 {"alias": "Kitchen AP", "env": "ESP32_S3", "buildversion": "31"}
             )
             instance.get_tag_type.return_value = make_tag_type()
+            instance.get_ap_config.return_value = make_ap_config()
             for name in (
                 "on_tag_update",
                 "on_ap_status",

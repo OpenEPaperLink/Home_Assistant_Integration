@@ -69,46 +69,93 @@
       "alias": {
         "name": "Alias"
       },
-      "repo": {
-        "name": "Repository"
-      },
       "tag_alias": {
         "name": "Alias"
       }
     },
     "select": {
       "channel": {
-        "name": "Channel"
-      },
-      "led": {
-        "name": "RGB LED brightness"
-      },
-      "tft": {
-        "name": "TFT Brightness"
-      },
-      "maxsleep": {
-        "name": "Maximum sleep"
-      },
-      "lock": {
-        "name": "Lock tag inventory"
-      },
-      "wifipower": {
-        "name": "WiFi Power"
-      },
-      "language": {
-        "name": "Language"
-      },
-      "discovery": {
-        "name": "Discovery method"
+        "name": "Channel",
+        "state": {
+          "ch11": "11",
+          "ch15": "15",
+          "ch20": "20",
+          "ch25": "25",
+          "ch26": "26"
+        }
       },
       "subghzchannel": {
-        "name": "Sub-GHz Channel"
+        "name": "Sub-GHz Channel",
+        "state": {
+          "off": "Off",
+          "ch103": "103 (867.020 MHz)",
+          "ch104": "104 (867.520 MHz)",
+          "ch105": "105 (868.020 MHz)"
+        }
       },
-      "sleeptime1": {
-        "name": "No updates between 1 (from)"
+      "led": {
+        "name": "RGB LED brightness",
+        "state": {
+          "off": "Off",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "max": "Maximum"
+        }
       },
-      "sleeptime2": {
-        "name": "No updates between 2 (to)"
+      "tft": {
+        "name": "TFT Brightness",
+        "state": {
+          "off": "Off",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "max": "Maximum"
+        }
+      },
+      "maxsleep": {
+        "name": "Maximum sleep",
+        "state": {
+          "h1": "1 hour",
+          "h4": "4 hours",
+          "h12": "12 hours",
+          "h24": "1 day",
+          "h48": "2 days"
+        }
+      },
+      "lock": {
+        "name": "Lock tag inventory",
+        "state": {
+          "open": "Open: accept any tag",
+          "learning": "Learning: only accept booting tags",
+          "locked": "Locked: do not accept new tags"
+        }
+      },
+      "wifipower": {
+        "name": "WiFi Power",
+        "state": {
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "max": "Maximum"
+        }
+      },
+      "language": {
+        "name": "Language",
+        "state": {
+          "en": "English",
+          "nl": "Nederlands",
+          "de": "Deutsch",
+          "fr": "Français",
+          "no": "Norsk",
+          "cz": "Čeština",
+          "da": "Dansk",
+          "sv": "Svenska",
+          "es": "Español",
+          "pl": "Polski",
+          "fi": "Suomi",
+          "et": "Eesti"
+        }
       }
     },
     "sensor": {
@@ -138,9 +185,6 @@
       },
       "heap": {
         "name": "Free Heap"
-      },
-      "sys_time": {
-        "name": "System Time"
       },
       "uptime": {
         "name": "Uptime"
@@ -228,9 +272,6 @@
       },
       "reboot_ap": {
         "name": "Reboot AP"
-      },
-      "refresh_tag_types": {
-        "name": "Refresh Tag Types"
       }
     },
     "event": {
@@ -270,6 +311,12 @@
   "exceptions": {
     "ap_cannot_connect": {
       "message": "Could not connect to the Access Point at {host}: {error}."
+    },
+    "ap_command_failed": {
+      "message": "The Access Point rejected the command: {error}."
+    },
+    "tag_command_failed": {
+      "message": "The Access Point rejected the command for this tag: {error}."
     }
   }
 }

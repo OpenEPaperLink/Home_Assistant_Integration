@@ -144,3 +144,144 @@ async def test_peer_ap_claims_its_own_tags(
     await hass.async_block_till_done()
 
     assert EXTERNAL_TAG not in coordinator.data
+
+
+async def test_all_platforms_create_entities(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """Every platform contributes entities for the Access Point or its tags."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    by_platform: dict[str, int] = {}
+    for record in er.async_entries_for_config_entry(registry, ap_config_entry.entry_id):
+        by_platform[record.domain] = by_platform.get(record.domain, 0) + 1
+
+    assert set(by_platform) == {
+        "button",
+        "event",
+        "image",
+        "select",
+        "sensor",
+        "switch",
+        "text",
+    }
+
+
+async def test_subghz_select_absent_without_the_radio(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """A sub-GHz channel select would configure hardware that is not there."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    entry_id = ap_config_entry.entry_id
+    assert (
+        registry.async_get_entity_id("select", DOMAIN, f"{entry_id}_subghzchannel")
+        is None
+    )
+    assert registry.async_get_entity_id("select", DOMAIN, f"{entry_id}_channel")
+
+
+async def test_button_event_is_created_disabled(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """A tag type declaring button support describes the model, not the unit.
+
+    So the entity exists but stays disabled until a real press proves it.
+    """
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        "event", DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}_button"
+    )
+    assert entity_id is not None
+    assert registry.async_get(entity_id).disabled_by is (
+        er.RegistryEntryDisabler.INTEGRATION
+    )
+
+
+async def test_nfc_event_absent_without_the_capability(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """NFC is reported by the capability bits, which this tag does not set."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    assert (
+        registry.async_get_entity_id(
+            "event", DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}_nfc"
+        )
+        is None
+    )
+
+
+async def test_nfc_event_created_when_capability_present(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """A tag reporting the NFC bits gets an NFC event entity, enabled."""
+    ap_config_entry.add_to_hass(hass)
+    # 0xC0 = NFC | NFC_WAKE, as real tags report.
+    mock_client.set_tags(make_tag(TAG_MAC, capabilities=0xC0))
+
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        "event", DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}_nfc"
+    )
+    assert entity_id is not None
+    assert registry.async_get(entity_id).disabled_by is None
+
+
+async def test_button_event_enables_itself_on_a_real_press(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """A press proves the button exists, so the entity stops being disabled."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        "event", DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}_button"
+    )
+    assert registry.async_get(entity_id).disabled_by is not None
+
+    # wakeupReason 4 is BUTTON1.
+    coordinator = ap_config_entry.runtime_data
+    coordinator._handle_tag_update(make_tag(TAG_MAC, wakeupReason=4))
+    await hass.async_block_till_done()
+
+    assert registry.async_get(entity_id).disabled_by is None
+
+
+async def test_user_disabled_event_is_not_re_enabled(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """Auto-enabling must never override a deliberate choice."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        "event", DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}_button"
+    )
+    registry.async_update_entity(entity_id, disabled_by=er.RegistryEntryDisabler.USER)
+
+    coordinator = ap_config_entry.runtime_data
+    coordinator._handle_tag_update(make_tag(TAG_MAC, wakeupReason=4))
+    await hass.async_block_till_done()
+
+    assert registry.async_get(entity_id).disabled_by is (er.RegistryEntryDisabler.USER)

@@ -57,9 +57,6 @@
       "alias": {
         "name": "Alias"
       },
-      "repo": {
-        "name": "Repozytorium"
-      },
       "tag_alias": {
         "name": "Alias"
       }
@@ -86,17 +83,8 @@
       "language": {
         "name": "Język"
       },
-      "discovery": {
-        "name": "Metoda wykrywania"
-      },
       "subghzchannel": {
         "name": "Kanał Sub-GHz"
-      },
-      "sleeptime1": {
-        "name": "Brak aktualizacji między 1 (od)"
-      },
-      "sleeptime2": {
-        "name": "Brak aktualizacji między 2 (do)"
       }
     },
     "sensor": {
@@ -126,9 +114,6 @@
       },
       "heap": {
         "name": "Wolna pamięć sterty"
-      },
-      "sys_time": {
-        "name": "Czas systemowy"
       },
       "uptime": {
         "name": "Czas działania"
@@ -216,9 +201,6 @@
       },
       "reboot_ap": {
         "name": "Uruchom ponownie AP"
-      },
-      "refresh_tag_types": {
-        "name": "Odśwież typy tagów"
       }
     }
   },

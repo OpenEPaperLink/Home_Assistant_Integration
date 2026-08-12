@@ -57,9 +57,6 @@
       "alias": {
         "name": "Alias"
       },
-      "repo": {
-        "name": "Repository"
-      },
       "tag_alias": {
         "name": "Alias"
       }
@@ -86,17 +83,8 @@
       "language": {
         "name": "Sprache"
       },
-      "discovery": {
-        "name": "Erkennungsmethode"
-      },
       "subghzchannel": {
         "name": "Sub-GHz-Kanal"
-      },
-      "sleeptime1": {
-        "name": "Keine Updates von (1)"
-      },
-      "sleeptime2": {
-        "name": "Keine Updates bis (2)"
       }
     },
     "sensor": {
@@ -126,9 +114,6 @@
       },
       "heap": {
         "name": "Freier Heap"
-      },
-      "sys_time": {
-        "name": "Systemzeit"
       },
       "uptime": {
         "name": "Betriebszeit"
@@ -216,9 +201,6 @@
       },
       "reboot_ap": {
         "name": "AP neu starten"
-      },
-      "refresh_tag_types": {
-        "name": "Tag-Typen aktualisieren"
       }
     }
   },
