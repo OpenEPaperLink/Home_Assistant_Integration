@@ -1,0 +1,83 @@
+"""Entity base classes."""
+
+from __future__ import annotations
+
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from oepl import Tag
+
+from .const import DOMAIN
+from .coordinator import APCoordinator
+
+
+class OpenEPaperLinkEntity(CoordinatorEntity[APCoordinator]):
+    """Shared behaviour for every entity backed by an Access Point."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(self, coordinator: APCoordinator, key: str) -> None:
+        """Set up the entity."""
+        super().__init__(coordinator)
+        self._attr_translation_key = key
+
+
+class OpenEPaperLinkAPEntity(OpenEPaperLinkEntity):
+    """An entity describing the Access Point itself."""
+
+    def __init__(self, coordinator: APCoordinator, key: str) -> None:
+        """Set up the entity."""
+        super().__init__(coordinator, key)
+        entry_id = coordinator.config_entry.entry_id
+        self._attr_unique_id = f"{entry_id}_{key}"
+        # Scoped to the entry rather than a shared (DOMAIN, "ap") identifier,
+        # which used to make a second Access Point collide with the first.
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_ap")},
+            name=coordinator.config_entry.title,
+            manufacturer="OpenEPaperLink",
+            model=coordinator.ap_info.env if coordinator.ap_info else None,
+            sw_version=coordinator.ap_info.build_version
+            if coordinator.ap_info
+            else None,
+            configuration_url=f"http://{coordinator.host}",
+            connections={("mac", coordinator.ap_mac)},
+        )
+
+    @property
+    def available(self) -> bool:
+        """Whether the Access Point is currently connected."""
+        return self.coordinator.online
+
+
+class OpenEPaperLinkTagEntity(OpenEPaperLinkEntity):
+    """An entity describing a single tag."""
+
+    def __init__(self, coordinator: APCoordinator, mac: str, key: str) -> None:
+        """Set up the entity."""
+        super().__init__(coordinator, key)
+        self._mac = mac
+        entry_id = coordinator.config_entry.entry_id
+        self._attr_unique_id = f"{entry_id}_{mac}_{key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_{mac}")},
+            name=self._tag_name(),
+            manufacturer="OpenEPaperLink",
+            model=coordinator.tag_type_name(mac),
+            via_device=(DOMAIN, f"{entry_id}_ap"),
+        )
+
+    def _tag_name(self) -> str:
+        """The tag's alias, falling back to its MAC."""
+        tag = self.tag
+        return tag.alias if tag and tag.alias else self._mac
+
+    @property
+    def tag(self) -> Tag | None:
+        """The current tag state, or None if it is no longer reported."""
+        return self.coordinator.data.get(self._mac)
+
+    @property
+    def available(self) -> bool:
+        """Whether the Access Point is connected and still knows this tag."""
+        return self.coordinator.online and self.tag is not None

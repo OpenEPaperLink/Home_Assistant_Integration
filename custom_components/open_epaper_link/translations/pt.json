@@ -186,18 +186,6 @@
       },
       "height": {
         "name": "Altura"
-      },
-      "runtime": {
-        "name": "Tempo de Execução"
-      },
-      "boot_count": {
-        "name": "Contagem de Arranques"
-      },
-      "checkin_count": {
-        "name": "Contagem de Checkins"
-      },
-      "block_requests": {
-        "name": "Bloquear Pedidos de Transferência"
       }
     },
     "image": {
@@ -231,14 +219,6 @@
       },
       "refresh_tag_types": {
         "name": "Atualizar Tipos de Etiqueta"
-      },
-      "refresh_config": {
-        "name": "Atualizar Configuração"
-      }
-    },
-    "update": {
-      "firmware": {
-        "name": "Firmware"
       }
     }
   },

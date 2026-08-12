@@ -16,13 +16,7 @@ from .runtime_data import OpenEPaperLinkConfigEntry
 _LOGGER = logging.getLogger(__name__)
 
 AP_PLATFORMS: list[Platform] = [
-    Platform.BUTTON,
-    Platform.EVENT,
-    Platform.IMAGE,
-    Platform.SELECT,
     Platform.SENSOR,
-    Platform.SWITCH,
-    Platform.TEXT,
 ]
 
 

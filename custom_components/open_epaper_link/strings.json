@@ -198,18 +198,6 @@
       },
       "height": {
         "name": "Height"
-      },
-      "runtime": {
-        "name": "Runtime"
-      },
-      "boot_count": {
-        "name": "Boot Count"
-      },
-      "checkin_count": {
-        "name": "Checkin Count"
-      },
-      "block_requests": {
-        "name": "Block Transfer Requests"
       }
     },
     "image": {
@@ -243,14 +231,39 @@
       },
       "refresh_tag_types": {
         "name": "Refresh Tag Types"
-      },
-      "refresh_config": {
-        "name": "Refresh Configuration"
       }
     },
-    "update": {
-      "firmware": {
-        "name": "Firmware"
+    "event": {
+      "button": {
+        "name": "Button",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "button1": "Button 1",
+              "button2": "Button 2"
+            }
+          }
+        }
+      },
+      "nfc": {
+        "name": "NFC",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "nfc": "Scanned"
+            }
+          }
+        }
+      },
+      "gpio": {
+        "name": "GPIO",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "gpio": "Triggered"
+            }
+          }
+        }
       }
     }
   },

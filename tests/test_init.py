@@ -1,0 +1,146 @@
+"""End-to-end setup, unload and mesh ownership."""
+
+from __future__ import annotations
+
+from unittest.mock import AsyncMock
+
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.open_epaper_link.const import DOMAIN
+
+from .conftest import PEER_HOST, TAG_MAC, make_tag
+
+EXTERNAL_TAG = "00000335042F3E11"
+
+
+async def test_setup_creates_entities(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """A configured Access Point produces entities for itself and its tags."""
+    ap_config_entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert ap_config_entry.state is ConfigEntryState.LOADED
+
+    registry = er.async_get(hass)
+    entry_id = ap_config_entry.entry_id
+
+    ap_state = registry.async_get_entity_id("sensor", DOMAIN, f"{entry_id}_ap_state")
+    temperature = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry_id}_{TAG_MAC}_temperature"
+    )
+    assert ap_state is not None
+    assert temperature is not None
+    assert hass.states.get(temperature).state == "21"
+
+
+async def test_setup_retries_when_ap_unreachable(
+    hass: HomeAssistant,
+    ap_config_entry: MockConfigEntry,
+    mock_unreachable_client: AsyncMock,
+) -> None:
+    """An unreachable Access Point leaves the entry retrying, not broken."""
+    ap_config_entry.add_to_hass(hass)
+
+    assert not await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert ap_config_entry.state is ConfigEntryState.SETUP_RETRY
+
+
+async def test_unload(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """Unloading disconnects the client and releases the entry."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert await hass.config_entries.async_unload(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert ap_config_entry.state is ConfigEntryState.NOT_LOADED
+    mock_client.disconnect.assert_awaited()
+
+
+async def test_devices_are_entry_scoped(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """Device identifiers include the entry id, so two APs cannot collide."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = dr.async_get(hass)
+    entry_id = ap_config_entry.entry_id
+
+    assert registry.async_get_device(identifiers={(DOMAIN, f"{entry_id}_ap")})
+    tag_device = registry.async_get_device(
+        identifiers={(DOMAIN, f"{entry_id}_{TAG_MAC}")}
+    )
+    assert tag_device is not None
+    # Tags hang off their Access Point.
+    assert tag_device.via_device_id is not None
+
+
+# ---------------------------------------------------------------------------
+# Mesh ownership
+# ---------------------------------------------------------------------------
+
+
+async def test_lone_ap_shows_external_tags(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """With one Access Point configured, a mesh peer's tags are still shown.
+
+    Filtering every external tag would hide them from someone who only added
+    one Access Point of several.
+    """
+    ap_config_entry.add_to_hass(hass)
+    mock_client.set_tags(
+        make_tag(TAG_MAC),
+        make_tag(EXTERNAL_TAG, is_external=True, ap_ip=PEER_HOST),
+    )
+
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert set(ap_config_entry.runtime_data.data) == {TAG_MAC, EXTERNAL_TAG}
+
+
+async def test_peer_ap_claims_its_own_tags(
+    hass: HomeAssistant,
+    ap_config_entry: MockConfigEntry,
+    peer_config_entry: MockConfigEntry,
+    mock_client: AsyncMock,
+) -> None:
+    """Once the owning Access Point is added, the other stops claiming its tags."""
+    ap_config_entry.add_to_hass(hass)
+    mock_client.set_tags(
+        make_tag(TAG_MAC),
+        make_tag(EXTERNAL_TAG, is_external=True, ap_ip=PEER_HOST),
+    )
+
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = ap_config_entry.runtime_data
+    assert EXTERNAL_TAG in coordinator.data
+
+    # Added only now: an entry present before the first setup would be loaded
+    # along with the component rather than on its own.
+    peer_config_entry.add_to_hass(hass)
+    # The peer natively owns the tag the first Access Point was only relaying.
+    mock_client.for_host(PEER_HOST)
+    mock_client.set_tags(make_tag(EXTERNAL_TAG), host=PEER_HOST)
+
+    await hass.config_entries.async_setup(peer_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert EXTERNAL_TAG not in coordinator.data

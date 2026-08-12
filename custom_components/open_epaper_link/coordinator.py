@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.dispatcher import (
+    async_dispatcher_connect,
+    async_dispatcher_send,
+)
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 from oepl import (
@@ -126,13 +131,28 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
                 translation_placeholders={"host": self.host, "error": str(err)},
             ) from err
 
-        self.async_set_updated_data(self._visible_tags(tags))
+        # The round trip above proves the Access Point is reachable. Waiting
+        # for the WebSocket to report a connection instead would leave every
+        # entity unavailable until it opens, and permanently so on a setup
+        # where HTTP works but the socket does not.
+        self.online = True
+
+        visible = self._visible_tags(tags)
+        # Entities read tag geometry and hardware names synchronously when
+        # building device info, so the definitions have to be in hand first.
+        await self._async_prefetch_tag_types(visible.values())
+        self.async_set_updated_data(visible)
 
         self._unsubs = [
             self.client.on_tag_update(self._handle_tag_update),
             self.client.on_ap_status(self._handle_ap_status),
             self.client.on_connection_change(self._handle_connection_change),
             self.client.on_ap_item(self._handle_ap_item),
+            # A sibling entry loading or unloading changes which of us owns a
+            # mesh tag, and that is not something the AP tells us about.
+            async_dispatcher_connect(
+                self.hass, SIGNAL_ENTRIES_CHANGED, self.async_reevaluate_ownership
+            ),
         ]
         await self.client.connect()
 
@@ -161,15 +181,21 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         return not self._other_entry_owns(tag.ap_ip)
 
     def _other_entry_owns(self, ap_ip: str) -> bool:
-        """Return True if another loaded entry is the AP at *ap_ip*."""
+        """Return True if another active entry is the Access Point at *ap_ip*.
+
+        An entry setting up counts as active: it announces itself at the end of
+        its own setup, before Home Assistant has marked it loaded, and it
+        plainly owns its own tags by then.
+        """
         if not ap_ip:
             return False
-        for entry in self.hass.config_entries.async_loaded_entries(DOMAIN):
-            if entry.entry_id == self.config_entry.entry_id:
-                continue
-            if entry.data.get(CONF_HOST) == ap_ip:
-                return True
-        return False
+        return any(
+            entry.entry_id != self.config_entry.entry_id
+            and entry.data.get(CONF_HOST) == ap_ip
+            and entry.state
+            in (ConfigEntryState.LOADED, ConfigEntryState.SETUP_IN_PROGRESS)
+            for entry in self.hass.config_entries.async_entries(DOMAIN)
+        )
 
     def _visible_tags(self, tags: list[Tag]) -> dict[str, Tag]:
         """Filter *tags* down to the ones this entry exposes."""
@@ -302,8 +328,19 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
                 _LOGGER.warning("AP has no tag type definition for 0x%02X", hw_type)
         return self._tag_types[hw_type]
 
+    async def _async_prefetch_tag_types(self, tags: Iterable[Tag]) -> None:
+        """Load the tag type for every distinct hardware type in *tags*."""
+        for hw_type in {tag.hw_type for tag in tags}:
+            await self.async_get_tag_type(hw_type)
 
-@callback
-def async_notify_entries_changed(hass: HomeAssistant) -> None:
-    """Tell loaded entries to re-evaluate mesh tag ownership."""
-    async_dispatcher_send(hass, SIGNAL_ENTRIES_CHANGED)
+    @callback
+    def tag_type(self, mac: str) -> TagType | None:
+        """Return the cached tag type for *mac*, without fetching."""
+        tag = self.data.get(mac)
+        return self._tag_types.get(tag.hw_type) if tag else None
+
+    @callback
+    def tag_type_name(self, mac: str) -> str | None:
+        """Return the hardware name for *mac*, for the device registry."""
+        tag_type = self.tag_type(mac)
+        return tag_type.name if tag_type else None

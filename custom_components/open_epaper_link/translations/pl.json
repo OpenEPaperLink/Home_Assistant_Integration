@@ -186,18 +186,6 @@
       },
       "height": {
         "name": "Wysokość"
-      },
-      "runtime": {
-        "name": "Czas działania"
-      },
-      "boot_count": {
-        "name": "Liczba uruchomień"
-      },
-      "checkin_count": {
-        "name": "Liczba zameldowań"
-      },
-      "block_requests": {
-        "name": "Żądania transferu blokowego"
       }
     },
     "image": {
@@ -231,14 +219,6 @@
       },
       "refresh_tag_types": {
         "name": "Odśwież typy tagów"
-      },
-      "refresh_config": {
-        "name": "Odśwież konfigurację"
-      }
-    },
-    "update": {
-      "firmware": {
-        "name": "Oprogramowanie układowe"
       }
     }
   },
