@@ -28,9 +28,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from oepl import TagCapability
 
 from .const import SIGNAL_TAG_INTERACTION
-from .coordinator import APCoordinator
+from .coordinator import APCoordinator, OpenEPaperLinkConfigEntry
 from .entity import OpenEPaperLinkTagEntity
-from .runtime_data import OpenEPaperLinkConfigEntry
 
 PARALLEL_UPDATES = 0
 

@@ -34,7 +34,7 @@ from .const import (
     OPT_BUTTON_DEBOUNCE,
     OPT_NFC_DEBOUNCE,
 )
-from .runtime_data import OpenEPaperLinkConfigEntry
+from .coordinator import OpenEPaperLinkConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -5,9 +5,9 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
@@ -44,10 +44,9 @@ from .const import (
     SIGNAL_TAG_INTERACTION,
 )
 
-if TYPE_CHECKING:
-    from .runtime_data import OpenEPaperLinkConfigEntry
-
 _LOGGER = logging.getLogger(__name__)
+
+type OpenEPaperLinkConfigEntry = ConfigEntry[APCoordinator]
 
 # Wake-up reasons surfaced as event entity events. The firmware defines exactly
 # two button reasons, so this is the complete set; the pre-4.0 integration

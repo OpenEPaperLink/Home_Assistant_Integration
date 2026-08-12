@@ -8,9 +8,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 from oepl import OEPLError
 
-from .coordinator import APCoordinator
+from .coordinator import APCoordinator, OpenEPaperLinkConfigEntry
 from .entity import OpenEPaperLinkTagEntity
-from .runtime_data import OpenEPaperLinkConfigEntry
 
 PARALLEL_UPDATES = 0
 

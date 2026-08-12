@@ -14,9 +14,8 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import APCoordinator
+from .coordinator import APCoordinator, OpenEPaperLinkConfigEntry
 from .entity import OpenEPaperLinkAPEntity
-from .runtime_data import OpenEPaperLinkConfigEntry
 
 PARALLEL_UPDATES = 1
 

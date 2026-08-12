@@ -16,9 +16,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from oepl import OEPLError
 
 from .const import DOMAIN
-from .coordinator import APCoordinator
+from .coordinator import APCoordinator, OpenEPaperLinkConfigEntry
 from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
-from .runtime_data import OpenEPaperLinkConfigEntry
 
 PARALLEL_UPDATES = 1
 

@@ -9,9 +9,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import CONF_HOST, SIGNAL_ENTRIES_CHANGED
-from .coordinator import APCoordinator
+from .coordinator import APCoordinator, OpenEPaperLinkConfigEntry
 from .migration import async_migrate_entry_data, async_migrate_registries
-from .runtime_data import OpenEPaperLinkConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
