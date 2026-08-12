@@ -301,7 +301,9 @@ async def test_migration_is_idempotent(hass: HomeAssistant) -> None:
 
     async_migrate_registries(hass, entry)
 
-    assert {e.entity_id: e.unique_id for e in ent_reg.entities.values()} == first_entities
+    assert {
+        e.entity_id: e.unique_id for e in ent_reg.entities.values()
+    } == first_entities
     assert {d.id: d.identifiers for d in dev_reg.devices.values()} == first_devices
 
 

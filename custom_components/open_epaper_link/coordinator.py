@@ -66,9 +66,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
 
     config_entry: OpenEPaperLinkConfigEntry
 
-    def __init__(
-        self, hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry
-    ) -> None:
+    def __init__(self, hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry) -> None:
         """Set up the coordinator without contacting the AP."""
         super().__init__(
             hass,
@@ -125,7 +123,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
             raise ConfigEntryNotReady(
                 translation_domain=DOMAIN,
                 translation_key="ap_cannot_connect",
-                translation_placeholders={"host": self.host},
+                translation_placeholders={"host": self.host, "error": str(err)},
             ) from err
 
         self.async_set_updated_data(self._visible_tags(tags))
@@ -301,9 +299,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
                 _LOGGER.warning("Could not load tag type 0x%02X: %s", hw_type, err)
                 return None
             if self._tag_types[hw_type] is None:
-                _LOGGER.warning(
-                    "AP has no tag type definition for 0x%02X", hw_type
-                )
+                _LOGGER.warning("AP has no tag type definition for 0x%02X", hw_type)
         return self._tag_types[hw_type]
 
 

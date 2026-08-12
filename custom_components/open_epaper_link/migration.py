@@ -72,9 +72,7 @@ def _removed_sensor_key(unique_id: str) -> bool:
 
 
 @callback
-def async_migrate_entry_data(
-    hass: HomeAssistant, entry, ap_mac: str | None
-) -> None:
+def async_migrate_entry_data(hass: HomeAssistant, entry, ap_mac: str | None) -> None:
     """Bring a config entry's stored data up to the 4.0 shape."""
     data = dict(entry.data)
     unique_id = entry.unique_id
@@ -131,9 +129,10 @@ def _async_migrate_entities(hass: HomeAssistant, entry) -> None:
         if new_unique_id == record.unique_id:
             continue
 
-        if registry.async_get_entity_id(
-            record.domain, DOMAIN, new_unique_id
-        ) not in (None, record.entity_id):
+        if registry.async_get_entity_id(record.domain, DOMAIN, new_unique_id) not in (
+            None,
+            record.entity_id,
+        ):
             _LOGGER.warning(
                 "Skipping migration of %s: unique_id %s is already taken",
                 record.entity_id,
