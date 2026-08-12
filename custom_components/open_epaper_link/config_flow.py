@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 import voluptuous as vol
+from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from homeassistant.config_entries import (
     ConfigFlow,
@@ -24,7 +25,13 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from oepl import OEPLClient, OEPLError
-from py_atc_ble_oepl import MANUFACTURER_ID, AdvertisingData, ATCProtocol
+from py_atc_ble_oepl import (
+    MANUFACTURER_ID,
+    AdvertisingData,
+    ATCDevice,
+    ATCError,
+    ATCProtocol,
+)
 
 from .const import (
     CONF_AP_MAC,
@@ -95,12 +102,11 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         # ignored, which is what keying on the host string used to prevent.
         self._abort_if_unique_id_configured(updates={CONF_HOST: discovery_info.ip})
 
-        probed = await self._async_probe(discovery_info.ip)
-        if probed is None:
-            return self.async_abort(reason="cannot_connect")
-
+        # Deliberately no probe here: the announcement already carries the MAC
+        # this entry is keyed on, and an Access Point that is briefly busy
+        # should still be offered rather than silently dropped. Reachability is
+        # verified when the user confirms.
         self._host = discovery_info.ip
-        _, self._alias = probed
         self.context["title_placeholders"] = {"name": self._title()}
         return await self.async_step_discovery_confirm()
 
@@ -129,18 +135,25 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_discovery_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Confirm adding a discovered AP."""
+        """Confirm adding a discovered AP, verifying it answers first."""
         assert self._host is not None
-        if user_input is not None:
-            return self.async_create_entry(
-                title=self._title(),
-                data={CONF_HOST: self._host, CONF_AP_MAC: self.unique_id},
-            )
+        errors: dict[str, str] = {}
 
-        self._set_confirm_only()
+        if user_input is not None:
+            probed = await self._async_probe(self._host)
+            if probed is None:
+                errors["base"] = "cannot_connect"
+            else:
+                _, self._alias = probed
+                return self.async_create_entry(
+                    title=self._title(),
+                    data={CONF_HOST: self._host, CONF_AP_MAC: self.unique_id},
+                )
+
         return self.async_show_form(
             step_id="discovery_confirm",
             description_placeholders={"name": self._title(), "host": self._host},
+            errors=errors,
         )
 
     # ------------------------------------------------------------------
@@ -231,27 +244,46 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_bluetooth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Confirm adding a discovered tag.
+        """Confirm adding a discovered tag, verifying it answers first.
 
-        No interrogation happens here. These are battery devices that are
-        usually asleep, so connecting would often fail and would cost the tag
-        a wake-up just to add it.
+        Discovery itself never connects -- it happens unprompted and would
+        cost a sleeping tag a wake-up. Confirming is a deliberate act, so one
+        connection here is worth it to fail now rather than at first upload.
         """
         assert self._atc_address is not None
-        if user_input is not None:
-            return self.async_create_entry(
-                title=self._atc_name or self._atc_address,
-                data={CONF_MAC_ADDRESS: self._atc_address},
-            )
+        errors: dict[str, str] = {}
 
-        self._set_confirm_only()
+        if user_input is not None:
+            if await self._async_probe_atc(self._atc_address):
+                return self.async_create_entry(
+                    title=self._atc_name or self._atc_address,
+                    data={CONF_MAC_ADDRESS: self._atc_address},
+                )
+            errors["base"] = "cannot_connect"
+
         return self.async_show_form(
             step_id="bluetooth_confirm",
             description_placeholders={
                 "name": self._atc_name or self._atc_address,
                 "address": self._atc_address,
             },
+            errors=errors,
         )
+
+    async def _async_probe_atc(self, address: str) -> bool:
+        """Return whether the tag at *address* can be reached right now."""
+        ble_device = bluetooth.async_ble_device_from_address(
+            self.hass, address, connectable=True
+        )
+        if ble_device is None:
+            _LOGGER.debug("No connectable device for %s", address)
+            return False
+        try:
+            async with ATCDevice(address, ble_device=ble_device):
+                return True
+        except ATCError as err:
+            _LOGGER.debug("Could not reach tag %s: %s", address, err)
+            return False
 
     @staticmethod
     @callback

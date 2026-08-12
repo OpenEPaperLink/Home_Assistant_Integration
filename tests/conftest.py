@@ -276,3 +276,28 @@ def mock_bluetooth_registration() -> Generator[None]:
         patch(f"{module}.async_address_present", return_value=True),
     ):
         yield
+
+
+@pytest.fixture
+def mock_atc_reachable() -> Generator[MagicMock]:
+    """A tag that answers when the config flow verifies it."""
+    device = MagicMock()
+    device.__aenter__ = AsyncMock(return_value=device)
+    device.__aexit__ = AsyncMock(return_value=False)
+    module = "custom_components.open_epaper_link.config_flow"
+    with (
+        patch(
+            f"{module}.bluetooth.async_ble_device_from_address",
+            return_value=MagicMock(),
+        ),
+        patch(f"{module}.ATCDevice", return_value=device),
+    ):
+        yield device
+
+
+@pytest.fixture
+def mock_atc_unreachable() -> Generator[None]:
+    """A tag that is asleep or out of range."""
+    module = "custom_components.open_epaper_link.config_flow"
+    with patch(f"{module}.bluetooth.async_ble_device_from_address", return_value=None):
+        yield

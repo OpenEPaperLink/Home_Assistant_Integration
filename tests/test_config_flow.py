@@ -6,7 +6,7 @@ had none at all.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
@@ -108,15 +108,23 @@ async def test_dhcp_updates_moved_ap(hass: HomeAssistant, mock_ap: AsyncMock) ->
     assert entry.data[CONF_HOST] == AP_HOST
 
 
-async def test_dhcp_unreachable(
+async def test_dhcp_offers_a_busy_ap_and_verifies_on_confirm(
     hass: HomeAssistant, mock_unreachable_ap: AsyncMock
 ) -> None:
-    """A discovery we cannot probe is abandoned rather than half-added."""
+    """Discovery does not probe, so a briefly busy AP is still offered.
+
+    Reachability is checked when the user commits, which is also where an
+    error can actually be shown to them.
+    """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_DHCP}, data=DHCP_INFO
     )
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "cannot_connect"
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "discovery_confirm"
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "cannot_connect"}
 
 
 # ---------------------------------------------------------------------------
@@ -242,7 +250,7 @@ def _atc_service_info(name: str = "") -> BluetoothServiceInfoBleak:
 
 
 async def test_bluetooth_discovery(
-    hass: HomeAssistant, mock_setup_entry: AsyncMock
+    hass: HomeAssistant, mock_setup_entry: AsyncMock, mock_atc_reachable: AsyncMock
 ) -> None:
     """A discovered ATC tag is added without connecting to it."""
     result = await hass.config_entries.flow.async_init(
@@ -292,3 +300,51 @@ async def test_bluetooth_rejects_non_atc_devices(hass: HomeAssistant) -> None:
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "not_supported"
+
+
+async def test_bluetooth_confirm_rejects_an_unreachable_tag(
+    hass: HomeAssistant, mock_atc_unreachable: None
+) -> None:
+    """A tag that cannot be reached is not added.
+
+    Discovery deliberately does not connect, so this is the first and only
+    point at which the tag is proven to answer; without it an unreachable tag
+    would be added silently and only fail at the first upload.
+    """
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=_atc_service_info()
+    )
+    assert result["step_id"] == "bluetooth_confirm"
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "cannot_connect"}
+
+
+async def test_bluetooth_confirm_recovers_after_a_retry(
+    hass: HomeAssistant, mock_setup_entry: AsyncMock
+) -> None:
+    """A tag that wakes up on the second attempt can still be added."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=_atc_service_info()
+    )
+
+    module = "custom_components.open_epaper_link.config_flow"
+    with patch(f"{module}.bluetooth.async_ble_device_from_address", return_value=None):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["errors"] == {"base": "cannot_connect"}
+
+    device = MagicMock()
+    device.__aenter__ = AsyncMock(return_value=device)
+    device.__aexit__ = AsyncMock(return_value=False)
+    with (
+        patch(
+            f"{module}.bluetooth.async_ble_device_from_address",
+            return_value=MagicMock(),
+        ),
+        patch(f"{module}.ATCDevice", return_value=device),
+    ):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"] == {CONF_MAC_ADDRESS: ATC_ADDRESS}
