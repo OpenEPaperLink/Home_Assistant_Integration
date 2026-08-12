@@ -7,11 +7,13 @@ import logging
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.typing import ConfigType
 
 from .atc_coordinator import ATCConfigEntry, ATCCoordinator, ATCRuntimeData
 from .const import CONF_HOST, CONF_MAC_ADDRESS, SIGNAL_ENTRIES_CHANGED
 from .coordinator import APConfigEntry, APCoordinator
 from .migration import async_migrate_entry_data, async_migrate_registries
+from .services import async_register_services
 
 type OpenEPaperLinkConfigEntry = APConfigEntry | ATCConfigEntry
 
@@ -39,6 +41,12 @@ def _is_ap_entry(entry: OpenEPaperLinkConfigEntry) -> bool:
     discriminator -- see migration.py for why the stored one was dropped.
     """
     return CONF_HOST in entry.data
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:  # noqa: ARG001
+    """Register actions, which exist independently of any config entry."""
+    async_register_services(hass)
+    return True
 
 
 async def async_setup_entry(

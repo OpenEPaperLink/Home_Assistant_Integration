@@ -322,6 +322,15 @@
     },
     "tag_command_failed": {
       "message": "The Access Point rejected the command for this tag: {error}."
+    },
+    "path_not_allowed": {
+      "message": "{path} is not in an allowed directory. Add it to allowlist_external_dirs in your configuration."
+    },
+    "unknown_tag_type": {
+      "message": "The Access Point has no tag type definition for {mac}, so its display size is unknown."
+    },
+    "no_tags_targeted": {
+      "message": "No OpenEPaperLink tags were targeted."
     }
   }
 }

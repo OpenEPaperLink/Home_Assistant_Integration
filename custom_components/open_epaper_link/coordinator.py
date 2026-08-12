@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
@@ -20,9 +20,11 @@ from homeassistant.helpers.dispatcher import (
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 from oepl import (
+    LUT,
     APConfig,
     APInfo,
     APStatus,
+    LEDPattern,
     OEPLClient,
     OEPLError,
     Tag,
@@ -43,6 +45,10 @@ from .const import (
     SIGNAL_ENTRIES_CHANGED,
     SIGNAL_TAG_INTERACTION,
 )
+
+if TYPE_CHECKING:
+    from epaper_dithering import ColorScheme, DitherMode
+    from PIL.Image import Image
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -296,6 +302,49 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         try:
             await self.client.send_tag_cmd(mac, command)
         except OEPLError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="tag_command_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+
+    async def async_upload_image(
+        self,
+        mac: str,
+        image: Image,
+        *,
+        ttl: int = 0,
+        lut: LUT | None = None,
+        dither_mode: DitherMode | None = None,
+        color_scheme: ColorScheme | None = None,
+    ) -> None:
+        """Render *image* on a tag.
+
+        Dithering happens client-side, so py-oepl tells the Access Point not
+        to dither again.
+        """
+        try:
+            await self.client.upload_image(
+                mac,
+                image,
+                ttl=ttl,
+                lut=lut,
+                dither_mode=dither_mode,
+                color_scheme=color_scheme,
+                content_mode=25,
+            )
+        except OEPLError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="tag_command_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+
+    async def async_set_led(self, mac: str, pattern: LEDPattern) -> None:
+        """Flash a tag's LED."""
+        try:
+            await self.client.set_led(mac, pattern)
+        except (OEPLError, ValueError) as err:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="tag_command_failed",
