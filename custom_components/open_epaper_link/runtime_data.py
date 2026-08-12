@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
@@ -22,7 +22,6 @@ class ATCRuntimeData:
     name: str
     coordinator: ATCCoordinator
     advertising: AdvertisingData | None = None
-    extra: dict[str, object] = field(default_factory=dict)
 
 
 type OpenEPaperLinkConfigEntry = ConfigEntry[APCoordinator | ATCRuntimeData]

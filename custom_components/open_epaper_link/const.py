@@ -17,7 +17,6 @@ CONF_DEVICE_TYPE: Final = "device_type"
 OPT_BLACKLISTED_TAGS: Final = "blacklisted_tags"
 OPT_BUTTON_DEBOUNCE: Final = "button_debounce"
 OPT_NFC_DEBOUNCE: Final = "nfc_debounce"
-OPT_CUSTOM_FONT_DIRS: Final = "custom_font_dirs"
 
 DEFAULT_BUTTON_DEBOUNCE: Final = 0.5
 DEFAULT_NFC_DEBOUNCE: Final = 1.0

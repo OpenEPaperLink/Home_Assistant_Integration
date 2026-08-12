@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
@@ -71,7 +71,8 @@ def _removed_sensor_key(unique_id: str) -> bool:
     return any(unique_id.endswith(f"_{key}") for key in REMOVED_SENSOR_KEYS)
 
 
-async def async_migrate_entry_data(
+@callback
+def async_migrate_entry_data(
     hass: HomeAssistant, entry, ap_mac: str | None
 ) -> None:
     """Bring a config entry's stored data up to the 4.0 shape."""
@@ -106,7 +107,8 @@ async def async_migrate_entry_data(
     _LOGGER.debug("Migrated config entry data for %s", entry.entry_id)
 
 
-async def async_migrate_registries(hass: HomeAssistant, entry) -> None:
+@callback
+def async_migrate_registries(hass: HomeAssistant, entry) -> None:
     """Rewrite this entry's entity and device registry rows.
 
     Only rows belonging to *entry* are touched.

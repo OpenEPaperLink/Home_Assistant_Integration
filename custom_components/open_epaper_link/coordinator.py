@@ -26,6 +26,8 @@ from oepl import (
 from .const import (
     CONF_AP_MAC,
     CONF_HOST,
+    DEFAULT_BUTTON_DEBOUNCE,
+    DEFAULT_NFC_DEBOUNCE,
     DOMAIN,
     OPT_BLACKLISTED_TAGS,
     OPT_BUTTON_DEBOUNCE,
@@ -84,7 +86,6 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         self.online = False
 
         self._tag_types: dict[int, TagType | None] = {}
-        self._known_tags: set[str] = set()
         self._last_trigger: dict[tuple[str, str], datetime] = {}
         self._unsubs: list[Any] = []
 
@@ -102,9 +103,9 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         """Return the debounce window for a trigger type."""
         options = self.config_entry.options
         if trigger_type == "nfc":
-            seconds = options.get(OPT_NFC_DEBOUNCE, 1.0)
+            seconds = options.get(OPT_NFC_DEBOUNCE, DEFAULT_NFC_DEBOUNCE)
         else:
-            seconds = options.get(OPT_BUTTON_DEBOUNCE, 0.5)
+            seconds = options.get(OPT_BUTTON_DEBOUNCE, DEFAULT_BUTTON_DEBOUNCE)
         return timedelta(seconds=float(seconds))
 
     # ------------------------------------------------------------------
@@ -201,8 +202,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         previous = self.data.get(tag.mac)
         self.data[tag.mac] = tag
 
-        if previous is None and tag.mac not in self._known_tags:
-            self._known_tags.add(tag.mac)
+        if previous is None:
             _LOGGER.debug("Discovered tag %s", tag.mac)
 
         if previous is not None and previous.alias != tag.alias:

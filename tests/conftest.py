@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
-from unittest.mock import patch
-
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -20,23 +17,13 @@ AP_MAC = "aa:bb:cc:dd:ee:ff"
 
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(
-    enable_custom_integrations: None,
+    enable_custom_integrations: None,  # noqa: ARG001
 ) -> None:
     """Load custom_components/ in every test.
 
     Without this the integration is invisible to the test hass instance.
     """
     return
-
-
-@pytest.fixture
-def mock_setup_entry() -> Generator[None]:
-    """Stop config flow tests from actually setting the integration up."""
-    with patch(
-        "custom_components.open_epaper_link.async_setup_entry",
-        return_value=True,
-    ):
-        yield
 
 
 @pytest.fixture

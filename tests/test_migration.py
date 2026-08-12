@@ -93,7 +93,7 @@ async def test_entry_rekeyed_from_host_to_mac(hass: HomeAssistant) -> None:
     )
     entry.add_to_hass(hass)
 
-    await async_migrate_entry_data(hass, entry, ap_mac=AP_MAC)
+    async_migrate_entry_data(hass, entry, ap_mac=AP_MAC)
 
     assert entry.unique_id == dr.format_mac(AP_MAC)
     assert entry.data["host"] == AP_HOST
@@ -116,7 +116,7 @@ async def test_obsolete_discriminators_are_dropped(hass: HomeAssistant) -> None:
     )
     entry.add_to_hass(hass)
 
-    await async_migrate_entry_data(hass, entry, ap_mac=None)
+    async_migrate_entry_data(hass, entry, ap_mac=None)
 
     assert "device_type" not in entry.data
     assert "protocol_type" not in entry.data
@@ -134,7 +134,7 @@ async def test_atc_entry_keeps_its_own_identity(hass: HomeAssistant) -> None:
     )
     entry.add_to_hass(hass)
 
-    await async_migrate_entry_data(hass, entry, ap_mac=AP_MAC)
+    async_migrate_entry_data(hass, entry, ap_mac=AP_MAC)
 
     assert entry.unique_id == ATC_MAC
     assert "ap_mac" not in entry.data
@@ -151,7 +151,7 @@ async def test_entry_rekey_is_idempotent(hass: HomeAssistant) -> None:
     )
     entry.add_to_hass(hass)
 
-    await async_migrate_entry_data(hass, entry, ap_mac=AP_MAC)
+    async_migrate_entry_data(hass, entry, ap_mac=AP_MAC)
 
     assert entry.unique_id == dr.format_mac(AP_MAC)
     assert entry.data["host"] == AP_HOST
@@ -175,7 +175,7 @@ async def test_entities_are_rekeyed_not_orphaned(hass: HomeAssistant) -> None:
         "sensor", DOMAIN, f"{ENTRY_ID}_ap_state", config_entry=entry
     )
 
-    await async_migrate_registries(hass, entry)
+    async_migrate_registries(hass, entry)
 
     assert registry.async_get(temperature.entity_id).unique_id == (
         f"{ENTRY_ID}_{TAG}_temperature"
@@ -199,7 +199,7 @@ async def test_removed_sensors_are_deleted(hass: HomeAssistant) -> None:
         "sensor", DOMAIN, f"{TAG}_update_count", config_entry=entry
     )
 
-    await async_migrate_registries(hass, entry)
+    async_migrate_registries(hass, entry)
 
     for entity in stale:
         assert registry.async_get(entity.entity_id) is None
@@ -229,7 +229,7 @@ async def test_entity_ids_are_left_alone(hass: HomeAssistant) -> None:
     original_entity_id = entity.entity_id
     assert original_entity_id == f"sensor.{TAG.lower()}_temperature"
 
-    await async_migrate_registries(hass, entry)
+    async_migrate_registries(hass, entry)
 
     migrated = registry.async_get(original_entity_id)
     assert migrated is not None
@@ -253,7 +253,7 @@ async def test_device_identifiers_are_entry_scoped(hass: HomeAssistant) -> None:
         config_entry_id=entry.entry_id, identifiers={(DOMAIN, TAG)}, name="Tag"
     )
 
-    await async_migrate_registries(hass, entry)
+    async_migrate_registries(hass, entry)
 
     assert registry.async_get(ap.id).identifiers == {(DOMAIN, f"{ENTRY_ID}_ap")}
     assert registry.async_get(tag.id).identifiers == {(DOMAIN, f"{ENTRY_ID}_{TAG}")}
@@ -276,7 +276,7 @@ async def test_via_device_link_survives(hass: HomeAssistant) -> None:
     )
     assert registry.async_get(tag.id).via_device_id == ap.id
 
-    await async_migrate_registries(hass, entry)
+    async_migrate_registries(hass, entry)
 
     assert registry.async_get(tag.id).via_device_id == registry.async_get(ap.id).id
 
@@ -295,11 +295,11 @@ async def test_migration_is_idempotent(hass: HomeAssistant) -> None:
         config_entry_id=entry.entry_id, identifiers={(DOMAIN, TAG)}, name="Tag"
     )
 
-    await async_migrate_registries(hass, entry)
+    async_migrate_registries(hass, entry)
     first_entities = {e.entity_id: e.unique_id for e in ent_reg.entities.values()}
     first_devices = {d.id: d.identifiers for d in dev_reg.devices.values()}
 
-    await async_migrate_registries(hass, entry)
+    async_migrate_registries(hass, entry)
 
     assert {e.entity_id: e.unique_id for e in ent_reg.entities.values()} == first_entities
     assert {d.id: d.identifiers for d in dev_reg.devices.values()} == first_devices
@@ -317,6 +317,6 @@ async def test_other_integrations_untouched(hass: HomeAssistant) -> None:
         "sensor", "other", f"{TAG}_temperature", config_entry=other
     )
 
-    await async_migrate_registries(hass, entry)
+    async_migrate_registries(hass, entry)
 
     assert registry.async_get(foreign.entity_id).unique_id == f"{TAG}_temperature"
