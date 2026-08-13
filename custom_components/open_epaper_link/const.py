@@ -40,3 +40,17 @@ SIGNAL_ENTRIES_CHANGED: Final = f"{DOMAIN}_entries_changed"
 REMOVED_SENSOR_KEYS: Final = frozenset(
     {"runtime", "boot_count", "checkin_count", "block_requests"}
 )
+
+# Battery percentage scale. Full is the point the M2 family stops measuring:
+# it reports exactly 2600 mV when full or better, and the Access Point's own
+# web interface renders that as "at least 2.6 V".
+#
+# This is knowingly approximate on other hardware, which reports true voltage
+# past 3100 mV, so a nearly flat M3 reads higher than it should. Scaling per
+# tag needs a measurement range that nothing publishes: the firmware only
+# forwards batteryMv, the tag types do not describe it, and learning it from
+# observation would make the reading depend on what this Home Assistant
+# instance happened to see. Use battery_low, which comes from the firmware's
+# own threshold, when the answer has to be right.
+BATTERY_EMPTY_MV: Final = 2200
+BATTERY_FULL_MV: Final = 2600

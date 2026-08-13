@@ -27,6 +27,7 @@ from oepl.enums import enum_label
 
 from .atc_coordinator import ATCConfigEntry, ATCRuntimeData
 from .atc_sensor import ATC_SENSORS, ATCSensor
+from .const import BATTERY_EMPTY_MV, BATTERY_FULL_MV
 from .coordinator import APConfigEntry, APCoordinator
 from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
 
@@ -50,16 +51,19 @@ class APSensorDescription(SensorEntityDescription):
 def _battery_percentage(tag: Tag) -> float | None:
     """Estimate charge from cell voltage.
 
-    A coin cell sits near 3.0 V for most of its life and falls off a cliff, so
-    this is a rough indicator rather than a measurement. Tags with no usable
-    reading report a sentinel rather than a voltage, which py-oepl knows
-    about; treating it as a measurement showed a flat battery on a tag that
-    simply had nothing to report.
+    A rough indicator rather than a measurement: a coin cell holds a nearly
+    flat voltage for most of its life and then falls off a cliff.
+
+    Approximate, and knowingly so on hardware that measures past 2.6 V -- see
+    BATTERY_FULL_MV. Tags with no usable reading report a sentinel rather than
+    a voltage, which py-oepl recognises; treating it as one showed a flat
+    battery on a tag that had nothing to report.
     """
     if not tag.has_battery_reading:
         return None
-    volts = tag.battery_mv / 1000
-    return round(max(0.0, min(100.0, (volts - 2.2) / (3.0 - 2.2) * 100)), 1)
+    span = BATTERY_FULL_MV - BATTERY_EMPTY_MV
+    fraction = (tag.battery_mv - BATTERY_EMPTY_MV) / span
+    return round(max(0.0, min(100.0, fraction * 100)), 1)
 
 
 TAG_SENSORS: tuple[TagSensorDescription, ...] = (
@@ -77,13 +81,6 @@ TAG_SENSORS: tuple[TagSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.MILLIVOLT,
         entity_registry_enabled_default=False,
         value_fn=lambda tag: tag.battery_mv if tag.has_battery_reading else None,
-    ),
-    TagSensorDescription(
-        key="battery_percentage",
-        device_class=SensorDeviceClass.BATTERY,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=PERCENTAGE,
-        value_fn=_battery_percentage,
     ),
     TagSensorDescription(
         key="lqi",
@@ -295,6 +292,7 @@ async def async_setup_entry(
                 for mac in new
                 for description in TAG_GEOMETRY_SENSORS
             )
+            async_add_entities(TagBatterySensor(coordinator, mac) for mac in new)
 
     _async_add_new_tags()
     entry.async_on_unload(coordinator.async_add_listener(_async_add_new_tags))
@@ -374,3 +372,23 @@ class APHostSensor(OpenEPaperLinkAPEntity, SensorEntity):
     def native_value(self) -> str:
         """Return the current host."""
         return self.coordinator.host
+
+
+class TagBatterySensor(OpenEPaperLinkTagEntity, SensorEntity):
+    """Estimated charge, scaled to what this tag can actually report."""
+
+    _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = PERCENTAGE
+
+    def __init__(self, coordinator: APCoordinator, mac: str) -> None:
+        """Set up the sensor."""
+        super().__init__(coordinator, mac, "battery_percentage")
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the estimated charge."""
+        tag = self.tag
+        if tag is None:
+            return None
+        return _battery_percentage(tag)

@@ -66,4 +66,21 @@ def test_battery_sentinel_is_not_a_flat_battery() -> None:
 
     assert _battery_percentage(make_tag("AA", batteryMv=1337)) is None
     assert _battery_percentage(make_tag("AA", batteryMv=0)) is None
-    assert _battery_percentage(make_tag("AA", batteryMv=2600)) == 50.0
+
+
+def test_battery_curve_is_full_at_the_measurement_ceiling() -> None:
+    """Full is 2.6 V, where the M2 family stops measuring.
+
+    The pre-4.0 docstring claimed 3.0 V, but its arithmetic put 100% at 2.6 V,
+    and eight of the nineteen tags on the test Access Point sit at exactly
+    2600 mV. Taking the docstring at its word rated them at 50%.
+    """
+    from custom_components.open_epaper_link.sensor import _battery_percentage
+
+    from .conftest import make_tag
+
+    assert _battery_percentage(make_tag("AA", batteryMv=2200)) == 0.0
+    assert _battery_percentage(make_tag("AA", batteryMv=2400)) == 50.0
+    assert _battery_percentage(make_tag("AA", batteryMv=2600)) == 100.0
+    # Hardware that measures higher is clamped rather than exceeding 100%.
+    assert _battery_percentage(make_tag("AA", batteryMv=3106)) == 100.0
