@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from functools import partial
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service import async_extract_entity_ids
 from odl_renderer import generate_image
 from oepl import LUT, Color, LEDPattern, LEDSegment, TagCommand, TagType
+from PIL.Image import Image
 
 from .const import DOMAIN, OPT_CUSTOM_FONT_DIRS
 from .coordinator import APCoordinator
@@ -289,7 +291,7 @@ async def _async_targets(
     device_registry = dr.async_get(hass)
 
     device_ids = set(call.data.get("device_id") or [])
-    for entity_id in await async_extract_entity_ids(hass, call):
+    for entity_id in await async_extract_entity_ids(call):
         if (record := entity_registry.async_get(entity_id)) and record.device_id:
             device_ids.add(record.device_id)
 
@@ -380,6 +382,10 @@ async def _async_drawcustom(call: ServiceCall) -> None:
             ),
         )
 
+        # Shown on the tag's image entity either way, so a dry run is a
+        # preview rather than a silent no-op.
+        coordinator.async_set_preview(mac, _to_png(image))
+
         if dry_run:
             _LOGGER.debug("Dry run: rendered %sx%s for %s", width, height, mac)
             continue
@@ -392,6 +398,17 @@ async def _async_drawcustom(call: ServiceCall) -> None:
             dither_mode=call.data["dither"],
             color_scheme=_color_scheme(tag_type),
         )
+
+
+def _to_png(image: Image) -> bytes:
+    """Encode a rendered image for the image entity.
+
+    PNG rather than JPEG: these are flat-colour e-paper images, where JPEG
+    ringing is both visible and larger.
+    """
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 def _led_pattern(data: dict[str, Any]) -> LEDPattern:

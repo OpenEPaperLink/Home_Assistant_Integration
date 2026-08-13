@@ -101,3 +101,38 @@ async def test_ap_and_atc_entries_coexist(
     assert ap_config_entry.state is ConfigEntryState.LOADED
     assert atc_config_entry.state is ConfigEntryState.LOADED
     assert atc_config_entry.data[CONF_MAC_ADDRESS] == ATC_ADDRESS
+
+
+async def test_image_entity_is_empty_until_something_is_drawn(
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry
+) -> None:
+    """An ATC tag cannot be read back, so there is nothing to show at first.
+
+    An Access Point serves the tag's current framebuffer; Bluetooth offers no
+    equivalent, so the only picture available is one we drew ourselves.
+    """
+    atc_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(atc_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        "image", DOMAIN, f"{atc_config_entry.entry_id}_content"
+    )
+    assert entity_id is not None
+    assert atc_config_entry.runtime_data.coordinator.rendered is None
+
+
+async def test_image_entity_shows_what_was_drawn(
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry
+) -> None:
+    """Once an image is drawn it becomes the entity's content."""
+    atc_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(atc_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = atc_config_entry.runtime_data.coordinator
+    coordinator.async_set_rendered(b"\x89PNG-pretend")
+    await hass.async_block_till_done()
+
+    assert coordinator.rendered == b"\x89PNG-pretend"

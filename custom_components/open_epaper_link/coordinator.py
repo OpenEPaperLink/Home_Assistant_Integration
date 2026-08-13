@@ -98,6 +98,9 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         self.online = False
 
         self._tag_types: dict[int, TagType | None] = {}
+        # Last image we rendered for a tag, kept until the tag reports having
+        # rendered something itself.
+        self._previews: dict[str, bytes] = {}
         self._last_trigger: dict[tuple[str, str], datetime] = {}
         self._unsubs: list[Any] = []
 
@@ -239,6 +242,9 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         if previous is None:
             _LOGGER.debug("Discovered tag %s", tag.mac)
 
+        if previous is not None and previous.hash != tag.hash:
+            self._async_clear_preview(tag.mac)
+
         if previous is not None and previous.alias != tag.alias:
             self._async_sync_device_name(tag)
 
@@ -307,6 +313,27 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
                 translation_key="tag_command_failed",
                 translation_placeholders={"error": str(err)},
             ) from err
+
+    @callback
+    def async_set_preview(self, mac: str, image: bytes) -> None:
+        """Remember an image we rendered, and show it straight away.
+
+        A tag takes a while to check in and render, and a dry run never sends
+        anything at all, so without this the image entity would show a stale
+        picture or nothing.
+        """
+        self._previews[mac] = image
+        self.async_update_listeners()
+
+    @callback
+    def preview(self, mac: str) -> bytes | None:
+        """Return the last image we rendered for *mac*, if it still applies."""
+        return self._previews.get(mac)
+
+    @callback
+    def _async_clear_preview(self, mac: str) -> None:
+        """Drop a preview once the tag has rendered something itself."""
+        self._previews.pop(mac, None)
 
     async def async_upload_image(
         self,

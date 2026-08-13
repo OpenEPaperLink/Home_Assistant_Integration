@@ -60,15 +60,51 @@ def test_config_flow_results_are_resolvable() -> None:
 
 
 def test_raised_translation_keys_exist() -> None:
-    """Every translation_key raised by the integration must have a string."""
+    """Every translation_key raised as an error must have a string.
+
+    Matched via translation_domain, which entity descriptions do not carry,
+    so entity translation keys are not caught by this.
+    """
     defined = _flatten(STRINGS)
+    pattern = re.compile(
+        r"translation_domain=DOMAIN,\s*\n\s*translation_key=\"([a-z_]+)\""
+    )
 
     for path in COMPONENT.glob("*.py"):
-        source = path.read_text()
-        for key in re.findall(r'translation_key="([a-z_]+)"', source):
+        for key in pattern.findall(path.read_text()):
             assert f"exceptions.{key}.message" in defined, (
                 f"{path.name} raises undefined translation_key: {key}"
             )
+
+
+def test_entity_translation_keys_exist() -> None:
+    """Every entity translation key must resolve, or entities show raw keys."""
+    defined = _flatten(STRINGS)
+    pattern = re.compile(r'translation_key="([a-z_0-9]+)"')
+    # Exception raises use the same keyword, so remove them first.
+    exceptions = re.compile(
+        r"translation_domain=DOMAIN,\s*\n\s*translation_key=\"[a-z_]+\""
+    )
+
+    platforms = {
+        "sensor": ("sensor.py", "atc_sensor.py"),
+        "button": ("button.py",),
+        "switch": ("switch.py",),
+        "select": ("select.py",),
+        "text": ("text.py",),
+        "image": ("image.py", "atc_image.py"),
+        "event": ("event.py",),
+    }
+    for platform, filenames in platforms.items():
+        for filename in filenames:
+            path = COMPONENT / filename
+            if not path.exists():
+                continue
+            source = exceptions.sub("", path.read_text())
+            for key in pattern.findall(source):
+                assert any(
+                    entry.startswith(f"entity.{platform}.{key}") for entry in defined
+                ), f"{filename} uses undefined entity key: {platform}.{key}"
 
 
 def test_abort_reasons_used_by_helpers_exist() -> None:

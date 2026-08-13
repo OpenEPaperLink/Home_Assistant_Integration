@@ -161,6 +161,9 @@ def mock_client() -> Generator[AsyncMock]:
                 "set_ap_config_item",
                 "send_tag_cmd",
                 "reboot_ap",
+                "upload_image",
+                "set_led",
+                "set_alias",
             ):
                 setattr(instance, name, AsyncMock())
             instance.get_sysinfo.return_value = APInfo.from_dict(

@@ -64,6 +64,16 @@ class ATCCoordinator(PassiveBluetoothDataUpdateCoordinator):
             connectable=True,
         )
         self.data: ATCUpdate | None = None
+        # ATC tags cannot be read back the way an Access Point serves
+        # /current/<mac>.raw, so the only picture we can show is the one we
+        # last drew.
+        self.rendered: bytes | None = None
+
+    @callback
+    def async_set_rendered(self, image: bytes) -> None:
+        """Remember the image last drawn for this tag."""
+        self.rendered = image
+        self.async_update_listeners()
 
     @callback
     @override

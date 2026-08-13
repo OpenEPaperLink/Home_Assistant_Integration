@@ -8,6 +8,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 from oepl import OEPLError
 
+from .atc_coordinator import ATCConfigEntry, ATCRuntimeData
+from .atc_image import ATCImage
 from .coordinator import APConfigEntry, APCoordinator
 from .entity import OpenEPaperLinkTagEntity
 
@@ -15,11 +17,17 @@ PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,  # noqa: ARG001  (signature fixed by Home Assistant)
-    entry: APConfigEntry,
+    hass: HomeAssistant,
+    entry: APConfigEntry | ATCConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up an image entity per tag."""
+    """Set up an image entity per tag, or one for an ATC tag."""
+    if isinstance(entry.runtime_data, ATCRuntimeData):
+        async_add_entities(
+            [ATCImage(hass, entry.runtime_data.coordinator, entry.entry_id)]
+        )
+        return
+
     coordinator = entry.runtime_data
     known: set[str] = set()
 
@@ -63,6 +71,11 @@ class TagImage(OpenEPaperLinkTagEntity, ImageEntity):
         tag = self.tag
         if tag is None:
             return None
+
+        # An image we just rendered wins until the tag reports rendering it,
+        # which is what makes a dry run visible.
+        if (preview := self.coordinator.preview(self._mac)) is not None:
+            return preview
         if self._cached is not None and self._cached_hash == tag.hash:
             return self._cached
 

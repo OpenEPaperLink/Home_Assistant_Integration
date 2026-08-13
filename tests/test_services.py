@@ -27,7 +27,7 @@ from custom_components.open_epaper_link.services import (
     async_register_services,
 )
 
-from .conftest import TAG_MAC
+from .conftest import TAG_MAC, make_tag
 
 PAYLOAD = [{"type": "text", "value": "Hello", "x": 0, "y": 0}]
 
@@ -330,3 +330,122 @@ async def test_targeting_nothing_is_an_error(
         await hass.services.async_call(
             DOMAIN, "clear_pending", {"device_id": ["nonexistent"]}, blocking=True
         )
+
+
+# ---------------------------------------------------------------------------
+# drawcustom against a real entry
+# ---------------------------------------------------------------------------
+
+
+def _text_payload() -> list[dict]:
+    """A payload simple enough to render without fonts or network access."""
+    return [{"type": "rectangle", "x_start": 0, "y_start": 0, "x_end": 10, "y_end": 10}]
+
+
+async def _draw(hass: HomeAssistant, device_id: str, **extra: object) -> None:
+    """Call drawcustom against one device."""
+    await hass.services.async_call(
+        DOMAIN,
+        "drawcustom",
+        {"device_id": [device_id], "payload": _text_payload(), **extra},
+        blocking=True,
+    )
+
+
+async def test_dry_run_renders_without_uploading(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """A dry run must not send anything to the tag."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    )
+    await _draw(hass, device.id, **{"dry-run": True})
+
+    mock_client.upload_image.assert_not_awaited()
+
+
+async def test_dry_run_shows_the_result_on_the_image_entity(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """Otherwise a dry run would be indistinguishable from doing nothing."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = ap_config_entry.runtime_data
+    assert coordinator.preview(TAG_MAC) is None
+
+    device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    )
+    await _draw(hass, device.id, **{"dry-run": True})
+
+    preview = coordinator.preview(TAG_MAC)
+    assert preview is not None
+    assert preview.startswith(b"\x89PNG")
+
+
+async def test_a_real_call_uploads_and_previews(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """A normal call both sends the image and shows it immediately.
+
+    The tag takes a while to check in and render, so without the preview the
+    entity would show the previous picture until it did.
+    """
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    )
+    await _draw(hass, device.id)
+
+    mock_client.upload_image.assert_awaited_once()
+    assert ap_config_entry.runtime_data.preview(TAG_MAC) is not None
+
+
+async def test_preview_is_dropped_once_the_tag_renders(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """The tag's own picture wins as soon as it reports a new image hash."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = ap_config_entry.runtime_data
+    device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    )
+    await _draw(hass, device.id, **{"dry-run": True})
+    assert coordinator.preview(TAG_MAC) is not None
+
+    coordinator._handle_tag_update(make_tag(TAG_MAC, hash="a-different-hash"))
+    await hass.async_block_till_done()
+
+    assert coordinator.preview(TAG_MAC) is None
+
+
+async def test_upload_uses_the_tags_own_palette(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """Dithering targets what the tag can render, not a fixed assumption."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    )
+    await _draw(hass, device.id, dither="floyd_steinberg")
+
+    kwargs = mock_client.upload_image.await_args.kwargs
+    assert kwargs["dither_mode"] is DitherMode.FLOYD_STEINBERG
+    # The fixture's tag type has no colour table beyond black and white.
+    assert kwargs["color_scheme"] is ColorScheme.MONO
+    assert kwargs["lut"] is LUT.DEFAULT

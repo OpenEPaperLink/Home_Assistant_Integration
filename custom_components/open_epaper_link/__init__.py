@@ -20,6 +20,7 @@ type OpenEPaperLinkConfigEntry = APConfigEntry | ATCConfigEntry
 _LOGGER = logging.getLogger(__name__)
 
 ATC_PLATFORMS: list[Platform] = [
+    Platform.IMAGE,
     Platform.SENSOR,
 ]
 
