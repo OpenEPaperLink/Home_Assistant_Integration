@@ -6,6 +6,8 @@ old calls must keep working. These pin the coercion.
 
 from __future__ import annotations
 
+import json
+from base64 import b64decode
 from pathlib import Path
 
 import pytest
@@ -449,3 +451,97 @@ async def test_upload_uses_the_tags_own_palette(
     # The fixture's tag type has no colour table beyond black and white.
     assert kwargs["color_scheme"] is ColorScheme.MONO
     assert kwargs["lut"] is LUT.DEFAULT
+
+
+async def test_drawcustom_returns_the_rendered_image(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """A script can reuse what was drawn, rather than only sending it."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    )
+    response = await hass.services.async_call(
+        DOMAIN,
+        "drawcustom",
+        {"device_id": [device.id], "payload": _text_payload()},
+        blocking=True,
+        return_response=True,
+    )
+
+    [rendered] = response["images"]
+    assert rendered["mac"] == TAG_MAC
+    assert rendered["mime_type"] == "image/png"
+    # The fixture's tag type is 296x128 and unrotated.
+    assert (rendered["width"], rendered["height"]) == (296, 128)
+    assert b64decode(rendered["image_base64"]).startswith(b"\x89PNG")
+
+
+async def test_response_survives_being_json(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """Service responses cross a JSON boundary, so raw bytes would not do."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    )
+    response = await hass.services.async_call(
+        DOMAIN,
+        "drawcustom",
+        {"device_id": [device.id], "payload": _text_payload()},
+        blocking=True,
+        return_response=True,
+    )
+
+    json.dumps(response)
+
+
+async def test_calls_without_return_response_still_work(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """Existing automations do not ask for a response and must keep working."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    )
+    assert (
+        await hass.services.async_call(
+            DOMAIN,
+            "drawcustom",
+            {"device_id": [device.id], "payload": _text_payload()},
+            blocking=True,
+        )
+        is None
+    )
+
+
+async def test_dry_run_still_returns_the_image(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """Rendering without sending is exactly when the result is most useful."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    )
+    response = await hass.services.async_call(
+        DOMAIN,
+        "drawcustom",
+        {"device_id": [device.id], "payload": _text_payload(), "dry-run": True},
+        blocking=True,
+        return_response=True,
+    )
+
+    assert len(response["images"]) == 1
+    mock_client.upload_image.assert_not_awaited()

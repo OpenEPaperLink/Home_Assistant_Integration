@@ -13,6 +13,7 @@ the pre-4.0 call shape and coerce it.
 from __future__ import annotations
 
 import logging
+from base64 import b64encode
 from datetime import datetime
 from functools import partial
 from io import BytesIO
@@ -21,7 +22,13 @@ from typing import Any
 
 import voluptuous as vol
 from epaper_dithering import ColorScheme, DitherMode
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+    callback,
+)
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
@@ -343,14 +350,21 @@ async def _async_target_tags(
 # ---------------------------------------------------------------------------
 
 
-async def _async_drawcustom(call: ServiceCall) -> None:
-    """Render a payload and send it to each targeted tag."""
+async def _async_drawcustom(call: ServiceCall) -> ServiceResponse:
+    """Render a payload and send it to each targeted tag.
+
+    Returns what was rendered, so a script can reuse it -- notify with it,
+    save it, or compare runs. Encoded as base64 rather than raw bytes because
+    a service response has to survive being JSON, and a template can turn
+    base64 straight into a data URI.
+    """
     hass = call.hass
     elements = call.data["payload"]
     _validate_local_paths(hass, elements)
 
     rotate: int = call.data["rotate"]
     dry_run = call.data.get("dry-run", call.data.get("dry_run", False))
+    rendered: list[dict[str, Any]] = []
 
     for coordinator, mac in await _async_target_tags(hass, call):
         tag_type = coordinator.tag_type(mac)
@@ -384,7 +398,17 @@ async def _async_drawcustom(call: ServiceCall) -> None:
 
         # Shown on the tag's image entity either way, so a dry run is a
         # preview rather than a silent no-op.
-        coordinator.async_set_preview(mac, _to_png(image))
+        png = _to_png(image)
+        coordinator.async_set_preview(mac, png)
+        rendered.append(
+            {
+                "mac": mac,
+                "width": image.width,
+                "height": image.height,
+                "mime_type": "image/png",
+                "image_base64": b64encode(png).decode("ascii"),
+            }
+        )
 
         if dry_run:
             _LOGGER.debug("Dry run: rendered %sx%s for %s", width, height, mac)
@@ -398,6 +422,8 @@ async def _async_drawcustom(call: ServiceCall) -> None:
             dither_mode=call.data["dither"],
             color_scheme=_color_scheme(tag_type),
         )
+
+    return {"images": rendered}
 
 
 def _to_png(image: Image) -> bytes:
@@ -472,7 +498,13 @@ async def _async_refresh_tag_types(call: ServiceCall) -> None:
 def async_register_services(hass: HomeAssistant) -> None:
     """Register the integration's actions."""
     hass.services.async_register(
-        DOMAIN, "drawcustom", _async_drawcustom, schema=SCHEMA_DRAWCUSTOM
+        DOMAIN,
+        "drawcustom",
+        _async_drawcustom,
+        schema=SCHEMA_DRAWCUSTOM,
+        # Optional rather than only: existing automations call this without
+        # asking for a response, and must keep working.
+        supports_response=SupportsResponse.OPTIONAL,
     )
     hass.services.async_register(DOMAIN, "setled", _async_setled, schema=SCHEMA_SETLED)
 
