@@ -331,6 +331,9 @@
     },
     "no_tags_targeted": {
       "message": "No OpenEPaperLink tags were targeted."
+    },
+    "no_led_segments": {
+      "message": "No LED colour groups were enabled; set a flash count above zero for at least one."
     }
   }
 }

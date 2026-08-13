@@ -5,10 +5,9 @@ no Home Assistant coupling of its own. What stays here is the part that
 genuinely needs Home Assistant: recorder history for plots, font locations and
 path validation.
 
-``drawcustom`` payloads are large, hand-written YAML living in people's
-automations, so unlike the rest of this rewrite the action keeps accepting the
-pre-4.0 call shape and coerces it. Legacy numeric values, the hyphenated
-``dry-run`` key and keys that no longer apply are all handled.
+``drawcustom`` and ``setled`` payloads are hand-written YAML living in people's
+automations, so unlike the rest of this rewrite these actions keep accepting
+the pre-4.0 call shape and coerce it.
 """
 
 from __future__ import annotations
@@ -29,25 +28,42 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service import async_extract_entity_ids
 from odl_renderer import generate_image
-from oepl import LUT, Color, LEDPattern, LEDSegment, TagType
+from oepl import LUT, Color, LEDPattern, LEDSegment, TagCommand, TagType
 
 from .const import DOMAIN, OPT_CUSTOM_FONT_DIRS
 from .coordinator import APCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-SERVICE_DRAWCUSTOM = "drawcustom"
-SERVICE_SETLED = "setled"
+# Commands that act on a single tag. Each was also a service before 4.0 and
+# stays one, because automations call them.
+TAG_COMMAND_SERVICES = {
+    "clear_pending": TagCommand.CLEAR,
+    "force_refresh": TagCommand.REFRESH,
+    "reboot_tag": TagCommand.REBOOT,
+    "scan_channels": TagCommand.SCAN,
+}
+
+_TARGET_FIELDS = {
+    vol.Optional("entity_id", default=[]): cv.entity_ids_or_uuids,
+    vol.Optional("device_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
+    vol.Optional("area_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
+    vol.Optional("label_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
+}
+
+
+# ---------------------------------------------------------------------------
+# Value coercion
+# ---------------------------------------------------------------------------
 
 
 def _refresh_type(value: Any) -> LUT:
     """Accept refresh names and the pre-4.0 numeric values.
 
-    The old numbers meant something different from what their labels implied:
-    "0" was labelled Full and stored the value that forces a full waveform on
-    every update. An explicit old value keeps its old meaning, but the default
-    is now the adaptive mode, which refreshes cheaply and promotes to one full
-    refresh nightly.
+    The old numbers meant something other than their labels implied: "0" was
+    labelled Full and stores the value that forces a full waveform on every
+    update. An explicit old value keeps its old meaning; only the default
+    changes.
     """
     legacy = {
         "0": LUT.NO_REPEAT,  # was labelled "Full"
@@ -62,20 +78,18 @@ def _refresh_type(value: Any) -> LUT:
         "fast_no_red": LUT.FAST_NO_REDS,
     }
     text = str(value).strip().lower()
-    if text in legacy:
-        return legacy[text]
-    if text in names:
-        return names[text]
+    # Checked against None rather than truthiness: LUT.DEFAULT is 0.
+    if (result := legacy.get(text, names.get(text))) is not None:
+        return result
     raise vol.Invalid(f"Invalid refresh_type: {value}")
 
 
 def _dither(value: Any) -> DitherMode:
     """Accept any epaper-dithering mode name, and the pre-4.0 numbers.
 
-    Dithering is done here rather than on the Access Point, so the full set of
-    algorithms is available instead of the three the Access Point offers. The
-    old numeric values named the Access Point's own options, so they map onto
-    the equivalent modes.
+    Dithering is done here rather than on the Access Point, so the whole set
+    of algorithms is available instead of the three it offers. The old numbers
+    named those three.
     """
     legacy = {"0": DitherMode.NONE, "1": DitherMode.BURKES, "2": DitherMode.ORDERED}
     text = str(value).strip().lower()
@@ -84,33 +98,54 @@ def _dither(value: Any) -> DitherMode:
     try:
         return DitherMode[text.upper()]
     except KeyError:
-        pass
-    raise vol.Invalid(
-        f"Invalid dither: {value}. Expected one of: "
-        + ", ".join(mode.name.lower() for mode in DitherMode)
-    )
+        raise vol.Invalid(
+            f"Invalid dither: {value}. Expected one of "
+            + ", ".join(mode.name.lower() for mode in DitherMode)
+        ) from None
 
 
 def _color_scheme(tag_type: TagType) -> ColorScheme:
     """Return the palette to dither for, from the tag's colour table."""
     table = tag_type.color_table or {}
-    has_red = "red" in table
-    has_yellow = "yellow" in table
-    if has_red and has_yellow:
-        return ColorScheme.BWRY
-    if has_red:
-        return ColorScheme.BWR
-    if has_yellow:
-        return ColorScheme.BWY
-    return ColorScheme.MONO
+    match "red" in table, "yellow" in table:
+        case True, True:
+            return ColorScheme.BWRY
+        case True, False:
+            return ColorScheme.BWR
+        case False, True:
+            return ColorScheme.BWY
+        case _:
+            return ColorScheme.MONO
+
+
+def _accent_color(tag_type: TagType) -> str:
+    """Return the colour odl-renderer should draw accents in.
+
+    A two-colour tag has no accent, so black is the only honest answer.
+    """
+    table = tag_type.color_table or {}
+    return next((name for name in ("red", "yellow") if name in table), "black")
+
+
+_RGB = vol.All(cv.ensure_list, [vol.All(vol.Coerce(int), vol.Range(min=0, max=255))])
+_SECONDS = vol.All(vol.Coerce(float), vol.Range(min=0, max=25.5))
+_FLASH_SPEED = vol.All(vol.Coerce(float), vol.Range(min=0, max=1.5))
+_FLASH_COUNT = vol.All(vol.Coerce(int), vol.Range(min=0, max=15))
+
+
+def _led_segment_fields(index: int, color: list[int], delay: float) -> dict:
+    """Return the schema fields for one of the three LED groups."""
+    return {
+        vol.Optional(f"color{index}", default=color): _RGB,
+        vol.Optional(f"flash_speed{index}", default=0.2): _FLASH_SPEED,
+        vol.Optional(f"flash_count{index}", default=2): _FLASH_COUNT,
+        vol.Optional(f"delay{index}", default=delay): _SECONDS,
+    }
 
 
 SCHEMA_DRAWCUSTOM = vol.Schema(
     {
-        vol.Optional("entity_id", default=[]): cv.entity_ids_or_uuids,
-        vol.Optional("device_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
-        vol.Optional("area_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
-        vol.Optional("label_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
+        **_TARGET_FIELDS,
         vol.Required("payload"): vol.All(cv.ensure_list, [dict]),
         vol.Optional("background", default="white"): cv.string,
         vol.Optional("rotate", default=0): vol.All(
@@ -120,39 +155,34 @@ SCHEMA_DRAWCUSTOM = vol.Schema(
         vol.Optional("ttl", default=60): vol.All(vol.Coerce(int), vol.Range(min=0)),
         vol.Optional("refresh_type", default="adaptive"): _refresh_type,
         # Hyphenated, as the pre-4.0 action defined it.
-        vol.Optional("dry-run", default=False): cv.boolean,
-        vol.Optional("dry_run", default=False): cv.boolean,
+        vol.Optional("dry-run"): cv.boolean,
+        vol.Optional("dry_run"): cv.boolean,
     },
-    # Silently drop keys that no longer apply, such as preload_type and
-    # preload_lut, rather than failing a call that used to work.
+    # Drop keys that no longer apply, such as preload_type, rather than
+    # failing a call that used to work.
     extra=vol.REMOVE_EXTRA,
 )
 
 SCHEMA_SETLED = vol.Schema(
     {
-        vol.Optional("entity_id", default=[]): cv.entity_ids_or_uuids,
-        vol.Optional("device_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
-        vol.Optional("area_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
-        vol.Optional("label_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
+        **_TARGET_FIELDS,
         vol.Optional("mode", default="flash"): vol.In(["off", "flash"]),
-        vol.Optional("brightness", default=2): vol.All(
+        vol.Optional("brightness", default=1): vol.All(
             vol.Coerce(int), vol.Range(min=1, max=16)
         ),
         vol.Optional("repeats", default=2): vol.All(
             vol.Coerce(int), vol.Range(min=1, max=256)
         ),
-        vol.Optional("color1", default=[255, 0, 0]): vol.All(
-            cv.ensure_list, [vol.All(vol.Coerce(int), vol.Range(min=0, max=255))]
-        ),
-        vol.Optional("flash_speed1", default=0.2): vol.All(
-            vol.Coerce(float), vol.Range(min=0, max=1.5)
-        ),
-        vol.Optional("flash_count1", default=2): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=15)
-        ),
+        # Three groups, as the pre-4.0 action had. A group with no flashes is
+        # skipped, which is how it documented turning one off.
+        **_led_segment_fields(1, [255, 0, 0], 0.1),
+        **_led_segment_fields(2, [0, 255, 0], 0.1),
+        **_led_segment_fields(3, [0, 0, 255], 0.0),
     },
     extra=vol.REMOVE_EXTRA,
 )
+
+SCHEMA_TARGET_ONLY = vol.Schema(_TARGET_FIELDS, extra=vol.REMOVE_EXTRA)
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +205,8 @@ class HADataProvider:
         self, entity_ids: list[str], start: datetime, end: datetime
     ) -> dict[str, list[dict[str, Any]]]:
         """Return state history for *entity_ids* between *start* and *end*."""
+        # Imported here because recorder is an after_dependency: it may not be
+        # loaded, and only the plot element needs it.
         from homeassistant.components.recorder import get_instance
         from homeassistant.components.recorder.history import get_significant_states
 
@@ -240,57 +272,63 @@ def _validate_local_paths(hass: HomeAssistant, elements: list[dict[str, Any]]) -
             )
 
 
-def _accent_color(tag_type: TagType) -> str:
-    """Return the tag's third colour, which odl-renderer draws accents in."""
-    table = tag_type.color_table or {}
-    return next((name for name in ("red", "yellow") if name in table), "red")
-
-
 # ---------------------------------------------------------------------------
 # Targeting
 # ---------------------------------------------------------------------------
 
 
-@callback
-def _async_targeted_tags(
+async def _async_targets(
     hass: HomeAssistant, call: ServiceCall
-) -> list[tuple[APCoordinator, str]]:
-    """Resolve everything the call targets to (coordinator, MAC) pairs.
+) -> list[tuple[APCoordinator, str | None]]:
+    """Resolve what a call targets to (coordinator, MAC) pairs.
 
-    Home Assistant expands areas and labels for us, which the pre-4.0 code did
-    by hand.
+    A MAC of None means the Access Point itself. Home Assistant expands areas
+    and labels for us, which the pre-4.0 code did by hand.
     """
     entity_registry = er.async_get(hass)
-    device_ids: set[str] = set(call.data.get("device_id") or [])
+    device_registry = dr.async_get(hass)
 
-    for entity_id in async_extract_entity_ids(hass, call):
+    device_ids = set(call.data.get("device_id") or [])
+    for entity_id in await async_extract_entity_ids(hass, call):
         if (record := entity_registry.async_get(entity_id)) and record.device_id:
             device_ids.add(record.device_id)
 
-    device_registry = dr.async_get(hass)
-    tags: list[tuple[APCoordinator, str]] = []
-    seen: set[tuple[str, str]] = set()
+    targets: list[tuple[APCoordinator, str | None]] = []
+    seen: set[str] = set()
 
     for device_id in device_ids:
         device = device_registry.async_get(device_id)
         if device is None:
             continue
-        for entry_id in device.config_entries:
-            entry = hass.config_entries.async_get_entry(entry_id)
-            if entry is None or entry.domain != DOMAIN:
+        for domain, value in device.identifiers:
+            if domain != DOMAIN or value in seen:
                 continue
-            coordinator = getattr(entry, "runtime_data", None)
+            # Identifiers are "{entry_id}_ap" or "{entry_id}_{mac}", and entry
+            # ids are ULIDs, so the first underscore is the separator.
+            entry_id, _, suffix = value.partition("_")
+            entry = hass.config_entries.async_get_entry(entry_id)
+            coordinator = getattr(entry, "runtime_data", None) if entry else None
             if not isinstance(coordinator, APCoordinator):
                 continue
-            prefix = f"{entry_id}_"
-            for domain, value in device.identifiers:
-                if domain != DOMAIN or not value.startswith(prefix):
-                    continue
-                mac = value.removeprefix(prefix)
-                if mac in coordinator.data and (entry_id, mac) not in seen:
-                    seen.add((entry_id, mac))
-                    tags.append((coordinator, mac))
+            seen.add(value)
+            targets.append((coordinator, None if suffix == "ap" else suffix))
 
+    if not targets:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="no_tags_targeted"
+        )
+    return targets
+
+
+async def _async_target_tags(
+    hass: HomeAssistant, call: ServiceCall
+) -> list[tuple[APCoordinator, str]]:
+    """Resolve what a call targets, rejecting anything that is not a tag."""
+    tags = [
+        (coordinator, mac)
+        for coordinator, mac in await _async_targets(hass, call)
+        if mac is not None and mac in coordinator.data
+    ]
     if not tags:
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="no_tags_targeted"
@@ -310,9 +348,9 @@ async def _async_drawcustom(call: ServiceCall) -> None:
     _validate_local_paths(hass, elements)
 
     rotate: int = call.data["rotate"]
-    dry_run: bool = call.data["dry-run"] or call.data["dry_run"]
+    dry_run = call.data.get("dry-run", call.data.get("dry_run", False))
 
-    for coordinator, mac in _async_targeted_tags(hass, call):
+    for coordinator, mac in await _async_target_tags(hass, call):
         tag_type = coordinator.tag_type(mac)
         if tag_type is None:
             raise HomeAssistantError(
@@ -323,8 +361,7 @@ async def _async_drawcustom(call: ServiceCall) -> None:
 
         width, height = tag_type.width, tag_type.height
         # The tag applies rotation itself and fits the result to its pixel
-        # grid, so matching the canvas aspect keeps that fit a no-op rather
-        # than a rescale.
+        # grid, so matching the canvas aspect keeps that fit a no-op.
         if (int(coordinator.data[mac].rotate) * 90 + rotate) % 360 in (90, 270):
             width, height = height, width
 
@@ -357,34 +394,82 @@ async def _async_drawcustom(call: ServiceCall) -> None:
         )
 
 
-async def _async_setled(call: ServiceCall) -> None:
-    """Flash a tag's LED."""
-    if call.data["mode"] == "off":
-        pattern = LEDPattern.off()
-    else:
-        red, green, blue = ([*call.data["color1"], 0, 0, 0])[:3]
-        pattern = LEDPattern(
-            segments=[
-                LEDSegment(
-                    color=Color(red, green, blue),
-                    flash_speed=call.data["flash_speed1"],
-                    flash_count=call.data["flash_count1"],
-                )
-            ],
-            repeats=call.data["repeats"],
-            brightness=call.data["brightness"],
-        )
+def _led_pattern(data: dict[str, Any]) -> LEDPattern:
+    """Build an LED pattern from a setled call."""
+    if data["mode"] == "off":
+        return LEDPattern.off()
 
-    for coordinator, mac in _async_targeted_tags(call.hass, call):
+    segments = [
+        LEDSegment(
+            color=Color(*[*data[f"color{i}"], 0, 0, 0][:3]),
+            flash_speed=data[f"flash_speed{i}"],
+            flash_count=data[f"flash_count{i}"],
+            delay=data[f"delay{i}"],
+        )
+        for i in (1, 2, 3)
+        # A group with no flashes is skipped, as the pre-4.0 action documented.
+        if data[f"flash_count{i}"] > 0
+    ]
+    if not segments:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="no_led_segments"
+        )
+    return LEDPattern(
+        segments=segments, repeats=data["repeats"], brightness=data["brightness"]
+    )
+
+
+async def _async_setled(call: ServiceCall) -> None:
+    """Set a tag's LED pattern."""
+    pattern = _led_pattern(call.data)
+    for coordinator, mac in await _async_target_tags(call.hass, call):
         await coordinator.async_set_led(mac, pattern)
+
+
+def _make_tag_command_handler(command: TagCommand):
+    """Return a handler that sends *command* to every targeted tag."""
+
+    async def handler(call: ServiceCall) -> None:
+        for coordinator, mac in await _async_target_tags(call.hass, call):
+            await coordinator.async_send_tag_command(mac, command)
+
+    return handler
+
+
+async def _async_reboot_ap(call: ServiceCall) -> None:
+    """Reboot every targeted Access Point."""
+    for coordinator, _ in await _async_targets(call.hass, call):
+        await coordinator.async_reboot_ap()
+
+
+async def _async_refresh_tag_types(call: ServiceCall) -> None:
+    """Reload tag type definitions from the Access Point.
+
+    Useful after it downloads a definition it did not previously hold.
+    """
+    for coordinator, _ in await _async_targets(call.hass, call):
+        await coordinator.async_refresh_tag_types()
 
 
 @callback
 def async_register_services(hass: HomeAssistant) -> None:
     """Register the integration's actions."""
     hass.services.async_register(
-        DOMAIN, SERVICE_DRAWCUSTOM, _async_drawcustom, schema=SCHEMA_DRAWCUSTOM
+        DOMAIN, "drawcustom", _async_drawcustom, schema=SCHEMA_DRAWCUSTOM
+    )
+    hass.services.async_register(DOMAIN, "setled", _async_setled, schema=SCHEMA_SETLED)
+
+    for name, command in TAG_COMMAND_SERVICES.items():
+        hass.services.async_register(
+            DOMAIN, name, _make_tag_command_handler(command), schema=SCHEMA_TARGET_ONLY
+        )
+
+    hass.services.async_register(
+        DOMAIN, "reboot_ap", _async_reboot_ap, schema=SCHEMA_TARGET_ONLY
     )
     hass.services.async_register(
-        DOMAIN, SERVICE_SETLED, _async_setled, schema=SCHEMA_SETLED
+        DOMAIN,
+        "refresh_tag_types",
+        _async_refresh_tag_types,
+        schema=SCHEMA_TARGET_ONLY,
     )

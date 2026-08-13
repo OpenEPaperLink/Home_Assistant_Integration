@@ -466,6 +466,12 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
                 _LOGGER.warning("AP has no tag type definition for 0x%02X", hw_type)
         return self._tag_types[hw_type]
 
+    async def async_refresh_tag_types(self) -> None:
+        """Drop the cached tag types and reload them from the Access Point."""
+        self._tag_types.clear()
+        await self._async_prefetch_tag_types(self.data.values())
+        self.async_update_listeners()
+
     async def _async_prefetch_tag_types(self, tags: Iterable[Tag]) -> None:
         """Load the tag type for every distinct hardware type in *tags*."""
         for hw_type in {tag.hw_type for tag in tags}:

@@ -6,15 +6,28 @@ old calls must keep working. These pin the coercion.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import voluptuous as vol
+import yaml
 from epaper_dithering import ColorScheme, DitherMode
-from oepl import LUT, TagType
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
+from oepl import LUT, LEDPattern, TagType
 
+from custom_components.open_epaper_link.const import DOMAIN
 from custom_components.open_epaper_link.services import (
     SCHEMA_DRAWCUSTOM,
+    SCHEMA_SETLED,
     _color_scheme,
+    _led_pattern,
+    async_register_services,
 )
+
+from .conftest import TAG_MAC
 
 PAYLOAD = [{"type": "text", "value": "Hello", "x": 0, "y": 0}]
 
@@ -160,3 +173,160 @@ def test_color_scheme_from_the_tag_type(
         },
     )
     assert _color_scheme(tag_type) is expected
+
+
+# ---------------------------------------------------------------------------
+# setled, which has three colour groups
+# ---------------------------------------------------------------------------
+
+
+def _setled(**overrides: object) -> dict:
+    """Validate a setled call, as Home Assistant would."""
+    return SCHEMA_SETLED(dict(overrides))
+
+
+def test_all_three_led_groups_survive() -> None:
+    """A three-colour call must not lose groups two and three.
+
+    They were silently dropped at one point, which is worse than failing.
+    """
+    pattern = _led_pattern(
+        _setled(
+            color1=[255, 0, 0],
+            color2=[0, 255, 0],
+            color3=[0, 0, 255],
+        )
+    )
+    assert len(pattern.segments) == 3
+    assert [(s.color.r, s.color.g, s.color.b) for s in pattern.segments] == [
+        (255, 0, 0),
+        (0, 255, 0),
+        (0, 0, 255),
+    ]
+
+
+def test_a_group_with_no_flashes_is_skipped() -> None:
+    """That is how the pre-4.0 action documented turning a group off."""
+    pattern = _led_pattern(_setled(flash_count2=0, flash_count3=0))
+    assert len(pattern.segments) == 1
+
+
+def test_setled_off_mode() -> None:
+    """Off stops the pattern rather than flashing anything."""
+    assert _led_pattern(_setled(mode="off")).encode() == LEDPattern.off().encode()
+
+
+def test_setled_rejects_an_empty_pattern() -> None:
+    """Silently sending nothing would look like the action failed."""
+    with pytest.raises(ServiceValidationError):
+        _led_pattern(_setled(flash_count1=0, flash_count2=0, flash_count3=0))
+
+
+def test_led_delays_are_carried_through() -> None:
+    """Delay between groups is part of the pattern, not decoration."""
+    pattern = _led_pattern(_setled(delay1=1.5))
+    assert pattern.segments[0].delay == 1.5
+
+
+# ---------------------------------------------------------------------------
+# Registration
+# ---------------------------------------------------------------------------
+
+
+async def test_every_declared_service_is_registered(hass: HomeAssistant) -> None:
+    """services.yaml and the registered actions must not drift apart.
+
+    They did: the file declared eight actions while only two were registered,
+    so six of them appeared in the UI and failed when called.
+    """
+    async_register_services(hass)
+    await hass.async_block_till_done()
+
+    declared = yaml.safe_load(
+        (Path("custom_components/open_epaper_link/services.yaml")).read_text()
+    )
+    registered = set(hass.services.async_services_for_domain(DOMAIN))
+    assert set(declared) == registered
+
+
+# ---------------------------------------------------------------------------
+# Targeting
+# ---------------------------------------------------------------------------
+
+
+async def test_targeting_a_tag_device(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """Actions target tags as devices, which is how a tag is picked in the UI.
+
+    Restricting the target to entities would make you choose one of a tag's
+    sensors to redraw the whole display.
+    """
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    )
+    assert device is not None
+
+    await hass.services.async_call(
+        DOMAIN, "clear_pending", {"device_id": [device.id]}, blocking=True
+    )
+
+    mock_client.send_tag_cmd.assert_awaited_once()
+    assert mock_client.send_tag_cmd.await_args.args[0] == TAG_MAC
+
+
+async def test_targeting_an_entity_resolves_to_its_tag(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """Targeting an entity still works, and resolves to the tag behind it."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}_temperature"
+    )
+
+    await hass.services.async_call(
+        DOMAIN, "force_refresh", {"entity_id": [entity_id]}, blocking=True
+    )
+
+    mock_client.send_tag_cmd.assert_awaited_once()
+    assert mock_client.send_tag_cmd.await_args.args[0] == TAG_MAC
+
+
+async def test_targeting_the_access_point_device(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """Access Point actions target the Access Point's own device."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_ap")}
+    )
+
+    await hass.services.async_call(
+        DOMAIN, "reboot_ap", {"device_id": [device.id]}, blocking=True
+    )
+
+    mock_client.reboot_ap.assert_awaited_once()
+
+
+async def test_targeting_nothing_is_an_error(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """A call that resolves to no tags should say so, not silently do nothing."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN, "clear_pending", {"device_id": ["nonexistent"]}, blocking=True
+        )
