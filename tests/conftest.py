@@ -171,6 +171,13 @@ def mock_client() -> Generator[AsyncMock]:
             )
             instance.get_tag_type.return_value = make_tag_type()
             instance.get_ap_config.return_value = make_ap_config()
+            # Uploads go through client.tag(mac), which validates the image
+            # against the tag's native resolution before sending. The handle
+            # shares the client's upload mock so assertions can stay on
+            # mock_client.upload_image, with the mac available via tag().
+            instance.tag = MagicMock(
+                return_value=MagicMock(upload_image=instance.upload_image)
+            )
             for name in (
                 "on_tag_update",
                 "on_ap_status",

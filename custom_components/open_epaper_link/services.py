@@ -375,16 +375,12 @@ async def _async_drawcustom(call: ServiceCall) -> ServiceResponse:
                 translation_placeholders={"mac": mac},
             )
 
+        # Always the panel's native size. The Access Point does not scale:
+        # spr2color() in makeimage.cpp sizes its output buffer from the
+        # uploaded image's own dimensions, so any other size indexes outside
+        # the sprite and renders as noise. py-oepl says the same, and enforces
+        # it on the tag handle used below.
         width, height = tag_type.width, tag_type.height
-        # Rotation replaces rather than accumulates: web.cpp assigns the
-        # uploaded value to taginfo->rotate, which contentmanager.cpp then
-        # reads back as imageParams.rotate. So the rotation in effect is the
-        # one being sent, or the tag's existing setting when none is.
-        effective = coordinator.data[mac].rotate.degrees if rotate is None else rotate
-        # The tag applies that rotation itself and fits the result to its
-        # pixel grid, so matching the canvas aspect keeps the fit a no-op.
-        if effective % 360 in (90, 270):
-            width, height = height, width
 
         image = await generate_image(
             width=width,

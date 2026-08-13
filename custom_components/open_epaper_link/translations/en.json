@@ -351,6 +351,9 @@
     },
     "no_led_segments": {
       "message": "No LED colour groups were enabled; set a flash count above zero for at least one."
+    },
+    "image_size_mismatch": {
+      "message": "The image for tag {mac} does not match the size its display expects, so the Access Point would render it as noise: {error}"
     }
   },
   "selector": {

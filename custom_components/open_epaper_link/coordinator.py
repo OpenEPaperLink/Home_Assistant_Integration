@@ -353,15 +353,21 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         Dithering happens client-side, so py-oepl tells the Access Point not
         to dither again.
 
+        This goes through the tag handle rather than the client's own
+        ``upload_image``, because the handle checks the image against the tag
+        type's native resolution first. The Access Point does no scaling, so a
+        mismatched image renders as noise rather than failing -- an exception
+        here is much easier to diagnose than a garbled tag.
+
         A *rotate* value is persistent: ``web.cpp`` assigns it straight to
         ``taginfo->rotate``, so it replaces whatever the tag was configured
         with rather than applying for this image alone. Pass None to leave
         that setting untouched.
         """
         try:
-            await self.client.upload_image(
-                mac,
+            await self.client.tag(mac).upload_image(
                 image,
+                fit="strict",
                 ttl=ttl,
                 lut=lut,
                 dither_mode=dither_mode,
@@ -369,6 +375,12 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
                 rotate=rotate,
                 content_mode=ContentMode.HOME_ASSISTANT,
             )
+        except ValueError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="image_size_mismatch",
+                translation_placeholders={"mac": mac, "error": str(err)},
+            ) from err
         except OEPLError as err:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
