@@ -12,6 +12,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 COMPONENT = Path("custom_components/open_epaper_link")
 STRINGS = json.loads((COMPONENT / "strings.json").read_text())
@@ -113,3 +114,47 @@ def test_abort_reasons_used_by_helpers_exist() -> None:
     # _abort_if_unique_id_configured and async_update_reload_and_abort use these.
     assert "config.abort.already_configured" in defined
     assert "config.abort.reconfigure_successful" in defined
+
+
+def test_every_service_has_strings() -> None:
+    """Actions need a name and description, or the UI shows raw keys."""
+    declared = yaml.safe_load((COMPONENT / "services.yaml").read_text())
+    described = STRINGS["services"]
+
+    assert set(declared) == set(described)
+    for name, spec in described.items():
+        assert spec.get("name"), f"{name} has no name"
+        assert spec.get("description"), f"{name} has no description"
+
+
+def test_every_service_field_has_strings() -> None:
+    """Every field offered in the UI needs a label."""
+    declared = yaml.safe_load((COMPONENT / "services.yaml").read_text())
+
+    for name, spec in declared.items():
+        fields = set((spec or {}).get("fields") or {})
+        described = set(STRINGS["services"][name].get("fields") or {})
+        assert fields <= described, (
+            f"{name} is missing strings for {fields - described}"
+        )
+        assert described <= fields, (
+            f"{name} describes unknown fields {described - fields}"
+        )
+
+
+def test_selector_options_are_translated() -> None:
+    """A select in an action shows its raw values without these."""
+    declared = yaml.safe_load((COMPONENT / "services.yaml").read_text())
+
+    for name, spec in declared.items():
+        for field, field_spec in ((spec or {}).get("fields") or {}).items():
+            selector = (field_spec or {}).get("selector") or {}
+            select = selector.get("select") or {}
+            key = select.get("translation_key")
+            if key is None:
+                continue
+            options = set(select.get("options") or [])
+            translated = set(STRINGS["selector"][key]["options"])
+            assert options == translated, (
+                f"{name}.{field} options do not match selector.{key}"
+            )

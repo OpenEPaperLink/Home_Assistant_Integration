@@ -335,5 +335,161 @@
     "no_led_segments": {
       "message": "No LED colour groups were enabled; set a flash count above zero for at least one."
     }
+  },
+  "selector": {
+    "dither": {
+      "options": {
+        "none": "None",
+        "burkes": "Burkes",
+        "ordered": "Ordered",
+        "floyd_steinberg": "Floyd-Steinberg",
+        "atkinson": "Atkinson",
+        "stucki": "Stucki",
+        "sierra": "Sierra",
+        "sierra_lite": "Sierra Lite",
+        "jarvis_judice_ninke": "Jarvis, Judice & Ninke",
+        "dizzy": "Dizzy"
+      }
+    },
+    "refresh_type": {
+      "options": {
+        "adaptive": "Adaptive (recommended)",
+        "full": "Always full refresh",
+        "fast": "Fast",
+        "fast_no_red": "Fast, skipping red"
+      }
+    }
+  },
+  "services": {
+    "drawcustom": {
+      "name": "Draw custom image",
+      "description": "Draws an image built from a list of elements on one or more tags.",
+      "fields": {
+        "payload": {
+          "name": "Payload",
+          "description": "The elements to draw, in order. See the documentation for the available element types and their options."
+        },
+        "background": {
+          "name": "Background colour",
+          "description": "Colour to fill the display with before drawing."
+        },
+        "rotate": {
+          "name": "Rotation",
+          "description": "Degrees to rotate the finished image. The tag applies this itself, on top of any rotation already configured for it."
+        },
+        "dither": {
+          "name": "Dithering",
+          "description": "Algorithm used to reduce the image to the colours the tag can actually show. Ordered suits flat graphics; the error-diffusion algorithms suit photographs."
+        },
+        "refresh_type": {
+          "name": "Refresh type",
+          "description": "How the tag redraws. Adaptive uses quick refreshes and does one full refresh a night to clear ghosting, which is much easier on the battery than refreshing fully every time."
+        },
+        "ttl": {
+          "name": "Time to live",
+          "description": "How long the tag sleeps before checking in again. Applies once, after this update. A long value means you cannot update the tag again until it elapses."
+        },
+        "dry-run": {
+          "name": "Dry run",
+          "description": "Render the image and show it on the tag's image entity without sending it to the tag."
+        }
+      }
+    },
+    "setled": {
+      "name": "Set LED pattern",
+      "description": "Flashes the LED on tags that have one. Up to three colour groups play in turn, and the whole pattern repeats.",
+      "fields": {
+        "mode": {
+          "name": "Mode",
+          "description": "Flash the pattern, or stop a running one."
+        },
+        "brightness": {
+          "name": "Brightness",
+          "description": "How long the LED stays on within each flash. Higher is brighter and uses more battery."
+        },
+        "repeats": {
+          "name": "Repeats",
+          "description": "How many times the whole pattern plays."
+        },
+        "color1": {
+          "name": "Colour 1",
+          "description": "Colour of the first group."
+        },
+        "flash_speed1": {
+          "name": "Flash speed 1",
+          "description": "Length of each flash in the first group."
+        },
+        "flash_count1": {
+          "name": "Flash count 1",
+          "description": "How many times the first group flashes. Zero skips the group."
+        },
+        "delay1": {
+          "name": "Delay 1",
+          "description": "Pause after the first group."
+        },
+        "color2": {
+          "name": "Colour 2",
+          "description": "Colour of the second group."
+        },
+        "flash_speed2": {
+          "name": "Flash speed 2",
+          "description": "Length of each flash in the second group."
+        },
+        "flash_count2": {
+          "name": "Flash count 2",
+          "description": "How many times the second group flashes. Zero skips the group."
+        },
+        "delay2": {
+          "name": "Delay 2",
+          "description": "Pause after the second group."
+        },
+        "color3": {
+          "name": "Colour 3",
+          "description": "Colour of the third group."
+        },
+        "flash_speed3": {
+          "name": "Flash speed 3",
+          "description": "Length of each flash in the third group."
+        },
+        "flash_count3": {
+          "name": "Flash count 3",
+          "description": "How many times the third group flashes. Zero skips the group."
+        },
+        "delay3": {
+          "name": "Delay 3",
+          "description": "Pause after the third group."
+        }
+      }
+    },
+    "clear_pending": {
+      "name": "Clear pending update",
+      "description": "Discards an update the tag has not collected yet.",
+      "fields": {}
+    },
+    "force_refresh": {
+      "name": "Force refresh",
+      "description": "Makes the tag redraw its current image.",
+      "fields": {}
+    },
+    "reboot_tag": {
+      "name": "Reboot tag",
+      "description": "Restarts the tag.",
+      "fields": {}
+    },
+    "scan_channels": {
+      "name": "Scan channels",
+      "description": "Makes the tag search the radio channels again for an Access Point.",
+      "fields": {}
+    },
+    "reboot_ap": {
+      "name": "Reboot Access Point",
+      "description": "Restarts the Access Point.",
+      "fields": {}
+    },
+    "refresh_tag_types": {
+      "name": "Refresh tag types",
+      "description": "Reloads tag hardware definitions from the Access Point. Useful after it downloads one it did not previously hold.",
+      "fields": {}
+    }
   }
 }
