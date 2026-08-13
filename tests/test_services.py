@@ -18,7 +18,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from oepl import LUT, LEDPattern, Rotation, TagType
+from oepl import LUT, LEDPattern, TagType
 
 from custom_components.open_epaper_link.const import DOMAIN
 from custom_components.open_epaper_link.services import (
@@ -550,15 +550,19 @@ async def test_dry_run_still_returns_the_image(
 # ---------------------------------------------------------------------------
 # Canvas size and rotation
 #
-# The Access Point does no scaling. spr2color() in makeimage.cpp sizes its
-# output buffer from the uploaded image's own dimensions, so an image that is
-# not the panel's native size indexes outside the sprite and reaches the tag
-# as noise. Confirmed on hardware: a transposed upload rendered as diagonal
+# rotate is applied here, as it was before 4.0: a quarter turn is laid out on
+# a transposed canvas and rotated back, so the upload is always the panel's
+# native size. It is never sent to the Access Point, which would persist it
+# onto the tag's record.
+#
+# Native size is not optional. spr2color() in makeimage.cpp derives its output
+# buffer geometry from the uploaded image, so anything else indexes outside
+# the sprite. Confirmed on hardware: a transposed upload rendered as diagonal
 # static on the panel.
 # ---------------------------------------------------------------------------
 
 
-async def _setup_tag(hass: HomeAssistant, entry, **_: object) -> str:
+async def _setup_tag(hass: HomeAssistant, entry) -> str:
     """Set an entry up with one tag and return that tag's device id."""
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
@@ -582,13 +586,9 @@ async def _render(hass: HomeAssistant, device_id: str, **extra: object) -> dict:
     return rendered
 
 
-def test_rotate_has_no_default() -> None:
-    """An unset rotate must stay unset, not become 0.
-
-    The Access Point stores what it is sent, so a 0 default would reset a
-    tag's configured rotation on every call.
-    """
-    assert "rotate" not in _drawcustom()
+def test_rotate_keeps_its_old_default() -> None:
+    """Existing automations relied on rotate defaulting to 0."""
+    assert _drawcustom()["rotate"] == 0
 
 
 @pytest.mark.parametrize("degrees", [0, 90, 180, 270])
@@ -618,41 +618,53 @@ async def test_uploads_go_through_the_size_checked_handle(
     assert mock_client.upload_image.await_args.kwargs["fit"] == "strict"
 
 
-@pytest.mark.parametrize("rotate", [None, 0, 90, 180, 270])
-async def test_canvas_is_always_the_panels_native_size(
-    hass: HomeAssistant, ap_config_entry, mock_client, rotate: int | None
+@pytest.mark.parametrize("rotate", [0, 90, 180, 270])
+async def test_every_rotation_uploads_at_native_size(
+    hass: HomeAssistant, ap_config_entry, mock_client, rotate: int
 ) -> None:
-    """No rotation transposes the canvas.
+    """Whatever the rotation, what reaches the tag matches the panel.
 
-    Transposing produced a garbled tag, because the Access Point derives its
-    buffer geometry from the uploaded image rather than the panel.
+    A quarter turn draws on a transposed canvas, so this only holds because
+    the image is rotated back before upload.
     """
     device_id = await _setup_tag(hass, ap_config_entry)
-    extra = {} if rotate is None else {"rotate": rotate}
-    rendered = await _render(hass, device_id, **extra)
+    rendered = await _render(hass, device_id, rotate=rotate)
 
     # The fixture's tag type is 296x128.
     assert (rendered["width"], rendered["height"]) == (296, 128)
+    uploaded = mock_client.upload_image.await_args.args[0]
+    assert uploaded.size == (296, 128)
 
 
-async def test_unset_rotate_is_not_sent(
+async def test_a_quarter_turn_rotates_the_content(
     hass: HomeAssistant, ap_config_entry, mock_client
 ) -> None:
-    """Omitting rotate leaves the tag's configured rotation alone."""
+    """The rotation must actually be applied, not just sized away.
+
+    A rectangle in the top-left corner lands in a different corner once
+    turned, which a no-op rotation would not do.
+    """
     device_id = await _setup_tag(hass, ap_config_entry)
-    await _draw(hass, device_id)
+    await _draw(hass, device_id, rotate=0)
+    upright = mock_client.upload_image.await_args.args[0].convert("L")
+    await _draw(hass, device_id, rotate=90)
+    turned = mock_client.upload_image.await_args.args[0].convert("L")
 
-    assert mock_client.upload_image.await_args.kwargs["rotate"] is None
+    assert upright.tobytes() != turned.tobytes()
 
 
-async def test_rotate_is_forwarded_as_a_quarter_turn(
+async def test_rotation_is_never_sent_to_the_access_point(
     hass: HomeAssistant, ap_config_entry, mock_client
 ) -> None:
-    """Degrees are converted to the wire's quarter-turn count."""
+    """The Access Point persists rotate onto the tag's stored record.
+
+    Sending it per draw would rewrite the tag's own configuration, which the
+    pre-4.0 action never did.
+    """
     device_id = await _setup_tag(hass, ap_config_entry)
     await _draw(hass, device_id, rotate=270)
 
-    assert mock_client.upload_image.await_args.kwargs["rotate"] is Rotation.R270
+    assert "rotate" not in mock_client.upload_image.await_args.kwargs
 
 
 async def test_stored_rotation_does_not_change_the_canvas(
@@ -660,8 +672,8 @@ async def test_stored_rotation_does_not_change_the_canvas(
 ) -> None:
     """A tag configured sideways still gets a native-size image.
 
-    The Access Point applies that rotation itself when building the tag's
-    buffer, so pre-rotating here would double it.
+    The Access Point applies that setting itself when building the tag's
+    buffer, so accounting for it here would double it.
     """
     mock_client.set_tags(make_tag(TAG_MAC, rotate=1))
     device_id = await _setup_tag(hass, ap_config_entry)

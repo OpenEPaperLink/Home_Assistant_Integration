@@ -36,7 +36,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service import async_extract_entity_ids
 from odl_renderer import generate_image
-from oepl import LUT, Color, LEDPattern, LEDSegment, Rotation, TagCommand, TagType
+from oepl import LUT, Color, LEDPattern, LEDSegment, TagCommand, TagType
 from PIL.Image import Image
 
 from .const import DOMAIN, OPT_CUSTOM_FONT_DIRS
@@ -156,10 +156,9 @@ SCHEMA_DRAWCUSTOM = vol.Schema(
         **_TARGET_FIELDS,
         vol.Required("payload"): vol.All(cv.ensure_list, [dict]),
         vol.Optional("background", default="white"): cv.string,
-        # No default: the Access Point stores whatever it is sent, so passing
-        # 0 for an unset field would silently reset a tag's configured
-        # rotation on every call.
-        vol.Optional("rotate"): vol.All(vol.Coerce(int), vol.In([0, 90, 180, 270])),
+        vol.Optional("rotate", default=0): vol.All(
+            vol.Coerce(int), vol.In([0, 90, 180, 270])
+        ),
         vol.Optional("dither", default="ordered"): _dither,
         vol.Optional("ttl", default=60): vol.All(vol.Coerce(int), vol.Range(min=0)),
         vol.Optional("refresh_type", default="adaptive"): _refresh_type,
@@ -362,7 +361,7 @@ async def _async_drawcustom(call: ServiceCall) -> ServiceResponse:
     elements = call.data["payload"]
     _validate_local_paths(hass, elements)
 
-    rotate: int | None = call.data.get("rotate")
+    rotate: int = call.data["rotate"]
     dry_run = call.data.get("dry-run", call.data.get("dry_run", False))
     rendered: list[dict[str, Any]] = []
 
@@ -375,12 +374,19 @@ async def _async_drawcustom(call: ServiceCall) -> ServiceResponse:
                 translation_placeholders={"mac": mac},
             )
 
-        # Always the panel's native size. The Access Point does not scale:
-        # spr2color() in makeimage.cpp sizes its output buffer from the
-        # uploaded image's own dimensions, so any other size indexes outside
-        # the sprite and renders as noise. py-oepl says the same, and enforces
-        # it on the tag handle used below.
-        width, height = tag_type.width, tag_type.height
+        # rotate is applied here, not by the Access Point, which is what the
+        # pre-4.0 action did and what existing automations expect. A quarter
+        # turn is laid out on a transposed canvas and turned back below, so
+        # the upload is always the panel's native size.
+        #
+        # That sizing is not optional: the Access Point does no scaling.
+        # spr2color() in makeimage.cpp derives its output buffer geometry from
+        # the uploaded image itself, so any other size indexes outside the
+        # sprite and reaches the tag as noise.
+        if rotate in (90, 270):
+            width, height = tag_type.height, tag_type.width
+        else:
+            width, height = tag_type.width, tag_type.height
 
         image = await generate_image(
             width=width,
@@ -396,6 +402,10 @@ async def _async_drawcustom(call: ServiceCall) -> ServiceResponse:
                 coordinator.config_entry.options.get(OPT_CUSTOM_FONT_DIRS),
             ),
         )
+
+        if rotate:
+            # Positive is anticlockwise in PIL, matching the pre-4.0 action.
+            image = image.rotate(rotate, expand=True)
 
         # Shown on the tag's image entity either way, so a dry run is a
         # preview rather than a silent no-op.
@@ -422,7 +432,6 @@ async def _async_drawcustom(call: ServiceCall) -> ServiceResponse:
             lut=call.data["refresh_type"],
             dither_mode=call.data["dither"],
             color_scheme=_color_scheme(tag_type),
-            rotate=None if rotate is None else Rotation(rotate // 90),
         )
 
     return {"images": rendered}

@@ -395,7 +395,7 @@
         },
         "rotate": {
           "name": "Rotation",
-          "description": "Degrees to rotate the finished image. The tag applies this itself, and the value replaces its configured rotation rather than adding to it, so it persists for later updates. Leave unset to keep the tag's current setting."
+          "description": "Degrees to rotate the finished image. Applied before sending, so the payload can be laid out sideways for a tag mounted that way. The tag's own configured rotation still applies on top of it."
         },
         "dither": {
           "name": "Dithering",

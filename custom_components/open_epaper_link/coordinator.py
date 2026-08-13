@@ -28,7 +28,6 @@ from oepl import (
     LEDPattern,
     OEPLClient,
     OEPLError,
-    Rotation,
     Tag,
     TagCommand,
     TagType,
@@ -346,7 +345,6 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         lut: LUT | None = None,
         dither_mode: DitherMode | None = None,
         color_scheme: ColorScheme | None = None,
-        rotate: Rotation | None = None,
     ) -> None:
         """Render *image* on a tag.
 
@@ -359,10 +357,10 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         mismatched image renders as noise rather than failing -- an exception
         here is much easier to diagnose than a garbled tag.
 
-        A *rotate* value is persistent: ``web.cpp`` assigns it straight to
-        ``taginfo->rotate``, so it replaces whatever the tag was configured
-        with rather than applying for this image alone. Pass None to leave
-        that setting untouched.
+        Rotation is deliberately absent. The Access Point persists whatever
+        ``rotate`` it is sent onto the tag's record (``web.cpp`` assigns it to
+        ``taginfo->rotate``), so sending it per upload would rewrite the tag's
+        configuration. Callers rotate the image themselves instead.
         """
         try:
             await self.client.tag(mac).upload_image(
@@ -372,7 +370,6 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
                 lut=lut,
                 dither_mode=dither_mode,
                 color_scheme=color_scheme,
-                rotate=rotate,
                 content_mode=ContentMode.HOME_ASSISTANT,
             )
         except ValueError as err:
