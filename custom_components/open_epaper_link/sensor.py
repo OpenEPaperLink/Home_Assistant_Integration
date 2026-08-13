@@ -51,9 +51,12 @@ def _battery_percentage(tag: Tag) -> float | None:
     """Estimate charge from cell voltage.
 
     A coin cell sits near 3.0 V for most of its life and falls off a cliff, so
-    this is a rough indicator rather than a measurement.
+    this is a rough indicator rather than a measurement. Tags with no usable
+    reading report a sentinel rather than a voltage, which py-oepl knows
+    about; treating it as a measurement showed a flat battery on a tag that
+    simply had nothing to report.
     """
-    if not tag.battery_mv:
+    if not tag.has_battery_reading:
         return None
     volts = tag.battery_mv / 1000
     return round(max(0.0, min(100.0, (volts - 2.2) / (3.0 - 2.2) * 100)), 1)
@@ -73,7 +76,7 @@ TAG_SENSORS: tuple[TagSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.MILLIVOLT,
         entity_registry_enabled_default=False,
-        value_fn=lambda tag: tag.battery_mv or None,
+        value_fn=lambda tag: tag.battery_mv if tag.has_battery_reading else None,
     ),
     TagSensorDescription(
         key="battery_percentage",

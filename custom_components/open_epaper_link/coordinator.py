@@ -24,6 +24,7 @@ from oepl import (
     APConfig,
     APInfo,
     APStatus,
+    ContentMode,
     LEDPattern,
     OEPLClient,
     OEPLError,
@@ -358,7 +359,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
                 lut=lut,
                 dither_mode=dither_mode,
                 color_scheme=color_scheme,
-                content_mode=25,
+                content_mode=ContentMode.HOME_ASSISTANT,
             )
         except OEPLError as err:
             raise HomeAssistantError(

@@ -61,32 +61,6 @@
         "name": "Alias"
       }
     },
-    "select": {
-      "channel": {
-        "name": "Canal"
-      },
-      "led": {
-        "name": "Brilho do LED RGB"
-      },
-      "tft": {
-        "name": "Brilho do TFT"
-      },
-      "maxsleep": {
-        "name": "Tempo máximo de sono"
-      },
-      "lock": {
-        "name": "Bloquear inventário de etiquetas"
-      },
-      "wifipower": {
-        "name": "Potência do WiFi"
-      },
-      "language": {
-        "name": "Idioma"
-      },
-      "subghzchannel": {
-        "name": "Canal Sub-GHz"
-      }
-    },
     "sensor": {
       "ip": {
         "name": "Endereço IP"

@@ -130,10 +130,9 @@ def _color_scheme(tag_type: TagType) -> ColorScheme:
 def _accent_color(tag_type: TagType) -> str:
     """Return the colour odl-renderer should draw accents in.
 
-    A two-colour tag has no accent, so black is the only honest answer.
+    A two-colour panel has no accent, so black is the only honest answer.
     """
-    table = tag_type.color_table or {}
-    return next((name for name in ("red", "yellow") if name in table), "black")
+    return tag_type.accent_color or "black"
 
 
 _RGB = vol.All(cv.ensure_list, [vol.All(vol.Coerce(int), vol.Range(min=0, max=255))])
@@ -378,7 +377,7 @@ async def _async_drawcustom(call: ServiceCall) -> ServiceResponse:
         width, height = tag_type.width, tag_type.height
         # The tag applies rotation itself and fits the result to its pixel
         # grid, so matching the canvas aspect keeps that fit a no-op.
-        if (int(coordinator.data[mac].rotate) * 90 + rotate) % 360 in (90, 270):
+        if (coordinator.data[mac].rotate.degrees + rotate) % 360 in (90, 270):
             width, height = height, width
 
         image = await generate_image(

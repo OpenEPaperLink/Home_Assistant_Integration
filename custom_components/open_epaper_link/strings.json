@@ -80,86 +80,103 @@
     },
     "select": {
       "channel": {
-        "name": "Channel",
         "state": {
-          "ch11": "11",
-          "ch15": "15",
-          "ch20": "20",
-          "ch25": "25",
-          "ch26": "26"
-        }
-      },
-      "subghzchannel": {
-        "name": "Sub-GHz Channel",
-        "state": {
-          "off": "Off",
-          "ch103": "103 (867.020 MHz)",
-          "ch104": "104 (867.520 MHz)",
-          "ch105": "105 (868.020 MHz)"
+          "auto": "Automatic",
+          "11": "11",
+          "15": "15",
+          "20": "20",
+          "25": "25",
+          "26": "26"
         }
       },
       "led": {
-        "name": "RGB LED brightness",
         "state": {
           "off": "Off",
-          "low": "Low",
-          "medium": "Medium",
-          "high": "High",
-          "max": "Maximum"
+          "10": "10%",
+          "25": "25%",
+          "50": "50%",
+          "75": "75%",
+          "100": "100%"
         }
       },
       "tft": {
-        "name": "TFT Brightness",
         "state": {
           "off": "Off",
-          "low": "Low",
-          "medium": "Medium",
-          "high": "High",
-          "max": "Maximum"
+          "10": "10%",
+          "25": "25%",
+          "50": "50%",
+          "75": "75%",
+          "100": "100%"
         }
       },
       "maxsleep": {
-        "name": "Maximum sleep",
         "state": {
-          "h1": "1 hour",
-          "h4": "4 hours",
-          "h12": "12 hours",
-          "h24": "1 day",
-          "h48": "2 days"
+          "shortest": "Shortest (40 sec)",
+          "5": "5 min",
+          "10": "10 min",
+          "30": "30 min",
+          "60": "1 hour"
         }
       },
       "lock": {
-        "name": "Lock tag inventory",
         "state": {
           "open": "Open: accept any tag",
-          "learning": "Learning: only accept booting tags",
-          "locked": "Locked: do not accept new tags"
+          "locked": "Locked: reject new tags",
+          "learning": "Learning: only accept booting tags"
+        }
+      },
+      "discovery": {
+        "state": {
+          "multicast": "Multicast",
+          "broadcast": "Broadcast"
         }
       },
       "wifipower": {
-        "name": "WiFi Power",
         "state": {
-          "low": "Low",
-          "medium": "Medium",
-          "high": "High",
-          "max": "Maximum"
+          "2_0": "2.0 dBm",
+          "5_0": "5.0 dBm",
+          "7_0": "7.0 dBm",
+          "8_5": "8.5 dBm",
+          "11_0": "11.0 dBm",
+          "13_0": "13.0 dBm",
+          "15_0": "15.0 dBm",
+          "17_0": "17.0 dBm",
+          "18_5": "18.5 dBm",
+          "19_0": "19.0 dBm",
+          "19_5": "19.5 dBm"
         }
       },
       "language": {
-        "name": "Language",
         "state": {
           "en": "English",
           "nl": "Nederlands",
           "de": "Deutsch",
-          "fr": "Français",
           "no": "Norsk",
+          "fr": "Français",
           "cz": "Čeština",
-          "da": "Dansk",
-          "sv": "Svenska",
-          "es": "Español",
+          "sk": "Slovenčina",
           "pl": "Polski",
-          "fi": "Suomi",
+          "es": "Español",
+          "sv": "Svenska",
+          "dk": "Dansk",
           "et": "Eesti"
+        }
+      },
+      "subghzchannel": {
+        "state": {
+          "disabled": "Disabled",
+          "100": "864.000 MHz (Europe)",
+          "101": "865.006 MHz (Europe)",
+          "102": "866.014 MHz (Europe)",
+          "103": "867.020 MHz (Europe)",
+          "104": "868.027 MHz (Europe)",
+          "105": "869.034 MHz (Europe)",
+          "200": "903.000 MHz (US)",
+          "201": "907.027 MHz (US)",
+          "202": "911.054 MHz (US)",
+          "203": "915.083 MHz (US)",
+          "204": "919.110 MHz (US)",
+          "205": "923.138 MHz (US)"
         }
       }
     },

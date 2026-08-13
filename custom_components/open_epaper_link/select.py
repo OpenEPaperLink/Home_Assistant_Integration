@@ -14,6 +14,7 @@ from homeassistant.components.select import SelectEntity, SelectEntityDescriptio
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from oepl import APConfig
 
 from .coordinator import APConfigEntry, APCoordinator
 from .entity import OpenEPaperLinkAPEntity
@@ -35,71 +36,108 @@ class APSelectDescription(SelectEntityDescription):
     options: list[str] = field(default_factory=list)
 
 
-def _numbered(prefix: str, values: dict[str, int]) -> dict[str, int]:
-    """Build a choice map, keeping keys valid as translation identifiers."""
-    return {f"{prefix}{name}": value for name, value in values.items()}
-
-
-_BRIGHTNESS = {"off": 0, "low": 63, "medium": 127, "high": 191, "max": 255}
-_CHANNELS = {f"ch{n}": n for n in (11, 15, 20, 25, 26)}
-_SUBGHZ = {"off": 0, "ch103": 103, "ch104": 104, "ch105": 105}
-_MAX_SLEEP = {"h1": 1, "h4": 4, "h12": 12, "h24": 24, "h48": 48}
-_LOCK = {"open": 0, "learning": 1, "locked": 2}
-_WIFI_POWER = {"low": 1, "medium": 2, "high": 3, "max": 4}
-_LANGUAGES = {
-    "en": 0, "nl": 1, "de": 2, "fr": 3, "no": 4, "cz": 5,
-    "da": 6, "sv": 7, "es": 8, "pl": 9, "fi": 10, "et": 11,
+# Which values exist is py-oepl's business, taken from the firmware. What
+# each one is called here is ours, because the option value is the entity
+# state: deriving it from a display label would change recorder history the
+# moment the label was reworded. test_select_keys_cover_the_library asserts
+# the two stay in step, so a value added upstream fails here until it is
+# named.
+_KEYS: dict[str, dict[int, str]] = {
+    "channel": {0: "auto", 11: "11", 15: "15", 20: "20", 25: "25", 26: "26"},
+    "led": {0: "off", 15: "10", 31: "25", 127: "50", 191: "75", 255: "100"},
+    "tft": {0: "off", 20: "10", 64: "25", 128: "50", 192: "75", 255: "100"},
+    "maxsleep": {0: "shortest", 5: "5", 10: "10", 30: "30", 60: "60"},
+    "lock": {0: "open", 1: "locked", 2: "learning"},
+    "discovery": {0: "multicast", 1: "broadcast"},
+    "wifipower": {
+        8: "2_0", 20: "5_0", 28: "7_0", 34: "8_5", 44: "11_0", 52: "13_0",
+        60: "15_0", 68: "17_0", 74: "18_5", 76: "19_0", 78: "19_5",
+    },
+    "language": {
+        0: "en", 1: "nl", 2: "de", 3: "no", 4: "fr", 5: "cz",
+        6: "sk", 7: "pl", 8: "es", 9: "sv", 10: "dk", 11: "et",
+    },
+    "subghzchannel": {
+        0: "disabled",
+        **{n: str(n) for n in (100, 101, 102, 103, 104, 105)},
+        **{n: str(n) for n in (200, 201, 202, 203, 204, 205)},
+    },
 }  # fmt: skip
+
+# The library value maps each set of keys describes.
+LIBRARY_VALUES: dict[str, dict[int, str]] = {
+    "channel": APConfig.CHANNELS,
+    "led": APConfig.LED_BRIGHTNESS_LEVELS,
+    "tft": APConfig.TFT_BRIGHTNESS_LEVELS,
+    "maxsleep": APConfig.MAX_SLEEP_LEVELS,
+    "lock": APConfig.LOCK_MODES,
+    "discovery": APConfig.DISCOVERY_MODES,
+    "wifipower": APConfig.WIFI_POWER_LEVELS,
+    "language": APConfig.LANGUAGES,
+    "subghzchannel": APConfig.SUBGHZ_CHANNELS,
+}
+
+
+def _choices(key: str) -> dict[str, int]:
+    """Return option name to stored value for one setting."""
+    return {name: value for value, name in _KEYS[key].items()}
+
 
 AP_SELECTS: tuple[APSelectDescription, ...] = (
     APSelectDescription(
         key="channel",
+        choices=_choices("channel"),
         attribute="channel",
-        choices=_CHANNELS,
         entity_category=EntityCategory.CONFIG,
     ),
     APSelectDescription(
         key="subghzchannel",
+        choices=_choices("subghzchannel"),
         attribute="subghz_channel",
-        choices=_SUBGHZ,
         # Pointless on hardware without a sub-GHz radio.
         requires="has_sub_ghz",
         entity_category=EntityCategory.CONFIG,
     ),
     APSelectDescription(
         key="led",
+        choices=_choices("led"),
         attribute="led_brightness",
-        choices=_numbered("", _BRIGHTNESS),
         entity_category=EntityCategory.CONFIG,
     ),
     APSelectDescription(
         key="tft",
+        choices=_choices("tft"),
         attribute="tft_brightness",
-        choices=_numbered("", _BRIGHTNESS),
         entity_category=EntityCategory.CONFIG,
     ),
     APSelectDescription(
         key="maxsleep",
+        choices=_choices("maxsleep"),
         attribute="max_sleep",
-        choices=_MAX_SLEEP,
         entity_category=EntityCategory.CONFIG,
     ),
     APSelectDescription(
         key="lock",
+        choices=_choices("lock"),
         attribute="lock",
-        choices=_LOCK,
         entity_category=EntityCategory.CONFIG,
     ),
     APSelectDescription(
         key="wifipower",
+        choices=_choices("wifipower"),
         attribute="wifi_power",
-        choices=_WIFI_POWER,
         entity_category=EntityCategory.CONFIG,
     ),
     APSelectDescription(
         key="language",
+        choices=_choices("language"),
         attribute="language",
-        choices=_LANGUAGES,
+        entity_category=EntityCategory.CONFIG,
+    ),
+    APSelectDescription(
+        key="discovery",
+        choices=_choices("discovery"),
+        attribute="discovery",
         entity_category=EntityCategory.CONFIG,
     ),
 )
