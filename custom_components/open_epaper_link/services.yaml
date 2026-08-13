@@ -13,7 +13,6 @@ drawcustom:
         select:
           options: ["white", "black", "accent", "red", "yellow"]
     rotate:
-      default: 0
       selector:
         number:
           min: 0

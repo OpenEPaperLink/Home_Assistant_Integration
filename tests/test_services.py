@@ -18,7 +18,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from oepl import LUT, LEDPattern, TagType
+from oepl import LUT, LEDPattern, Rotation, TagType
 
 from custom_components.open_epaper_link.const import DOMAIN
 from custom_components.open_epaper_link.services import (
@@ -545,3 +545,141 @@ async def test_dry_run_still_returns_the_image(
 
     assert len(response["images"]) == 1
     mock_client.upload_image.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# rotation
+#
+# The Access Point stores what it is sent: web.cpp assigns the uploaded value
+# to taginfo->rotate, which contentmanager.cpp reads back as
+# imageParams.rotate. Rotation therefore replaces the tag's setting rather
+# than adding to it, and an unset field must not be sent at all.
+# ---------------------------------------------------------------------------
+
+
+async def _setup_tag(hass: HomeAssistant, entry, **tag_overrides: object) -> str:
+    """Set an entry up with one tag and return that tag's device id."""
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    device = dr.async_get(hass).async_get_device(
+        identifiers={(DOMAIN, f"{entry.entry_id}_{TAG_MAC}")}
+    )
+    return device.id
+
+
+def test_rotate_has_no_default() -> None:
+    """An unset rotate must stay unset, not become 0.
+
+    A 0 default would be indistinguishable from the caller asking for no
+    rotation, and would reset the tag's stored setting on every call.
+    """
+    assert "rotate" not in _drawcustom()
+
+
+@pytest.mark.parametrize("degrees", [0, 90, 180, 270])
+def test_rotate_accepts_each_quarter_turn(degrees: int) -> None:
+    """The four legal values pass validation."""
+    assert _drawcustom(rotate=degrees)["rotate"] == degrees
+
+
+def test_rotate_rejects_other_angles() -> None:
+    """A tag can only rotate in quarter turns."""
+    with pytest.raises(vol.Invalid):
+        _drawcustom(rotate=45)
+
+
+async def test_unset_rotate_is_not_sent(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """Omitting rotate leaves the tag's configured rotation alone."""
+    device_id = await _setup_tag(hass, ap_config_entry)
+    await _draw(hass, device_id)
+
+    assert mock_client.upload_image.await_args.kwargs["rotate"] is None
+
+
+async def test_rotate_is_forwarded_as_a_quarter_turn(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """Degrees are converted to the wire's quarter-turn count."""
+    device_id = await _setup_tag(hass, ap_config_entry)
+    await _draw(hass, device_id, rotate=270)
+
+    assert mock_client.upload_image.await_args.kwargs["rotate"] is Rotation.R270
+
+
+async def test_rotate_transposes_the_canvas(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """A quarter turn swaps the canvas, so the tag's fit stays a no-op."""
+    device_id = await _setup_tag(hass, ap_config_entry)
+    response = await hass.services.async_call(
+        DOMAIN,
+        "drawcustom",
+        {"device_id": [device_id], "payload": _text_payload(), "rotate": 90},
+        blocking=True,
+        return_response=True,
+    )
+
+    [rendered] = response["images"]
+    assert (rendered["width"], rendered["height"]) == (128, 296)
+
+
+async def test_half_turn_does_not_transpose(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """180 degrees keeps the aspect, so the canvas must not swap."""
+    device_id = await _setup_tag(hass, ap_config_entry)
+    response = await hass.services.async_call(
+        DOMAIN,
+        "drawcustom",
+        {"device_id": [device_id], "payload": _text_payload(), "rotate": 180},
+        blocking=True,
+        return_response=True,
+    )
+
+    [rendered] = response["images"]
+    assert (rendered["width"], rendered["height"]) == (296, 128)
+
+
+async def test_stored_rotation_transposes_when_rotate_is_unset(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """A tag already configured sideways still gets a matching canvas."""
+    mock_client.set_tags(make_tag(TAG_MAC, rotate=1))
+    device_id = await _setup_tag(hass, ap_config_entry)
+    response = await hass.services.async_call(
+        DOMAIN,
+        "drawcustom",
+        {"device_id": [device_id], "payload": _text_payload()},
+        blocking=True,
+        return_response=True,
+    )
+
+    [rendered] = response["images"]
+    assert (rendered["width"], rendered["height"]) == (128, 296)
+
+
+async def test_rotation_replaces_rather_than_accumulates(
+    hass: HomeAssistant, ap_config_entry, mock_client
+) -> None:
+    """The regression this suite exists for.
+
+    A tag stored at 90 degrees, asked to draw at 180, must render at 180 --
+    not at 270. Adding the two would both transpose the canvas wrongly and
+    send the wrong quarter turn.
+    """
+    mock_client.set_tags(make_tag(TAG_MAC, rotate=1))
+    device_id = await _setup_tag(hass, ap_config_entry)
+    response = await hass.services.async_call(
+        DOMAIN,
+        "drawcustom",
+        {"device_id": [device_id], "payload": _text_payload(), "rotate": 180},
+        blocking=True,
+        return_response=True,
+    )
+
+    [rendered] = response["images"]
+    assert (rendered["width"], rendered["height"]) == (296, 128)
+    assert mock_client.upload_image.await_args.kwargs["rotate"] is Rotation.R180

@@ -198,7 +198,7 @@
         },
         "rotate": {
           "name": "Rotation",
-          "description": "Rotation in Grad (0, 90, 180, 270)"
+          "description": "Drehung in Grad (0, 90, 180, 270). Der Wert ersetzt die am Tag eingestellte Drehung und bleibt für spätere Aktualisierungen erhalten. Ohne Angabe bleibt die aktuelle Einstellung bestehen."
         },
         "dither": {
           "name": "Dithering",

@@ -392,7 +392,7 @@
         },
         "rotate": {
           "name": "Rotation",
-          "description": "Degrees to rotate the finished image. The tag applies this itself, on top of any rotation already configured for it."
+          "description": "Degrees to rotate the finished image. The tag applies this itself, and the value replaces its configured rotation rather than adding to it, so it persists for later updates. Leave unset to keep the tag's current setting."
         },
         "dither": {
           "name": "Dithering",

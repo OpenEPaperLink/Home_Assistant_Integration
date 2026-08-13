@@ -36,7 +36,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service import async_extract_entity_ids
 from odl_renderer import generate_image
-from oepl import LUT, Color, LEDPattern, LEDSegment, TagCommand, TagType
+from oepl import LUT, Color, LEDPattern, LEDSegment, Rotation, TagCommand, TagType
 from PIL.Image import Image
 
 from .const import DOMAIN, OPT_CUSTOM_FONT_DIRS
@@ -156,9 +156,10 @@ SCHEMA_DRAWCUSTOM = vol.Schema(
         **_TARGET_FIELDS,
         vol.Required("payload"): vol.All(cv.ensure_list, [dict]),
         vol.Optional("background", default="white"): cv.string,
-        vol.Optional("rotate", default=0): vol.All(
-            vol.Coerce(int), vol.In([0, 90, 180, 270])
-        ),
+        # No default: the Access Point stores whatever it is sent, so passing
+        # 0 for an unset field would silently reset a tag's configured
+        # rotation on every call.
+        vol.Optional("rotate"): vol.All(vol.Coerce(int), vol.In([0, 90, 180, 270])),
         vol.Optional("dither", default="ordered"): _dither,
         vol.Optional("ttl", default=60): vol.All(vol.Coerce(int), vol.Range(min=0)),
         vol.Optional("refresh_type", default="adaptive"): _refresh_type,
@@ -361,7 +362,7 @@ async def _async_drawcustom(call: ServiceCall) -> ServiceResponse:
     elements = call.data["payload"]
     _validate_local_paths(hass, elements)
 
-    rotate: int = call.data["rotate"]
+    rotate: int | None = call.data.get("rotate")
     dry_run = call.data.get("dry-run", call.data.get("dry_run", False))
     rendered: list[dict[str, Any]] = []
 
@@ -375,9 +376,14 @@ async def _async_drawcustom(call: ServiceCall) -> ServiceResponse:
             )
 
         width, height = tag_type.width, tag_type.height
-        # The tag applies rotation itself and fits the result to its pixel
-        # grid, so matching the canvas aspect keeps that fit a no-op.
-        if (coordinator.data[mac].rotate.degrees + rotate) % 360 in (90, 270):
+        # Rotation replaces rather than accumulates: web.cpp assigns the
+        # uploaded value to taginfo->rotate, which contentmanager.cpp then
+        # reads back as imageParams.rotate. So the rotation in effect is the
+        # one being sent, or the tag's existing setting when none is.
+        effective = coordinator.data[mac].rotate.degrees if rotate is None else rotate
+        # The tag applies that rotation itself and fits the result to its
+        # pixel grid, so matching the canvas aspect keeps the fit a no-op.
+        if effective % 360 in (90, 270):
             width, height = height, width
 
         image = await generate_image(
@@ -420,6 +426,7 @@ async def _async_drawcustom(call: ServiceCall) -> ServiceResponse:
             lut=call.data["refresh_type"],
             dither_mode=call.data["dither"],
             color_scheme=_color_scheme(tag_type),
+            rotate=None if rotate is None else Rotation(rotate // 90),
         )
 
     return {"images": rendered}

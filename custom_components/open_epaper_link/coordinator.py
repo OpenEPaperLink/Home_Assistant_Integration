@@ -28,6 +28,7 @@ from oepl import (
     LEDPattern,
     OEPLClient,
     OEPLError,
+    Rotation,
     Tag,
     TagCommand,
     TagType,
@@ -345,11 +346,17 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         lut: LUT | None = None,
         dither_mode: DitherMode | None = None,
         color_scheme: ColorScheme | None = None,
+        rotate: Rotation | None = None,
     ) -> None:
         """Render *image* on a tag.
 
         Dithering happens client-side, so py-oepl tells the Access Point not
         to dither again.
+
+        A *rotate* value is persistent: ``web.cpp`` assigns it straight to
+        ``taginfo->rotate``, so it replaces whatever the tag was configured
+        with rather than applying for this image alone. Pass None to leave
+        that setting untouched.
         """
         try:
             await self.client.upload_image(
@@ -359,6 +366,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
                 lut=lut,
                 dither_mode=dither_mode,
                 color_scheme=color_scheme,
+                rotate=rotate,
                 content_mode=ContentMode.HOME_ASSISTANT,
             )
         except OEPLError as err:
