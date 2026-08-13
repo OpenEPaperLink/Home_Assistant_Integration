@@ -9,21 +9,25 @@ from __future__ import annotations
 import json
 from base64 import b64decode
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import voluptuous as vol
 import yaml
 from epaper_dithering import ColorScheme, DitherMode
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 from oepl import LUT, LEDPattern, TagType
 
 from custom_components.open_epaper_link.const import DOMAIN
 from custom_components.open_epaper_link.services import (
     SCHEMA_DRAWCUSTOM,
     SCHEMA_SETLED,
+    HADataProvider,
+    _as_history_row,
     _color_scheme,
     _led_pattern,
     async_register_services,
@@ -680,3 +684,79 @@ async def test_stored_rotation_does_not_change_the_canvas(
     rendered = await _render(hass, device_id)
 
     assert (rendered["width"], rendered["height"]) == (296, 128)
+
+
+# ---------------------------------------------------------------------------
+# Recorder history, which feeds odl-renderer's plot element
+# ---------------------------------------------------------------------------
+
+
+def test_history_row_from_a_state_object() -> None:
+    """A State is flattened to the mapping the renderer expects."""
+    moment = dt_util.utcnow()
+    row = _as_history_row(State("sensor.x", "21.5", last_changed=moment))
+
+    assert row == {"state": "21.5", "last_changed": str(moment)}
+
+
+def test_history_row_from_a_dict_is_passed_through() -> None:
+    """Rows the recorder already returned as dicts are left alone."""
+    row = {"state": "20.0", "last_changed": "2026-01-01T00:00:00+00:00"}
+
+    assert _as_history_row(row) is row
+
+
+async def test_every_history_row_is_normalised(hass: HomeAssistant) -> None:
+    """Not just the first one.
+
+    minimal_response returns the first row of each entity as a State and the
+    rest as dicts, but that is an optimisation rather than a guarantee. Trusting
+    the position would leave a State in the output the moment it changed, and
+    the renderer would fail on an attribute it cannot read.
+    """
+    moment = dt_util.utcnow()
+    rows = [
+        State("sensor.x", "1", last_changed=moment),
+        {"state": "2", "last_changed": "later"},
+        State("sensor.x", "3", last_changed=moment),
+    ]
+
+    instance = MagicMock()
+    instance.async_add_executor_job = AsyncMock(
+        # Run the job, so the patched recorder call is what supplies the rows.
+        side_effect=lambda job: job()
+    )
+    with (
+        patch("homeassistant.helpers.recorder.get_instance", return_value=instance),
+        patch(
+            "homeassistant.components.recorder.history.get_significant_states",
+            return_value={"sensor.x": rows},
+        ),
+    ):
+        history = await HADataProvider(hass).get_history(
+            ["sensor.x"], moment, dt_util.utcnow()
+        )
+
+    assert history["sensor.x"] == [
+        {"state": "1", "last_changed": str(moment)},
+        {"state": "2", "last_changed": "later"},
+        {"state": "3", "last_changed": str(moment)},
+    ]
+
+
+async def test_history_of_an_entity_with_no_rows(hass: HomeAssistant) -> None:
+    """An entity the recorder knows nothing about yields an empty list."""
+    instance = MagicMock()
+    instance.async_add_executor_job = AsyncMock(side_effect=lambda job: job())
+    with (
+        patch("homeassistant.helpers.recorder.get_instance", return_value=instance),
+        patch(
+            "homeassistant.components.recorder.history.get_significant_states",
+            return_value={"sensor.x": []},
+        ),
+    ):
+        history = await HADataProvider(hass).get_history(
+            ["sensor.x"], dt_util.utcnow(), dt_util.utcnow()
+        )
+
+    assert history == {"sensor.x": []}

@@ -29,6 +29,9 @@ jobs:
       - name: Check formatting
         run: uv run ruff format --check custom_components tests
 
+      - name: Type check
+        run: uv run mypy custom_components
+
       - name: Run tests
         run: >-
           uv run pytest tests

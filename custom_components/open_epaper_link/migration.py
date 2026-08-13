@@ -25,7 +25,9 @@ working; only newly discovered tags get name-derived slugs.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -72,7 +74,9 @@ def _removed_sensor_key(unique_id: str) -> bool:
 
 
 @callback
-def async_migrate_entry_data(hass: HomeAssistant, entry, ap_mac: str | None) -> None:
+def async_migrate_entry_data(
+    hass: HomeAssistant, entry: ConfigEntry[Any], ap_mac: str | None
+) -> None:
     """Bring a config entry's stored data up to the 4.0 shape."""
     data = dict(entry.data)
     unique_id = entry.unique_id
@@ -106,7 +110,7 @@ def async_migrate_entry_data(hass: HomeAssistant, entry, ap_mac: str | None) -> 
 
 
 @callback
-def async_migrate_registries(hass: HomeAssistant, entry) -> None:
+def async_migrate_registries(hass: HomeAssistant, entry: ConfigEntry[Any]) -> None:
     """Rewrite this entry's entity and device registry rows.
 
     Only rows belonging to *entry* are touched.
@@ -115,7 +119,7 @@ def async_migrate_registries(hass: HomeAssistant, entry) -> None:
     _async_migrate_devices(hass, entry)
 
 
-def _async_migrate_entities(hass: HomeAssistant, entry) -> None:
+def _async_migrate_entities(hass: HomeAssistant, entry: ConfigEntry[Any]) -> None:
     """Drop removed sensors, then re-key whatever remains."""
     registry = er.async_get(hass)
 
@@ -143,7 +147,7 @@ def _async_migrate_entities(hass: HomeAssistant, entry) -> None:
         registry.async_update_entity(record.entity_id, new_unique_id=new_unique_id)
 
 
-def _async_migrate_devices(hass: HomeAssistant, entry) -> None:
+def _async_migrate_devices(hass: HomeAssistant, entry: ConfigEntry[Any]) -> None:
     """Scope device identifiers to the config entry.
 
     ``via_device`` links survive because the registry tracks them by internal

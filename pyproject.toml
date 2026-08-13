@@ -15,6 +15,7 @@ dependencies = []
 # HA install cannot share an environment.
 dev = [
     "pytest-homeassistant-custom-component==0.13.355",
+    "mypy==1.18.2",
     "ruff==0.16.2",
     # Runtime requirements, kept in sync with custom_components/open_epaper_link/manifest.json
     "odl-renderer==0.5.12",

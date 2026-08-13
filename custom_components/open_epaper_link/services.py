@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 from base64 import b64encode
+from collections.abc import Callable, Coroutine
 from datetime import datetime
 from functools import partial
 from io import BytesIO
@@ -26,6 +27,7 @@ from homeassistant.core import (
     HomeAssistant,
     ServiceCall,
     ServiceResponse,
+    State,
     SupportsResponse,
     callback,
 )
@@ -35,6 +37,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service import async_extract_entity_ids
+from homeassistant.util.json import JsonValueType
 from odl_renderer import generate_image
 from oepl import LUT, Color, LEDPattern, LEDSegment, TagCommand, TagType
 from PIL.Image import Image
@@ -53,7 +56,7 @@ TAG_COMMAND_SERVICES = {
     "scan_channels": TagCommand.SCAN,
 }
 
-_TARGET_FIELDS = {
+_TARGET_FIELDS: dict[Any, Any] = {
     vol.Optional("entity_id", default=[]): cv.entity_ids_or_uuids,
     vol.Optional("device_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
     vol.Optional("area_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
@@ -141,7 +144,7 @@ _FLASH_SPEED = vol.All(vol.Coerce(float), vol.Range(min=0, max=1.5))
 _FLASH_COUNT = vol.All(vol.Coerce(int), vol.Range(min=0, max=15))
 
 
-def _led_segment_fields(index: int, color: list[int], delay: float) -> dict:
+def _led_segment_fields(index: int, color: list[int], delay: float) -> dict[Any, Any]:
     """Return the schema fields for one of the three LED groups."""
     return {
         vol.Optional(f"color{index}", default=color): _RGB,
@@ -215,8 +218,8 @@ class HADataProvider:
         """Return state history for *entity_ids* between *start* and *end*."""
         # Imported here because recorder is an after_dependency: it may not be
         # loaded, and only the plot element needs it.
-        from homeassistant.components.recorder import get_instance
         from homeassistant.components.recorder.history import get_significant_states
+        from homeassistant.helpers.recorder import get_instance
 
         raw = await get_instance(self._hass).async_add_executor_job(
             partial(
@@ -231,19 +234,22 @@ class HADataProvider:
             )
         )
 
-        result: dict[str, list[dict[str, Any]]] = {}
-        for entity_id, states in raw.items():
-            if not states:
-                result[entity_id] = []
-                continue
-            # minimal_response returns the first entry as a full State object
-            # and the rest as dicts, so only the first needs converting.
-            first = states[0]
-            result[entity_id] = [
-                {"state": first.state, "last_changed": str(first.last_changed)},
-                *states[1:],
-            ]
-        return result
+        return {
+            entity_id: [_as_history_row(row) for row in rows]
+            for entity_id, rows in raw.items()
+        }
+
+
+def _as_history_row(row: State | dict[str, Any]) -> dict[str, Any]:
+    """Normalise one recorder row into a plain mapping.
+
+    ``minimal_response`` returns the first row of each entity as a full State
+    and the rest as dicts. That is an optimisation rather than a guarantee, so
+    each row is converted on its own merits instead of by position.
+    """
+    if isinstance(row, State):
+        return {"state": row.state, "last_changed": str(row.last_changed)}
+    return row
 
 
 def _font_search_dirs(hass: HomeAssistant, extra: str | None) -> list[str]:
@@ -363,7 +369,7 @@ async def _async_drawcustom(call: ServiceCall) -> ServiceResponse:
 
     rotate: int = call.data["rotate"]
     dry_run = call.data.get("dry-run", call.data.get("dry_run", False))
-    rendered: list[dict[str, Any]] = []
+    rendered: list[JsonValueType] = []
 
     for coordinator, mac in await _async_target_tags(hass, call):
         tag_type = coordinator.tag_type(mac)
@@ -480,7 +486,9 @@ async def _async_setled(call: ServiceCall) -> None:
         await coordinator.async_set_led(mac, pattern)
 
 
-def _make_tag_command_handler(command: TagCommand):
+def _make_tag_command_handler(
+    command: TagCommand,
+) -> Callable[[ServiceCall], Coroutine[Any, Any, None]]:
     """Return a handler that sends *command* to every targeted tag."""
 
     async def handler(call: ServiceCall) -> None:

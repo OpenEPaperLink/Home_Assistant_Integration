@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TypeIs
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -35,11 +36,15 @@ AP_PLATFORMS: list[Platform] = [
 ]
 
 
-def _is_ap_entry(entry: OpenEPaperLinkConfigEntry) -> bool:
+def _is_ap_entry(entry: OpenEPaperLinkConfigEntry) -> TypeIs[APConfigEntry]:
     """Whether *entry* is an Access Point rather than a Bluetooth tag.
 
     An AP entry has a host; an ATC entry does not. That is the whole
     discriminator -- see migration.py for why the stored one was dropped.
+
+    Returns TypeIs rather than bool so the two entry types, which carry
+    different runtime_data, are told apart in both branches. TypeGuard would
+    only narrow the true one.
     """
     return CONF_HOST in entry.data
 
