@@ -192,7 +192,7 @@
         }
       },
       "sleeptime1": {
-        "name": "Quiet hours start",
+        "name": "Quiet hours from",
         "state": {
           "00": "00:00",
           "01": "01:00",
@@ -221,7 +221,7 @@
         }
       },
       "sleeptime2": {
-        "name": "Quiet hours end",
+        "name": "Quiet hours to",
         "state": {
           "00": "00:00",
           "01": "01:00",
