@@ -101,17 +101,20 @@ TAG_SENSORS: tuple[TagSensorDescription, ...] = (
     TagSensorDescription(
         key="last_seen",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda tag: tag.last_seen_at,
     ),
     TagSensorDescription(
         key="next_update",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda tag: tag.next_update_at,
     ),
     TagSensorDescription(
         key="next_checkin",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda tag: tag.next_checkin_at,
     ),
@@ -182,6 +185,7 @@ AP_SENSORS: tuple[APSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="dBm",
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         value_fn=lambda status: status.rssi or None,
     ),
     APSensorDescription(
@@ -239,6 +243,7 @@ AP_SENSORS: tuple[APSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.SECONDS,
         suggested_unit_of_measurement=UnitOfTime.HOURS,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         value_fn=lambda status: status.uptime or None,
     ),
     APSensorDescription(

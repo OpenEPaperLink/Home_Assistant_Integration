@@ -36,22 +36,33 @@ class APButtonDescription(ButtonEntityDescription):
 
 
 TAG_BUTTONS: tuple[TagButtonDescription, ...] = (
-    TagButtonDescription(key="clear_pending", command=TagCommand.CLEAR),
-    TagButtonDescription(key="force_refresh", command=TagCommand.REFRESH),
+    # These act on a tag rather than configuring one -- clearing a stuck
+    # queue, forcing a redraw, rebooting, rescanning, putting it to sleep --
+    # so they are diagnostic rather than config.
+    TagButtonDescription(
+        key="clear_pending",
+        command=TagCommand.CLEAR,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    TagButtonDescription(
+        key="force_refresh",
+        command=TagCommand.REFRESH,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     TagButtonDescription(
         key="reboot_tag",
         device_class=ButtonDeviceClass.RESTART,
-        entity_category=EntityCategory.CONFIG,
+        entity_category=EntityCategory.DIAGNOSTIC,
         command=TagCommand.REBOOT,
     ),
     TagButtonDescription(
         key="scan_channels",
-        entity_category=EntityCategory.CONFIG,
+        entity_category=EntityCategory.DIAGNOSTIC,
         command=TagCommand.SCAN,
     ),
     TagButtonDescription(
         key="deep_sleep",
-        entity_category=EntityCategory.CONFIG,
+        entity_category=EntityCategory.DIAGNOSTIC,
         command=TagCommand.DEEPSLEEP,
     ),
 )
@@ -60,7 +71,7 @@ AP_BUTTONS: tuple[APButtonDescription, ...] = (
     APButtonDescription(
         key="reboot_ap",
         device_class=ButtonDeviceClass.RESTART,
-        entity_category=EntityCategory.CONFIG,
+        entity_category=EntityCategory.DIAGNOSTIC,
         press_fn=lambda coordinator: coordinator.async_reboot_ap(),
     ),
 )
