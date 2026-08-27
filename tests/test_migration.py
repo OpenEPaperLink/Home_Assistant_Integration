@@ -12,14 +12,14 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.open_epaper_link.const import DOMAIN
+from custom_components.open_epaper_link.const import DOMAIN, REMOVED_SENSOR_KEYS
 from custom_components.open_epaper_link.migration import (
     async_migrate_entry_data,
     async_migrate_registries,
     migrate_unique_id,
 )
 
-from .conftest import AP_HOST, AP_MAC
+from .conftest import AP_HOST, AP_MAC, TAG_MAC
 
 ENTRY_ID = "01JABCDEF0123456789"
 TAG = "00000335042F3E10"
@@ -37,9 +37,10 @@ ATC_MAC = "AA:BB:CC:DD:EE:01"
         # Tag entities: bare MAC prefix, no domain or entry scoping.
         (f"{TAG}_temperature", f"{ENTRY_ID}_{TAG}_temperature"),
         (f"{TAG}_battery_voltage", f"{ENTRY_ID}_{TAG}_battery_voltage"),
-        (f"{TAG}_alias", f"{ENTRY_ID}_{TAG}_alias"),
-        (f"{TAG}_display_content", f"{ENTRY_ID}_{TAG}_display_content"),
         (f"{TAG}_clear_pending", f"{ENTRY_ID}_{TAG}_clear_pending"),
+        # Renamed in 4.0, so the key changes as well as the scoping.
+        (f"{TAG}_alias", f"{ENTRY_ID}_{TAG}_tag_alias"),
+        (f"{TAG}_display_content", f"{ENTRY_ID}_{TAG}_content"),
         # AP entities were already entry-scoped and must not change.
         (f"{ENTRY_ID}_ap_state", f"{ENTRY_ID}_ap_state"),
         (f"{ENTRY_ID}_reboot_ap", f"{ENTRY_ID}_reboot_ap"),
@@ -322,3 +323,95 @@ async def test_other_integrations_untouched(hass: HomeAssistant) -> None:
     async_migrate_registries(hass, entry)
 
     assert registry.async_get(foreign.entity_id).unique_id == f"{TAG}_temperature"
+
+
+# ---------------------------------------------------------------------------
+# Against a real pre-4.0 registry
+#
+# The inventory below was taken from a production instance running the pre-4.0
+# integration: 20 tags and one Access Point, 551 entities. Only the key names
+# are reproduced -- no addresses, identifiers or entity ids.
+#
+# This exists because the synthetic cases above were written from the same
+# assumptions as the code they check, so both agreed the alias and
+# display_content keys were unchanged. They were not, and 40 entities would
+# have been orphaned on upgrade.
+# ---------------------------------------------------------------------------
+
+PRODUCTION_TAG_KEYS = frozenset(
+    {
+        "alias",
+        "battery_percentage",
+        "battery_voltage",
+        "block_requests",
+        "boot_count",
+        "capabilities",
+        "checkin_count",
+        "clear_pending",
+        "content_mode",
+        "deep_sleep",
+        "display_content",
+        "force_refresh",
+        "height",
+        "last_seen",
+        "lqi",
+        "next_checkin",
+        "next_update",
+        "pending_updates",
+        "reboot_tag",
+        "rssi",
+        "runtime",
+        "scan_channels",
+        "temperature",
+        "update_count",
+        "wakeup_reason",
+        "width",
+    }
+)
+
+# Created only when the hardware reports the capability, so a tag fixture
+# without it legitimately has no such entity.
+CONDITIONAL_TAG_KEYS = frozenset({"nfc"})
+
+
+async def test_every_production_tag_key_survives_migration(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client
+) -> None:
+    """No tag entity in a real pre-4.0 registry is left orphaned.
+
+    A key that migrates to something the integration never creates leaves a
+    dead registry row and a second entity beside it, breaking any automation
+    that referenced the original.
+    """
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    entry_id = ap_config_entry.entry_id
+    prefix = f"{entry_id}_{TAG_MAC}_"
+    created = {
+        record.unique_id[len(prefix) :]
+        for record in er.async_entries_for_config_entry(er.async_get(hass), entry_id)
+        if record.unique_id.startswith(prefix)
+    } | CONDITIONAL_TAG_KEYS
+
+    orphaned = set()
+    for key in PRODUCTION_TAG_KEYS:
+        if key in REMOVED_SENSOR_KEYS:
+            continue  # deliberately dropped; the migration deletes these
+        migrated = migrate_unique_id(f"{TAG_MAC}_{key}", entry_id)
+        if migrated[len(prefix) :] not in created:
+            orphaned.add(key)
+
+    assert not orphaned, f"pre-4.0 tag keys with nothing to migrate onto: {orphaned}"
+
+
+@pytest.mark.parametrize(
+    ("old_key", "new_key"),
+    [("alias", "tag_alias"), ("display_content", "content")],
+)
+def test_renamed_tag_keys(old_key: str, new_key: str) -> None:
+    """Keys that changed name in 4.0 are re-keyed, not abandoned."""
+    assert (
+        migrate_unique_id(f"{TAG}_{old_key}", ENTRY_ID) == f"{ENTRY_ID}_{TAG}_{new_key}"
+    )

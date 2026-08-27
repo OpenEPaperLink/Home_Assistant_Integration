@@ -45,6 +45,18 @@ _LOGGER = logging.getLogger(__name__)
 # Pre-4.0 unique_id prefix for what are now called ATC tags.
 _LEGACY_ATC_PREFIX = "oepl_ble_"
 
+# Tag entity keys that were renamed in 4.0, old name to new. Without these the
+# entity is not re-keyed but replaced: the old row keeps a unique_id nothing
+# claims, and a second entity appears alongside it. Found by diffing a real
+# pre-4.0 registry rather than by reading this module's own assumptions.
+_RENAMED_TAG_KEYS = {
+    # Disambiguated from the Access Point's own alias text entity, which
+    # already owned the "alias" translation key.
+    "alias": "tag_alias",
+    # The image platform gives the domain, so "display" said it twice.
+    "display_content": "content",
+}
+
 
 def migrate_unique_id(old: str, entry_id: str) -> str:
     """Map a pre-4.0 unique_id onto the new entry-scoped scheme.
@@ -65,6 +77,9 @@ def migrate_unique_id(old: str, entry_id: str) -> str:
         return f"{entry_id}_{key}" if key else f"{entry_id}_{remainder}"
 
     # Everything else is a tag entity keyed as <MAC>_<key>.
+    mac, _, key = old.partition("_")
+    if key in _RENAMED_TAG_KEYS:
+        return f"{entry_id}_{mac}_{_RENAMED_TAG_KEYS[key]}"
     return f"{entry_id}_{old}"
 
 
