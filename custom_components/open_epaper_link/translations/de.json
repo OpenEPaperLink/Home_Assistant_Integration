@@ -238,6 +238,33 @@
           "22": "22:00",
           "23": "23:00"
         }
+      },
+      "channel": {
+        "name": "Kanal"
+      },
+      "led": {
+        "name": "RGB-LED-Helligkeit"
+      },
+      "tft": {
+        "name": "TFT-Helligkeit"
+      },
+      "maxsleep": {
+        "name": "Maximale Schlafzeit"
+      },
+      "lock": {
+        "name": "Tag-Inventar sperren"
+      },
+      "wifipower": {
+        "name": "WLAN-Sendeleistung"
+      },
+      "language": {
+        "name": "Sprache"
+      },
+      "discovery": {
+        "name": "Erkennungsmethode"
+      },
+      "subghzchannel": {
+        "name": "Sub-GHz-Kanal"
       }
     }
   },

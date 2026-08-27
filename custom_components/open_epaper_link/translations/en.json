@@ -83,6 +83,7 @@
     },
     "select": {
       "channel": {
+        "name": "Channel",
         "state": {
           "auto": "Automatic",
           "11": "11",
@@ -93,6 +94,7 @@
         }
       },
       "led": {
+        "name": "RGB LED brightness",
         "state": {
           "off": "Off",
           "10": "10%",
@@ -103,6 +105,7 @@
         }
       },
       "tft": {
+        "name": "TFT brightness",
         "state": {
           "off": "Off",
           "10": "10%",
@@ -113,6 +116,7 @@
         }
       },
       "maxsleep": {
+        "name": "Maximum sleep",
         "state": {
           "shortest": "Shortest (40 sec)",
           "5": "5 min",
@@ -122,6 +126,7 @@
         }
       },
       "lock": {
+        "name": "Lock tag inventory",
         "state": {
           "open": "Open: accept any tag",
           "locked": "Locked: reject new tags",
@@ -129,12 +134,14 @@
         }
       },
       "discovery": {
+        "name": "Discovery method",
         "state": {
           "multicast": "Multicast",
           "broadcast": "Broadcast"
         }
       },
       "wifipower": {
+        "name": "Wi-Fi power",
         "state": {
           "2_0": "2.0 dBm",
           "5_0": "5.0 dBm",
@@ -150,6 +157,7 @@
         }
       },
       "language": {
+        "name": "Language",
         "state": {
           "en": "English",
           "nl": "Nederlands",
@@ -166,6 +174,7 @@
         }
       },
       "subghzchannel": {
+        "name": "Sub-GHz channel",
         "state": {
           "disabled": "Disabled",
           "100": "864.000 MHz (Europe)",
