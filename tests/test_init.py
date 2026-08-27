@@ -80,13 +80,18 @@ async def test_devices_are_entry_scoped(
     registry = dr.async_get(hass)
     entry_id = ap_config_entry.entry_id
 
-    assert registry.async_get_device(identifiers={(DOMAIN, f"{entry_id}_ap")})
-    tag_device = registry.async_get_device(
-        identifiers={(DOMAIN, f"{entry_id}_{TAG_MAC}")}
+    ap_device = registry.async_get_device_by_identifier(
+        (DOMAIN, f"{entry_id}_ap"), entry_id
+    )
+    assert ap_device is not None
+    tag_device = registry.async_get_device_by_identifier(
+        (DOMAIN, f"{entry_id}_{TAG_MAC}"), entry_id
     )
     assert tag_device is not None
-    # Tags hang off their Access Point.
-    assert tag_device.via_device_id is not None
+    # Tags hang off their own Access Point, not merely off something. Asserting
+    # the identity is what catches a link resolved to the wrong device, which
+    # is the failure via_device was deprecated for.
+    assert tag_device.via_device_id == ap_device.id
 
 
 # ---------------------------------------------------------------------------
@@ -285,3 +290,41 @@ async def test_user_disabled_event_is_not_re_enabled(
     await hass.async_block_till_done()
 
     assert registry.async_get(entity_id).disabled_by is (er.RegistryEntryDisabler.USER)
+
+
+async def test_each_tag_links_to_its_own_access_point(
+    hass: HomeAssistant,
+    ap_config_entry: MockConfigEntry,
+    peer_config_entry: MockConfigEntry,
+    mock_client: AsyncMock,
+) -> None:
+    """Two Access Points, and neither one's tags hang off the other.
+
+    This is the case via_device was deprecated for: an identifier is only
+    unique within a config entry, so resolving a parent by identifier alone
+    could attach a tag to whichever Access Point happened to match first.
+    """
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    peer_config_entry.add_to_hass(hass)
+    mock_client.for_host(PEER_HOST)
+    mock_client.set_tags(make_tag(EXTERNAL_TAG), host=PEER_HOST)
+    await hass.config_entries.async_setup(peer_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = dr.async_get(hass)
+    for entry, mac in (
+        (ap_config_entry, TAG_MAC),
+        (peer_config_entry, EXTERNAL_TAG),
+    ):
+        ap_device = registry.async_get_device_by_identifier(
+            (DOMAIN, f"{entry.entry_id}_ap"), entry.entry_id
+        )
+        tag_device = registry.async_get_device_by_identifier(
+            (DOMAIN, f"{entry.entry_id}_{mac}"), entry.entry_id
+        )
+        assert ap_device is not None
+        assert tag_device is not None
+        assert tag_device.via_device_id == ap_device.id

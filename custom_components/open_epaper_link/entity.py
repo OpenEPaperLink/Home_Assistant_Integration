@@ -5,7 +5,11 @@ from __future__ import annotations
 from homeassistant.components.bluetooth.passive_update_coordinator import (
     PassiveBluetoothCoordinatorEntity,
 )
-from homeassistant.helpers.device_registry import CONNECTION_BLUETOOTH, DeviceInfo
+from homeassistant.helpers.device_registry import (
+    CONNECTION_BLUETOOTH,
+    DeviceInfo,
+    async_get_device_id_by_identifier,
+)
 from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from oepl import Tag
@@ -70,7 +74,15 @@ class OpenEPaperLinkTagEntity(OpenEPaperLinkEntity):
             name=self._tag_name(),
             manufacturer="OpenEPaperLink",
             model=coordinator.tag_type_name(mac),
-            via_device=(DOMAIN, f"{entry_id}_ap"),
+            # via_device is deprecated and goes away in 2027.8: an identifier
+            # is only unique within a config entry, so resolving one to a
+            # parent is ambiguous. The coordinator registers the Access Point
+            # during setup, so this resolves by the time entities are built.
+            via_device_id=async_get_device_id_by_identifier(
+                coordinator.hass,
+                (DOMAIN, f"{entry_id}_ap"),
+                config_entry_id=entry_id,
+            ),
         )
 
     def _tag_name(self) -> str:

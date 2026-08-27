@@ -100,7 +100,13 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(dr.format_mac(discovery_info.macaddress))
         # An AP that moved to a new address updates its entry rather than being
         # ignored, which is what keying on the host string used to prevent.
-        self._abort_if_unique_id_configured(updates={CONF_HOST: discovery_info.ip})
+        #
+        # reload_on_update=False because this entry already carries an update
+        # listener that reloads. Doing both reloads twice and can race, which
+        # Home Assistant deprecated in 2026.6 and rejects from 2026.12.
+        self._abort_if_unique_id_configured(
+            updates={CONF_HOST: discovery_info.ip}, reload_on_update=False
+        )
 
         # Deliberately no probe here: the announcement already carries the MAC
         # this entry is keyed on, and an Access Point that is briefly busy
@@ -125,7 +131,10 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
 
         ap_mac, alias = probed
         await self.async_set_unique_id(ap_mac)
-        self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+        # See async_step_dhcp: the update listener owns the reload.
+        self._abort_if_unique_id_configured(
+            updates={CONF_HOST: host}, reload_on_update=False
+        )
 
         self._host = host
         self._alias = alias or discovery_info.get("alias")
@@ -174,7 +183,10 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 ap_mac, alias = probed
                 await self.async_set_unique_id(ap_mac)
-                self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+                # See async_step_dhcp: the update listener owns the reload.
+                self._abort_if_unique_id_configured(
+                    updates={CONF_HOST: host}, reload_on_update=False
+                )
                 self._host, self._alias = host, alias
                 return self.async_create_entry(
                     title=self._title(),
@@ -204,7 +216,9 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
                 await self.async_set_unique_id(ap_mac)
                 # Refuse to repoint an entry at a different physical AP.
                 self._abort_if_unique_id_mismatch(reason="wrong_ap")
-                return self.async_update_reload_and_abort(
+                # Updating the entry wakes the update listener, which reloads.
+                # Reloading here as well is the deprecated double reload.
+                return self.async_update_and_abort(
                     entry, data_updates={CONF_HOST: host}
                 )
 

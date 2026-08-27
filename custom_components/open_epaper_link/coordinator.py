@@ -151,6 +151,11 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         # where HTTP works but the socket does not.
         self.online = True
 
+        # Before any platform builds an entity: tag devices link to the Access
+        # Point through via_device_id, and resolving that raises if the parent
+        # is not registered yet.
+        self._async_register_ap_device()
+
         visible = self._visible_tags(tags)
         # Entities read tag geometry and hardware names synchronously when
         # building device info, so the definitions have to be in hand first.
@@ -482,11 +487,34 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         registry.async_update_entity(entity_id, disabled_by=None)
 
     @callback
+    def _async_register_ap_device(self) -> None:
+        """Register the Access Point's own device.
+
+        Done here rather than left to whichever entity is built first, because
+        tag devices resolve it as their via_device parent and that lookup
+        raises when the parent is missing.
+        """
+        entry = self.config_entry
+        dr.async_get(self.hass).async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, f"{entry.entry_id}_ap")},
+            connections={(dr.CONNECTION_NETWORK_MAC, self.ap_mac)},
+            name=entry.title,
+            manufacturer="OpenEPaperLink",
+            model=self.ap_info.env if self.ap_info else None,
+            sw_version=self.ap_info.build_version if self.ap_info else None,
+            configuration_url=f"http://{self.host}",
+        )
+
+    @callback
     def _async_sync_device_name(self, tag: Tag) -> None:
         """Mirror an alias change from the AP into the device registry."""
         registry = dr.async_get(self.hass)
-        device = registry.async_get_device(
-            identifiers={(DOMAIN, f"{self.config_entry.entry_id}_{tag.mac}")}
+        # Identifiers are only unique within a config entry, so the lookup is
+        # scoped to this one; the unscoped form resolves ambiguously.
+        device = registry.async_get_device_by_identifier(
+            (DOMAIN, f"{self.config_entry.entry_id}_{tag.mac}"),
+            self.config_entry.entry_id,
         )
         if device is not None:
             registry.async_update_device(device.id, name=tag.alias or tag.mac)
