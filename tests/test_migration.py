@@ -12,9 +12,14 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.open_epaper_link.const import DOMAIN, REMOVED_SENSOR_KEYS
+from custom_components.open_epaper_link.const import (
+    CONF_HOST,
+    DOMAIN,
+    REMOVED_SENSOR_KEYS,
+)
 from custom_components.open_epaper_link.migration import (
     async_migrate_entry_data,
+    async_migrate_entry_title,
     async_migrate_registries,
     migrate_unique_id,
 )
@@ -415,3 +420,65 @@ def test_renamed_tag_keys(old_key: str, new_key: str) -> None:
     assert (
         migrate_unique_id(f"{TAG}_{old_key}", ENTRY_ID) == f"{ENTRY_ID}_{TAG}_{new_key}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Entry title
+# ---------------------------------------------------------------------------
+
+
+async def test_legacy_title_is_replaced(hass: HomeAssistant) -> None:
+    """A pre-4.0 entry stops being named after the address it was added at."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=f"OpenEPaperLink AP ({AP_HOST})",
+        data={CONF_HOST: AP_HOST},
+    )
+    entry.add_to_hass(hass)
+
+    async_migrate_entry_title(hass, entry, "OpenEpaperLink-EEFF")
+
+    assert entry.title == "OpenEpaperLink-EEFF"
+
+
+async def test_legacy_title_matches_even_after_the_ap_moved(
+    hass: HomeAssistant,
+) -> None:
+    """The title holds the address at creation, which DHCP may have changed."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OpenEPaperLink AP (192.0.2.99)",
+        data={CONF_HOST: AP_HOST},
+    )
+    entry.add_to_hass(hass)
+
+    async_migrate_entry_title(hass, entry, "OpenEpaperLink-EEFF")
+
+    assert entry.title == "OpenEpaperLink-EEFF"
+
+
+async def test_a_name_the_user_chose_is_left_alone(hass: HomeAssistant) -> None:
+    """Renaming the entry is how someone overrides this."""
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="Kitchen display hub", data={CONF_HOST: AP_HOST}
+    )
+    entry.add_to_hass(hass)
+
+    async_migrate_entry_title(hass, entry, "OpenEpaperLink-EEFF")
+
+    assert entry.title == "Kitchen display hub"
+
+
+async def test_retitling_cannot_fire_twice(hass: HomeAssistant) -> None:
+    """It runs on every setup, so the rewritten title must not match again."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=f"OpenEPaperLink AP ({AP_HOST})",
+        data={CONF_HOST: AP_HOST},
+    )
+    entry.add_to_hass(hass)
+
+    async_migrate_entry_title(hass, entry, "OpenEpaperLink-EEFF")
+    async_migrate_entry_title(hass, entry, "something-else")
+
+    assert entry.title == "OpenEpaperLink-EEFF"

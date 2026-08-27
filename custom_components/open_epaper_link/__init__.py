@@ -13,7 +13,11 @@ from homeassistant.helpers.typing import ConfigType
 from .atc_coordinator import ATCConfigEntry, ATCCoordinator, ATCRuntimeData
 from .const import CONF_HOST, CONF_MAC_ADDRESS, SIGNAL_ENTRIES_CHANGED
 from .coordinator import APConfigEntry, APCoordinator
-from .migration import async_migrate_entry_data, async_migrate_registries
+from .migration import (
+    async_migrate_entry_data,
+    async_migrate_entry_title,
+    async_migrate_registries,
+)
 from .services import async_register_services
 
 type OpenEPaperLinkConfigEntry = APConfigEntry | ATCConfigEntry
@@ -69,6 +73,7 @@ async def async_setup_entry(
     # deliberately happens here rather than in async_migrate_entry: it needs a
     # round trip to the AP, and migrations should not do network I/O.
     async_migrate_entry_data(hass, entry, ap_mac=coordinator.ap_mac)
+    async_migrate_entry_title(hass, entry, coordinator.ap_name)
 
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, AP_PLATFORMS)

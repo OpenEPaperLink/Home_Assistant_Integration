@@ -25,6 +25,7 @@ working; only newly discovered tags get name-derived slugs.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -44,6 +45,11 @@ _LOGGER = logging.getLogger(__name__)
 
 # Pre-4.0 unique_id prefix for what are now called ATC tags.
 _LEGACY_ATC_PREFIX = "oepl_ble_"
+
+# The title pre-4.0 gave an Access Point, which embedded the address it was
+# added at (config_flow.py:83 and :438 of that version). Matched loosely on
+# the address because DHCP may have moved it since.
+_LEGACY_TITLE = re.compile(r"^OpenEPaperLink AP \(.*\)$")
 
 # Tag entity keys that were renamed in 4.0, old name to new. Without these the
 # entity is not re-keyed but replaced: the old row keeps a unique_id nothing
@@ -122,6 +128,24 @@ def async_migrate_entry_data(
 
     hass.config_entries.async_update_entry(entry, unique_id=unique_id, data=data)
     _LOGGER.debug("Migrated config entry data for %s", entry.entry_id)
+
+
+@callback
+def async_migrate_entry_title(
+    hass: HomeAssistant, entry: ConfigEntry[Any], name: str
+) -> None:
+    """Replace a pre-4.0 title that named the Access Point after its address.
+
+    Only the title that version generated is rewritten. Anything else is a
+    name the user chose, and choosing one is how they override this.
+
+    Runs on every setup rather than once: it is cheap, and the rewritten title
+    no longer matches, so it cannot fire twice.
+    """
+    if not _LEGACY_TITLE.match(entry.title):
+        return
+    hass.config_entries.async_update_entry(entry, title=name)
+    _LOGGER.debug("Retitled config entry %s to %s", entry.entry_id, name)
 
 
 @callback

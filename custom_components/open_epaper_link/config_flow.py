@@ -24,7 +24,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
-from oepl import OEPLClient, OEPLError
+from oepl import OEPLClient, OEPLError, build_hostname
 from py_atc_ble_oepl import (
     MANUFACTURER_ID,
     AdvertisingData,
@@ -58,6 +58,7 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         """Initialise the flow."""
         self._host: str | None = None
         self._alias: str | None = None
+        self._ap_mac: str | None = None
         self._atc_address: str | None = None
         self._atc_name: str | None = None
 
@@ -86,8 +87,19 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         return dr.format_mac(wifi.mac), info.alias
 
     def _title(self) -> str:
-        """Human-readable entry title."""
-        return self._alias or f"OpenEPaperLink {self._host}"
+        """Human-readable entry title.
+
+        The Access Point's alias, or failing that the name it gives itself on
+        the network -- py-oepl derives that from the MAC the way the firmware
+        does. Deliberately not the address: DHCP moves it, and the title is
+        set once at creation, so an address here is wrong from the first time
+        the Access Point is handed a different one.
+        """
+        if self._alias:
+            return self._alias
+        if self._ap_mac:
+            return build_hostname(self._ap_mac)
+        return "OpenEPaperLink"
 
     # ------------------------------------------------------------------
     # DHCP discovery -- the primary path
@@ -142,6 +154,7 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         # should still be offered rather than silently dropped. Reachability is
         # verified when the user confirms.
         self._host = discovery_info.ip
+        self._ap_mac = mac
         self.context["title_placeholders"] = {"name": self._title()}
         return await self.async_step_discovery_confirm()
 
@@ -166,6 +179,7 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
         self._host = host
+        self._ap_mac = ap_mac
         self._alias = alias or discovery_info.get("alias")
         self.context["title_placeholders"] = {"name": self._title()}
         return await self.async_step_discovery_confirm()
@@ -216,7 +230,7 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured(
                     updates={CONF_HOST: host}, reload_on_update=False
                 )
-                self._host, self._alias = host, alias
+                self._host, self._alias, self._ap_mac = host, alias, ap_mac
                 return self.async_create_entry(
                     title=self._title(),
                     data={CONF_HOST: host, CONF_AP_MAC: ap_mac},
