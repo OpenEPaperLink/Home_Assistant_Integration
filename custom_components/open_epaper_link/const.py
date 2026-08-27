@@ -33,12 +33,26 @@ SIGNAL_TAG_INTERACTION: Final = f"{DOMAIN}_tag_interaction"
 # entries can re-evaluate which of them owns each mesh tag.
 SIGNAL_ENTRIES_CHANGED: Final = f"{DOMAIN}_entries_changed"
 
-# Sensor keys removed in the rewrite. These were derived by the integration
-# from what it happened to observe, so they undercounted after any restart or
-# WebSocket drop. The AP's own updatecount/updatelast are authoritative and
-# replace them. migration.py removes the orphaned entities.
+# Entity keys removed in the rewrite, whose registry rows migration.py deletes
+# rather than leaving orphaned.
+#
+# The first four were derived by the integration from what it happened to
+# observe, so they undercounted after any restart or WebSocket drop; the AP's
+# own updatecount/updatelast are authoritative and replace them.
+#
+# ap_sys_time was a clock: it changed on every WebSocket message and did
+# nothing but fill the recorder database. refresh_tag_types existed to pull tag
+# type definitions from GitHub, which the rewrite does not do -- the AP serves
+# the definitions for every tag it has connected.
 REMOVED_SENSOR_KEYS: Final = frozenset(
-    {"runtime", "boot_count", "checkin_count", "block_requests"}
+    {
+        "runtime",
+        "boot_count",
+        "checkin_count",
+        "block_requests",
+        "sys_time",
+        "refresh_tag_types",
+    }
 )
 
 # Battery percentage scale. Full is the point the M2 family stops measuring:

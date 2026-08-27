@@ -30,7 +30,7 @@ async def async_setup_entry(
     """Set up text entities for an Access Point and its tags."""
     coordinator = entry.runtime_data
 
-    async_add_entities([APAliasText(coordinator)])
+    async_add_entities([APAliasText(coordinator), APRepoText(coordinator)])
 
     known: set[str] = set()
 
@@ -94,3 +94,33 @@ class APAliasText(OpenEPaperLinkAPEntity, TextEntity):
     async def async_set_value(self, value: str) -> None:
         """Rename the Access Point."""
         await self.coordinator.async_set_ap_config_item("alias", value)
+
+
+class APRepoText(OpenEPaperLinkAPEntity, TextEntity):
+    """The GitHub repository the Access Point takes its updates from.
+
+    Disabled by default. The default suits everyone who is not running a fork,
+    and a typo here silently points the update flow at a repository with no
+    releases -- a failure that surfaces only when an update is attempted. It is
+    also not load-bearing: the update flow reads the value from the Access
+    Point's own config rather than from this entity.
+    """
+
+    _attr_mode = TextMode.TEXT
+    _attr_native_max = 64
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: APCoordinator) -> None:
+        """Set up the entity."""
+        super().__init__(coordinator, "repo")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the configured repository."""
+        config = self.coordinator.ap_config
+        return config.repo if config else None
+
+    async def async_set_value(self, value: str) -> None:
+        """Point the Access Point at a different repository."""
+        await self.coordinator.async_set_ap_config_item("repo", value)

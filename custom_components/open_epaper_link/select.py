@@ -83,6 +83,13 @@ def _choices(key: str) -> dict[str, int]:
     return {name: value for value, name in _KEYS[key].items()}
 
 
+# The quiet-hours window, as hours of the day. Deliberately outside _KEYS:
+# those mirror value sets py-oepl takes from the firmware, whereas this is
+# just the clock. util.h:isSleeping compares both against tm_hour, reads equal
+# values as "no window", and wraps past midnight when the first is the larger.
+_SLEEP_HOURS: dict[str, int] = {f"{hour:02d}": hour for hour in range(24)}
+
+
 AP_SELECTS: tuple[APSelectDescription, ...] = (
     APSelectDescription(
         key="channel",
@@ -138,6 +145,20 @@ AP_SELECTS: tuple[APSelectDescription, ...] = (
         key="discovery",
         choices=_choices("discovery"),
         attribute="discovery",
+        entity_category=EntityCategory.CONFIG,
+    ),
+    # Start and end of the window in which the Access Point stops updating
+    # tags. Setting both to the same hour disables it.
+    APSelectDescription(
+        key="sleeptime1",
+        choices=_SLEEP_HOURS,
+        attribute="sleep_time1",
+        entity_category=EntityCategory.CONFIG,
+    ),
+    APSelectDescription(
+        key="sleeptime2",
+        choices=_SLEEP_HOURS,
+        attribute="sleep_time2",
         entity_category=EntityCategory.CONFIG,
     ),
 )
