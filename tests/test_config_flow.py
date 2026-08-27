@@ -348,3 +348,57 @@ async def test_bluetooth_confirm_recovers_after_a_retry(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == {CONF_MAC_ADDRESS: ATC_ADDRESS}
+
+
+async def test_dhcp_adopts_a_pre_4_0_entry_instead_of_duplicating_it(
+    hass: HomeAssistant, mock_ap: AsyncMock
+) -> None:
+    """A discovery must not add a second entry for an already configured AP.
+
+    Pre-4.0 entries were keyed on the host, whichever way they were set up.
+    Migration swaps that for the MAC, but it needs the MAC from the Access
+    Point and so only runs once setup succeeds -- and an unreachable Access
+    Point retries indefinitely, leaving the old key in place meanwhile. A
+    discovery arriving in that window used to match nothing.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        # The pre-4.0 shape: keyed on the host, with no MAC stored.
+        unique_id=AP_HOST,
+        data={CONF_HOST: AP_HOST},
+        version=4,
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_DHCP}, data=DHCP_INFO
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+    # Adopted rather than abandoned: it now carries the identity it will keep.
+    assert entry.unique_id == dr.format_mac(AP_MAC)
+    assert entry.data[CONF_AP_MAC] == dr.format_mac(AP_MAC)
+
+
+async def test_dhcp_leaves_a_different_ap_alone(
+    hass: HomeAssistant, mock_ap: AsyncMock, mock_setup_entry: AsyncMock
+) -> None:
+    """Adoption matches on the host, so a second Access Point still gets added."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="192.0.2.99",
+        data={CONF_HOST: "192.0.2.99"},
+        version=4,
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_DHCP}, data=DHCP_INFO
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.unique_id == "192.0.2.99"
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 2

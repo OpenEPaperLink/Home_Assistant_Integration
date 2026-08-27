@@ -93,11 +93,40 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
     # DHCP discovery -- the primary path
     # ------------------------------------------------------------------
 
+    @callback
+    def _async_adopt_unmigrated_entry(self, mac: str, host: str) -> None:
+        """Re-key a pre-4.0 entry for this Access Point onto its MAC.
+
+        Entries added before 4.0 were keyed on the host, whichever way they
+        were set up: both the manual step and DHCP discovery called
+        ``async_set_unique_id(host)``. Migration replaces that with the MAC,
+        but it needs the MAC from the Access Point, so it only runs once setup
+        has succeeded -- and an unreachable Access Point retries indefinitely,
+        leaving the old key in place for as long as it is down.
+
+        A discovery arriving in that window would match nothing and add a
+        second entry for hardware already configured. Discovery carries the
+        MAC, so the re-key can happen here without a round trip.
+        """
+        for entry in self._async_current_entries():
+            if entry.data.get(CONF_HOST) != host or entry.unique_id == mac:
+                continue
+            self.hass.config_entries.async_update_entry(
+                entry, unique_id=mac, data={**entry.data, CONF_AP_MAC: mac}
+            )
+            _LOGGER.debug(
+                "Re-keyed pre-4.0 entry %s onto %s before discovery",
+                entry.entry_id,
+                mac,
+            )
+
     async def async_step_dhcp(
         self, discovery_info: DhcpServiceInfo
     ) -> ConfigFlowResult:
         """Handle an AP discovered over DHCP."""
-        await self.async_set_unique_id(dr.format_mac(discovery_info.macaddress))
+        mac = dr.format_mac(discovery_info.macaddress)
+        self._async_adopt_unmigrated_entry(mac, discovery_info.ip)
+        await self.async_set_unique_id(mac)
         # An AP that moved to a new address updates its entry rather than being
         # ignored, which is what keying on the host string used to prevent.
         #
