@@ -32,6 +32,7 @@ from oepl import (
     TagCommand,
     TagType,
     WakeupReason,
+    build_hostname,
 )
 
 from .const import (
@@ -486,6 +487,18 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         _LOGGER.debug("Enabling %s after a real %s event", entity_id, event_type)
         registry.async_update_entity(entity_id, disabled_by=None)
 
+    @property
+    def ap_name(self) -> str:
+        """What to call the Access Point.
+
+        Its alias when it has one, otherwise the name it gives itself on the
+        network -- py-oepl derives that from the MAC the way the firmware
+        does. Deliberately not the address: that changes under DHCP, and a
+        device named after one would be wrong the moment it moved.
+        """
+        alias = self.ap_config.alias if self.ap_config else ""
+        return alias or build_hostname(self.ap_mac) or "OpenEPaperLink"
+
     @callback
     def _async_register_ap_device(self) -> None:
         """Register the Access Point's own device.
@@ -499,7 +512,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
             config_entry_id=entry.entry_id,
             identifiers={(DOMAIN, f"{entry.entry_id}_ap")},
             connections={(dr.CONNECTION_NETWORK_MAC, self.ap_mac)},
-            name=entry.title,
+            name=self.ap_name,
             manufacturer="OpenEPaperLink",
             model=self.ap_info.env if self.ap_info else None,
             sw_version=self.ap_info.build_version if self.ap_info else None,

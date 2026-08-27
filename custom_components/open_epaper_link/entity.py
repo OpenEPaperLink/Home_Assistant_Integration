@@ -44,7 +44,7 @@ class OpenEPaperLinkAPEntity(OpenEPaperLinkEntity):
         # which used to make a second Access Point collide with the first.
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_ap")},
-            name=coordinator.config_entry.title,
+            name=coordinator.ap_name,
             manufacturer="OpenEPaperLink",
             model=coordinator.ap_info.env if coordinator.ap_info else None,
             sw_version=coordinator.ap_info.build_version

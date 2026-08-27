@@ -12,7 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.open_epaper_link.const import DOMAIN
 
-from .conftest import PEER_HOST, TAG_MAC, make_tag
+from .conftest import AP_HOST, PEER_HOST, TAG_MAC, make_ap_config, make_tag
 
 EXTERNAL_TAG = "00000335042F3E11"
 
@@ -328,3 +328,38 @@ async def test_each_tag_links_to_its_own_access_point(
         assert ap_device is not None
         assert tag_device is not None
         assert tag_device.via_device_id == ap_device.id
+
+
+async def test_access_point_is_named_after_itself_not_its_address(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """The device takes the Access Point's alias when it has one."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{ap_config_entry.entry_id}_ap"), ap_config_entry.entry_id
+    )
+    assert device.name == "Kitchen AP"
+
+
+async def test_unnamed_access_point_uses_the_name_it_gives_itself(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """Without an alias, the derived hostname stands in for one.
+
+    Never the address: that changes under DHCP, and a device named after one
+    would be wrong the moment it moved.
+    """
+    mock_client.get_ap_config.return_value = make_ap_config(alias="")
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{ap_config_entry.entry_id}_ap"), ap_config_entry.entry_id
+    )
+    # py-oepl derives this from the MAC the way the firmware does.
+    assert device.name == "OpenEpaperLink-EEFF"
+    assert AP_HOST not in device.name
