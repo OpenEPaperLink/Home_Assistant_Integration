@@ -1533,7 +1533,7 @@ dev = [
     { name = "habluetooth", specifier = "==6.26.5" },
     { name = "mypy", specifier = "==1.18.2" },
     { name = "odl-renderer", specifier = "==0.5.12" },
-    { name = "py-atc-ble-oepl", specifier = "==0.5.1" },
+    { name = "py-atc-ble-oepl", specifier = "==0.5.2" },
     { name = "py-oepl", extras = ["dither"], specifier = "==0.6.0" },
     { name = "pytest-homeassistant-custom-component", specifier = "==0.13.355" },
     { name = "ruff", specifier = "==0.16.2" },
@@ -1750,7 +1750,7 @@ wheels = [
 
 [[package]]
 name = "py-atc-ble-oepl"
-version = "0.5.1"
+version = "0.5.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bleak" },
@@ -1759,9 +1759,9 @@ dependencies = [
     { name = "numpy" },
     { name = "pillow" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fa/b2/7abce674a29f5b8c72ebc3b5e303756c5b7c30fd1abf6ece53d72c0932ae/py_atc_ble_oepl-0.5.1.tar.gz", hash = "sha256:434c87e7a04e9637a758c0b9bfd3e7dd4ca2ce8b18b1ff390979a11ca5a5b47b", size = 105277, upload-time = "2026-08-12T14:33:34.663Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/95/070932cbd11384420322d9b807dc617e182e58e2d66b3ef615ac4476ddad/py_atc_ble_oepl-0.5.2.tar.gz", hash = "sha256:c38bae8aaf51c631fb39ddbaef6217d81210b0a87adfdaa7931139ebae56660e", size = 107675, upload-time = "2026-08-28T13:07:46.589Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/25/b0/7603b893fb7bb5ad9a609610309ef62db0da0b2273f64c2e4729e96894f2/py_atc_ble_oepl-0.5.1-py3-none-any.whl", hash = "sha256:11e52be8f92883c6abd12ab25df57e136f221d1685a2638d68a426397f3ce469", size = 38355, upload-time = "2026-08-12T14:33:32.854Z" },
+    { url = "https://files.pythonhosted.org/packages/bc/cb/9deddb825f63c1739ab60661504868fc99844e95d1e164b1ace96ef0747c/py_atc_ble_oepl-0.5.2-py3-none-any.whl", hash = "sha256:21f4c1b50e48bb93f1400771c221e6ffc977935b66d6eb124e4ec658990133f6", size = 39494, upload-time = "2026-08-28T13:07:45.385Z" },
 ]
 
 [[package]]

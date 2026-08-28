@@ -271,6 +271,12 @@
   "exceptions": {
     "ap_cannot_connect": {
       "message": "Kann keine Verbindung zum AP unter {host} herstellen: {error}."
+    },
+    "atc_not_in_range": {
+      "message": "Das Tag {address} ist über Bluetooth derzeit nicht erreichbar. Diese Tags schlafen zwischen den Advertisements, es ist also möglicherweise noch nicht wach."
+    },
+    "atc_failed": {
+      "message": "Auf das Tag {address} konnte über Bluetooth nicht gezeichnet werden: {error}"
     }
   },
   "services": {

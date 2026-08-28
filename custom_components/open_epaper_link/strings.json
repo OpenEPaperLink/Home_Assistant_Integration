@@ -424,6 +424,12 @@
     },
     "image_size_mismatch": {
       "message": "The image for tag {mac} does not match the size its display expects, so the Access Point would render it as noise: {error}"
+    },
+    "atc_not_in_range": {
+      "message": "The tag {address} is not currently reachable over Bluetooth. These tags sleep between advertisements, so it may simply not be awake yet."
+    },
+    "atc_failed": {
+      "message": "Could not draw on the tag {address} over Bluetooth: {error}"
     }
   },
   "selector": {

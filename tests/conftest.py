@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from oepl import APConfig, APInfo, OEPLConnectionError, Tag, TagType
-from py_atc_ble_oepl import MANUFACTURER_ID
+from py_atc_ble_oepl import MANUFACTURER_ID, DeviceCapabilities
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.open_epaper_link.const import (
@@ -303,6 +303,38 @@ def mock_atc_reachable() -> Generator[MagicMock]:
         patch(f"{module}.ATCDevice", return_value=device),
     ):
         yield device
+
+
+@pytest.fixture
+def mock_atc_tag() -> Generator[MagicMock]:
+    """A tag that answers when an entry is set up.
+
+    Setup interrogates the tag for its panel geometry, so an entry cannot load
+    without one answering.
+    """
+    device = MagicMock()
+    device.__aenter__ = AsyncMock(return_value=device)
+    device.__aexit__ = AsyncMock(return_value=False)
+    # Sizes are the orientation the panel displays; py-atc-ble-oepl rotates
+    # into the wire format itself.
+    device.interrogate = AsyncMock(
+        return_value=DeviceCapabilities(width=152, height=200, color_scheme=2)
+    )
+    device.upload_image = AsyncMock(return_value=True)
+    module = "custom_components.open_epaper_link"
+    with (
+        patch(f"{module}.async_ble_device_from_address", return_value=MagicMock()),
+        patch(f"{module}.ATCDevice", return_value=device),
+    ):
+        yield device
+
+
+@pytest.fixture
+def mock_atc_tag_absent() -> Generator[None]:
+    """A tag that is not currently reachable over Bluetooth."""
+    module = "custom_components.open_epaper_link"
+    with patch(f"{module}.async_ble_device_from_address", return_value=None):
+        yield
 
 
 @pytest.fixture

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 from homeassistant.components.bluetooth import BluetoothChange
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -14,13 +16,13 @@ from custom_components.open_epaper_link.const import CONF_MAC_ADDRESS, DOMAIN
 from .conftest import ATC_ADDRESS, atc_service_info
 
 
-async def test_setup_without_connecting(
-    hass: HomeAssistant, atc_config_entry: MockConfigEntry
+async def test_setup_interrogates_the_tag(
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
 ) -> None:
-    """An ATC entry sets up even though the tag is asleep and unreachable.
+    """Panel geometry is read once at setup and kept in runtime data.
 
-    Requiring a connection would fail setup and leave Home Assistant retrying
-    against a battery device that cannot answer.
+    It cannot change for a tag, so every draw reads it from there rather than
+    paying for a Bluetooth connection.
     """
     atc_config_entry.add_to_hass(hass)
 
@@ -28,15 +30,29 @@ async def test_setup_without_connecting(
     await hass.async_block_till_done()
 
     assert atc_config_entry.state is ConfigEntryState.LOADED
+    caps = atc_config_entry.runtime_data.capabilities
+    assert (caps.width, caps.height, caps.color_scheme) == (152, 200, 2)
+    mock_atc_tag.interrogate.assert_awaited_once()
 
-    registry = er.async_get(hass)
-    assert registry.async_get_entity_id(
-        "sensor", DOMAIN, f"{atc_config_entry.entry_id}_battery_percentage"
-    )
+
+async def test_unreachable_tag_leaves_the_entry_not_ready(
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag_absent: None
+) -> None:
+    """A tag nobody can reach has nothing usable to offer.
+
+    These tags sleep only briefly between advertisements, so retrying costs
+    seconds rather than leaving an entry stuck.
+    """
+    atc_config_entry.add_to_hass(hass)
+
+    assert not await hass.config_entries.async_setup(atc_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert atc_config_entry.state is ConfigEntryState.SETUP_RETRY
 
 
 async def test_advertisement_populates_state(
-    hass: HomeAssistant, atc_config_entry: MockConfigEntry
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
 ) -> None:
     """State comes from advertisements, which cost the tag nothing."""
     atc_config_entry.add_to_hass(hass)
@@ -56,7 +72,7 @@ async def test_advertisement_populates_state(
 
 
 async def test_malformed_advertisement_is_ignored(
-    hass: HomeAssistant, atc_config_entry: MockConfigEntry
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
 ) -> None:
     """A truncated advertisement must not take the entry down."""
     atc_config_entry.add_to_hass(hass)
@@ -90,6 +106,7 @@ async def test_ap_and_atc_entries_coexist(
     ap_config_entry: MockConfigEntry,
     atc_config_entry: MockConfigEntry,
     mock_client,
+    mock_atc_tag: MagicMock,
 ) -> None:
     """The two transports are separate entry shapes under one domain."""
     ap_config_entry.add_to_hass(hass)
@@ -104,7 +121,7 @@ async def test_ap_and_atc_entries_coexist(
 
 
 async def test_image_entity_is_empty_until_something_is_drawn(
-    hass: HomeAssistant, atc_config_entry: MockConfigEntry
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
 ) -> None:
     """An ATC tag cannot be read back, so there is nothing to show at first.
 
@@ -124,7 +141,7 @@ async def test_image_entity_is_empty_until_something_is_drawn(
 
 
 async def test_image_entity_shows_what_was_drawn(
-    hass: HomeAssistant, atc_config_entry: MockConfigEntry
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
 ) -> None:
     """Once an image is drawn it becomes the entity's content."""
     atc_config_entry.add_to_hass(hass)

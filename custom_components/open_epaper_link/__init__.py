@@ -5,10 +5,13 @@ from __future__ import annotations
 import logging
 from typing import TypeIs
 
+from homeassistant.components.bluetooth import async_ble_device_from_address
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.typing import ConfigType
+from py_atc_ble_oepl import ATCDevice, ATCError
 
 from .atc_coordinator import ATCConfigEntry, ATCCoordinator, ATCRuntimeData
 from .const import CONF_HOST, CONF_MAC_ADDRESS, SIGNAL_ENTRIES_CHANGED
@@ -89,12 +92,33 @@ async def async_setup_entry(
 async def _async_setup_atc_entry(hass: HomeAssistant, entry: ATCConfigEntry) -> bool:
     """Set up a tag running ATC firmware.
 
-    No connection is made here. These are battery devices that are usually
-    asleep, so requiring one would fail setup and leave Home Assistant
-    retrying in a loop against a tag that cannot answer.
+    The tag is interrogated once here for its panel geometry, which cannot
+    change and is then read from runtime data rather than costing a connection
+    on every draw. A tag that cannot be reached leaves the entry not ready: it
+    sleeps only seconds between advertisements, so this retries quickly, and a
+    tag nobody can reach has nothing usable to offer.
     """
-    coordinator = ATCCoordinator(hass, entry.data[CONF_MAC_ADDRESS])
-    entry.runtime_data = ATCRuntimeData(coordinator=coordinator)
+    address = entry.data[CONF_MAC_ADDRESS]
+    ble_device = async_ble_device_from_address(hass, address, connectable=True)
+    if ble_device is None:
+        raise ConfigEntryNotReady(f"{address} is not currently reachable")
+
+    # auto_interrogate would query inside __aenter__ and hand back nothing:
+    # the capabilities object is only obtainable as interrogate()'s return
+    # value, so leaving it on would query twice.
+    device = ATCDevice(address, ble_device=ble_device, auto_interrogate=False)
+    try:
+        async with device:
+            capabilities = await device.interrogate()
+    except ATCError as err:
+        raise ConfigEntryNotReady(f"Could not interrogate {address}: {err}") from err
+
+    coordinator = ATCCoordinator(hass, address)
+    entry.runtime_data = ATCRuntimeData(
+        coordinator=coordinator,
+        device=device,
+        capabilities=capabilities,
+    )
     await hass.config_entries.async_forward_entry_setups(entry, ATC_PLATFORMS)
     # Started last, so entities are subscribed before advertisements arrive.
     entry.async_on_unload(coordinator.async_start())

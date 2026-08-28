@@ -26,7 +26,13 @@ from homeassistant.components.bluetooth.passive_update_coordinator import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from py_atc_ble_oepl import MANUFACTURER_ID, AdvertisingData, ATCProtocol
+from py_atc_ble_oepl import (
+    MANUFACTURER_ID,
+    AdvertisingData,
+    ATCDevice,
+    ATCProtocol,
+    DeviceCapabilities,
+)
 
 _LOGGER = logging.getLogger(__package__)
 
@@ -38,8 +44,11 @@ class ATCRuntimeData:
     """Runtime data for an ATC tag entry."""
 
     coordinator: ATCCoordinator
-    # Uploads take tens of seconds over Bluetooth; a newer one supersedes an
-    # older rather than queueing behind it.
+    # One per tag: ATCDevice serialises connections on its own lock, so a
+    # second instance would not be serialised against this one.
+    device: ATCDevice
+    capabilities: DeviceCapabilities
+    # A newer upload supersedes an older rather than queueing behind it.
     upload_task: asyncio.Task[None] | None = None
 
 
