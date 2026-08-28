@@ -6,8 +6,6 @@ old calls must keep working. These pin the coercion.
 
 from __future__ import annotations
 
-import json
-from base64 import b64decode
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -21,6 +19,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from oepl import LUT, LEDPattern, TagType
+from PIL.Image import Image
 
 from custom_components.open_epaper_link.const import DOMAIN
 from custom_components.open_epaper_link.services import (
@@ -457,59 +456,14 @@ async def test_upload_uses_the_tags_own_palette(
     assert kwargs["lut"] is LUT.DEFAULT
 
 
-async def test_drawcustom_returns_the_rendered_image(
+async def test_drawcustom_returns_nothing(
     hass: HomeAssistant, ap_config_entry, mock_client
 ) -> None:
-    """A script can reuse what was drawn, rather than only sending it."""
-    ap_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(ap_config_entry.entry_id)
-    await hass.async_block_till_done()
+    """The action draws; it does not hand anything back.
 
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
-    )
-    response = await hass.services.async_call(
-        DOMAIN,
-        "drawcustom",
-        {"device_id": [device.id], "payload": _text_payload()},
-        blocking=True,
-        return_response=True,
-    )
-
-    [rendered] = response["images"]
-    assert rendered["mac"] == TAG_MAC
-    assert rendered["mime_type"] == "image/png"
-    # The fixture's tag type is 296x128 and unrotated.
-    assert (rendered["width"], rendered["height"]) == (296, 128)
-    assert b64decode(rendered["image_base64"]).startswith(b"\x89PNG")
-
-
-async def test_response_survives_being_json(
-    hass: HomeAssistant, ap_config_entry, mock_client
-) -> None:
-    """Service responses cross a JSON boundary, so raw bytes would not do."""
-    ap_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(ap_config_entry.entry_id)
-    await hass.async_block_till_done()
-
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
-    )
-    response = await hass.services.async_call(
-        DOMAIN,
-        "drawcustom",
-        {"device_id": [device.id], "payload": _text_payload()},
-        blocking=True,
-        return_response=True,
-    )
-
-    json.dumps(response)
-
-
-async def test_calls_without_return_response_still_work(
-    hass: HomeAssistant, ap_config_entry, mock_client
-) -> None:
-    """Existing automations do not ask for a response and must keep working."""
+    What was drawn is on the tag's image entity, which is where it can be
+    looked at -- an action response is rendered as JSON.
+    """
     ap_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(ap_config_entry.entry_id)
     await hass.async_block_till_done()
@@ -526,29 +480,6 @@ async def test_calls_without_return_response_still_work(
         )
         is None
     )
-
-
-async def test_dry_run_still_returns_the_image(
-    hass: HomeAssistant, ap_config_entry, mock_client
-) -> None:
-    """Rendering without sending is exactly when the result is most useful."""
-    ap_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(ap_config_entry.entry_id)
-    await hass.async_block_till_done()
-
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
-    )
-    response = await hass.services.async_call(
-        DOMAIN,
-        "drawcustom",
-        {"device_id": [device.id], "payload": _text_payload(), "dry-run": True},
-        blocking=True,
-        return_response=True,
-    )
-
-    assert len(response["images"]) == 1
-    mock_client.upload_image.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------
@@ -577,17 +508,17 @@ async def _setup_tag(hass: HomeAssistant, entry) -> str:
     return device.id
 
 
-async def _render(hass: HomeAssistant, device_id: str, **extra: object) -> dict:
-    """Draw on one device and return the rendered image record."""
-    response = await hass.services.async_call(
+async def _render(
+    hass: HomeAssistant, device_id: str, mock_client, **extra: object
+) -> Image:
+    """Draw on one device and return the image that reached the tag."""
+    await hass.services.async_call(
         DOMAIN,
         "drawcustom",
         {"device_id": [device_id], "payload": _text_payload(), **extra},
         blocking=True,
-        return_response=True,
     )
-    [rendered] = response["images"]
-    return rendered
+    return mock_client.upload_image.await_args.args[0]
 
 
 def test_rotate_keeps_its_old_default() -> None:
@@ -632,11 +563,9 @@ async def test_every_rotation_uploads_at_native_size(
     the image is rotated back before upload.
     """
     device_id = await _setup_tag(hass, ap_config_entry)
-    rendered = await _render(hass, device_id, rotate=rotate)
+    uploaded = await _render(hass, device_id, mock_client, rotate=rotate)
 
     # The fixture's tag type is 296x128.
-    assert (rendered["width"], rendered["height"]) == (296, 128)
-    uploaded = mock_client.upload_image.await_args.args[0]
     assert uploaded.size == (296, 128)
 
 
@@ -681,9 +610,9 @@ async def test_stored_rotation_does_not_change_the_canvas(
     """
     mock_client.set_tags(make_tag(TAG_MAC, rotate=1))
     device_id = await _setup_tag(hass, ap_config_entry)
-    rendered = await _render(hass, device_id)
+    uploaded = await _render(hass, device_id, mock_client)
 
-    assert (rendered["width"], rendered["height"]) == (296, 128)
+    assert uploaded.size == (296, 128)
 
 
 # ---------------------------------------------------------------------------
