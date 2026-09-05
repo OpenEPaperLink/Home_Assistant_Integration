@@ -33,16 +33,18 @@ Example payload:
   value: Hello World!
   font: ppb.ttf
   x: 0
-  y: 0
+  'y': 0
   size: 40
   color: red
 - type: icon
   value: account-cowboy-hat
   x: 60
-  y: 120
+  'y': 120
   size: 120
   color: red
 ```
+
+Note that `'y'` needs to be quoted until HomeAssistant switches to only supporting yaml 1.2 due to how [booleans](https://www.home-assistant.io/docs/configuration/yaml/#booleans) are handled in 1.1.
 
 ### Service Options
 
@@ -79,7 +81,7 @@ Example payload adapting to tag color:
   value: Hello World!
   font: ppb.ttf
   x: 0
-  y: 0
+  'y': 0
   size: 40
   color: accent  # Will be red or yellow depending on the tag
 ```
@@ -109,21 +111,21 @@ Custom fonts are supported for text elements. The integration provides several w
   value: Default font
   font: ppb.ttf # Optional, you can also omit this line
   x: 10
-  y: 10
+  'y': 10
   
 # Using just the filename (searched in all font directories)
 - type: text
   value: "Custom Font"
   font: "CustomFont.ttf"
   x: 10
-  y: 50
+  'y': 50
 
 # Using the absolute path (direct access)
 - type: text
   value: "Custom Font with Path"
   font: "/media/GothamBold-Rnd.ttf"
   x: 10
-  y: 90
+  'y': 90
 ```
 
 ### Font locations
@@ -216,7 +218,7 @@ Draws text.
   value: "Hello World!"
   font: "/media/custom.ttf"
   x: 0
-  y: 0
+  'y': 0
   size: 40
   color: red
 ```
@@ -264,21 +266,21 @@ Examples:
 - type: text
   value: "Temperature: [red]25°C[/red]"
   x: 10
-  y: 10
+  'y': 10
   parse_colors: true
 
 # Multiple colors
 - type: text
   value: "[black]Current[/black] temp: [accent]25°C[/accent]"
   x: 10
-  y: 40
+  'y': 40
   parse_colors: true
 
 # With Home Assistant templates
 - type: text
   value: "Status: [{{ 'accent' if is_state('binary_sensor.door', 'on') else 'black' }}]{{ states('binary_sensor.door') }}[/{{ 'accent' if is_state('binary_sensor.door', 'on') else 'black' }}]"
   x: 10
-  y: 70
+  'y': 70
   parse_colors: true
 ```
 
@@ -296,7 +298,7 @@ When `parse_colors` is enabled, text elements support newline characters (`\n`) 
 - type: text
   value: "Line 1\n[red]Red Line 2[/red]\n[yellow]Yellow Line 3[/yellow]"
   x: "50%"
-  y: "50%"
+  'y': "50%"
   font: "ppb.ttf"
   size: 24
   parse_colors: true
@@ -453,7 +455,7 @@ Draws a circle around a center point.
 ```yaml
 - type: circle
   x: 50
-  y: 50
+  'y': 50
   radius: 20
 ```
 
@@ -494,14 +496,14 @@ Draws an arc (outline-only) or a pie slice (filled) based on the specified cente
 ```yaml
 - type: arc
   x: 100
-  y: 75
+  'y': 75
   radius: 50
   start_angle: 0
   end_angle: 90
   fill: red
 - type: arc
   x: 100
-  y: 75
+  'y': 75
   radius: 50
   start_angle: 90
   end_angle: 0
@@ -525,7 +527,7 @@ Draws Material Design Icons.
 - type: icon
   value: "account-cowboy-hat"
   x: 60
-  y: 120
+  'y': 120
   size: 120
   color: red
 ```
@@ -548,7 +550,7 @@ Draws multiple Material Design Icons in a sequence with specified direction and 
 ```yaml
 - type: icon_sequence
   x: 10
-  y: 10
+  'y': 10
   icons:
     - mdi:home
     - mdi:arrow-right
@@ -577,7 +579,7 @@ Downloads and displays an image from a URL.
 - type: dlimg
   url: "https://upload.wikimedia.org/wikipedia/en/9/9a/Trollface_non-free.png"
   x: 10
-  y: 10
+  'y': 10
   xsize: 120
   ysize: 120
   rotate: 0
@@ -607,7 +609,7 @@ Generates and displays a QR code.
 - type: qrcode
   data: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
   x: 140
-  y: 50
+  'y': 50
   boxsize: 2
   border: 2
   color: "black"
@@ -896,7 +898,7 @@ Basic state display:
 - type: "text"
   value: "Temperature: {{ states('sensor.temperature') }}°C"
   x: 10
-  y: 10
+  'y': 10
 ```
 
 Conditional formatting:
@@ -909,7 +911,7 @@ Conditional formatting:
     [/{{ 'red' if is_state('binary_sensor.door', 'on') else 'black' }}]
   parse_colors: true
   x: 10
-  y: 10
+  'y': 10
 ```
 
 Dynamic positioning:
@@ -917,7 +919,7 @@ Dynamic positioning:
 - type: "text"
   value: "Centered"
   x: "50%"
-  y: "50%"
+  'y': "50%"
   anchor: "mm"
 ```
 
@@ -928,13 +930,13 @@ Battery status with icon:
 - type: "icon"
   value: "mdi:battery"
   x: 10
-  y: 10
+  'y': 10
   size: 24
   color: "{{ 'red' if states('sensor.battery')|float < 20 else 'black' }}"
 - type: "text"
   value: "{{ states('sensor.battery') }}%"
   x: 40
-  y: 10
+  'y': 10
 ```
 
 Header with divider:
@@ -942,7 +944,7 @@ Header with divider:
 - type: "text"
   value: "Status Overview"
   x: 10
-  y: 10
+  'y': 10
   size: 24
 - type: "line"
   x_start: 10
@@ -956,24 +958,24 @@ Multi-sensor display:
 - type: "text"
   value: "Living Room"
   x: 10
-  y: 10
+  'y': 10
   size: 24
 - type: "icon"
   value: "mdi:thermometer"
   x: 10
-  y: 40
+  'y': 40
   size: 20
 - type: "text"
   value: "{{ states('sensor.living_room_temperature') }}°C"
   x: 35
-  y: 40
+  'y': 40
 - type: "icon"
   value: "mdi:water-percent"
   x: 10
-  y: 70
+  'y': 70
   size: 20
 - type: "text"
   value: "{{ states('sensor.living_room_humidity') }}%"
   x: 35
-  y: 70
+  'y': 70
 ```

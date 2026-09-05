@@ -158,7 +158,7 @@ After setup, you can configure additional options through the integration's opti
 - type: "text"
   value: "Hello World!"
   x: 10
-  y: 10
+  'y': 10
   size: 40
   color: "red"
 ```
@@ -176,7 +176,7 @@ After setup, you can configure additional options through the integration's opti
 - type: "icon"
   value: "mdi:battery-70"
   x: 190
-  y: 20
+  'y': 20
   size: 24
 ```
 
@@ -185,13 +185,13 @@ After setup, you can configure additional options through the integration's opti
 - type: "text"
   value: "Temperature: {{ states('sensor.temperature') }}°C"
   x: 10
-  y: 10
+  'y': 10
   size: 24
   color: "black"
 - type: "text"
   value: "Humidity: {{ states('sensor.humidity') }}%"
   x: 10
-  y: 40
+  'y': 40
   size: 24
   color: "black"
 ```
@@ -224,12 +224,12 @@ New format (`drawcustom` payload):
 - type: "text"
   value: "Hello"
   x: 10
-  y: 10
+  'y': 10
   size: 24
 - type: "text"
   value: "World"
   x: 10
-  y: 40
+  'y': 40
   size: 24
 ```
 
@@ -248,7 +248,7 @@ New format (`drawcustom` payload):
 - type: "dlimg"
   url: "https://example.com/image.jpg"
   x: 0
-  y: 0
+  'y': 0
   xsize: 296
   ysize: 128
 ```
