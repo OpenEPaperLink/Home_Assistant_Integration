@@ -9,6 +9,7 @@ from homeassistant.const import Platform, EVENT_HOMEASSISTANT_STARTED, CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import entity_registry as er, device_registry as dr, storage
+from homeassistant.helpers.storage import Store
 from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.helpers.typing import ConfigType
 from .ble import BLEDeviceMetadata
@@ -585,10 +586,21 @@ async def async_remove_storage_files(hass: HomeAssistant) -> None:
         except OSError as err:
             _LOGGER.error("Error removing tag types file: %s", err)
 
-    # Remove tag types storage entry
+    # Remove tag types storage entry.
+    # Home Assistant 2026.9 removed the module-level ``storage.async_remove_store``
+    # helper; the public API is now ``Store(...).async_remove()``. Older HA versions
+    # only expose the module-level helper, so we try the new API first and fall back
+    # gracefully to keep the integration compatible across releases.
     try:
-        await storage.async_remove_store(hass, "open_epaper_link_tagtypes")
+        await Store(hass, version=1, key="open_epaper_link_tagtypes").async_remove()
         _LOGGER.debug("Removed tag types storage file")
+    except AttributeError:
+        # HA < 2026.9 — fall back to the legacy module-level helper
+        try:
+            await storage.async_remove_store(hass, "open_epaper_link_tagtypes")  # type: ignore[attr-defined]
+            _LOGGER.debug("Removed tag types storage file (legacy helper)")
+        except Exception as err:
+            _LOGGER.error("Error removing tag types storage file: %s", err)
     except Exception as err:
         _LOGGER.error("Error removing tag types storage file: %s", err)
 
