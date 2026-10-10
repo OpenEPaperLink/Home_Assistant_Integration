@@ -13,7 +13,8 @@ the pre-4.0 call shape and coerce it.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Coroutine
+from collections.abc import Awaitable, Callable, Coroutine, Mapping
+from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
 from io import BytesIO
@@ -22,6 +23,7 @@ from typing import Any
 
 import voluptuous as vol
 from epaper_dithering import ColorScheme, DitherMode
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import (
     HomeAssistant,
     ServiceCall,
@@ -37,7 +39,10 @@ from homeassistant.helpers.service import async_extract_entity_ids
 from odl_renderer import generate_image
 from oepl import LUT, Color, LEDPattern, LEDSegment, TagCommand, TagType
 from PIL.Image import Image
+from py_atc_ble_oepl import ATCError, FitMode
+from py_atc_ble_oepl import ColorScheme as ATCColorScheme
 
+from .atc_coordinator import ATCConfigEntry, ATCRuntimeData
 from .const import DOMAIN, OPT_CUSTOM_FONT_DIRS
 from .coordinator import APCoordinator
 
@@ -289,11 +294,14 @@ def _validate_local_paths(hass: HomeAssistant, elements: list[dict[str, Any]]) -
 
 async def _async_targets(
     hass: HomeAssistant, call: ServiceCall
-) -> list[tuple[APCoordinator, str | None]]:
-    """Resolve what a call targets to (coordinator, MAC) pairs.
+) -> list[tuple[ConfigEntry, str | None]]:
+    """Resolve what a call targets to (entry, MAC) pairs.
 
-    A MAC of None means the Access Point itself. Home Assistant expands areas
-    and labels for us, which the pre-4.0 code did by hand.
+    A MAC of None means the Access Point itself. Entries come back whatever
+    their kind, because a tag reached over Bluetooth is as legitimate a target
+    as one behind an Access Point; callers narrow on runtime_data. Home
+    Assistant expands areas and labels for us, which the pre-4.0 code did by
+    hand.
     """
     entity_registry = er.async_get(hass)
     device_registry = dr.async_get(hass)
@@ -303,7 +311,7 @@ async def _async_targets(
         if (record := entity_registry.async_get(entity_id)) and record.device_id:
             device_ids.add(record.device_id)
 
-    targets: list[tuple[APCoordinator, str | None]] = []
+    targets: list[tuple[ConfigEntry, str | None]] = []
     seen: set[str] = set()
 
     for device_id in device_ids:
@@ -317,11 +325,10 @@ async def _async_targets(
             # ids are ULIDs, so the first underscore is the separator.
             entry_id, _, suffix = value.partition("_")
             entry = hass.config_entries.async_get_entry(entry_id)
-            coordinator = getattr(entry, "runtime_data", None) if entry else None
-            if not isinstance(coordinator, APCoordinator):
-                continue
+            if entry is None or getattr(entry, "runtime_data", None) is None:
+                continue  # not loaded, so nothing to act on
             seen.add(value)
-            targets.append((coordinator, None if suffix == "ap" else suffix))
+            targets.append((entry, None if suffix == "ap" else suffix))
 
     if not targets:
         raise ServiceValidationError(
@@ -333,11 +340,13 @@ async def _async_targets(
 async def _async_target_tags(
     hass: HomeAssistant, call: ServiceCall
 ) -> list[tuple[APCoordinator, str]]:
-    """Resolve what a call targets, rejecting anything that is not a tag."""
+    """Resolve what a call targets, rejecting all but Access Point tags."""
     tags = [
-        (coordinator, mac)
-        for coordinator, mac in await _async_targets(hass, call)
-        if mac is not None and mac in coordinator.data
+        (entry.runtime_data, mac)
+        for entry, mac in await _async_targets(hass, call)
+        if mac is not None
+        and isinstance(entry.runtime_data, APCoordinator)
+        and mac in entry.runtime_data.data
     ]
     if not tags:
         raise ServiceValidationError(
@@ -366,41 +375,26 @@ async def _async_drawcustom(call: ServiceCall) -> None:
     rotate: int = call.data["rotate"]
     dry_run = call.data.get("dry-run", call.data.get("dry_run", False))
 
-    for coordinator, mac in await _async_target_tags(hass, call):
-        tag_type = coordinator.tag_type(mac)
-        if tag_type is None:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="unknown_tag_type",
-                translation_placeholders={"mac": mac},
-            )
-
-        # rotate is applied here, not by the Access Point, which is what the
-        # pre-4.0 action did and what existing automations expect. A quarter
-        # turn is laid out on a transposed canvas and turned back below, so
-        # the upload is always the panel's native size.
-        #
-        # That sizing is not optional: the Access Point does no scaling.
-        # spr2color() in makeimage.cpp derives its output buffer geometry from
-        # the uploaded image itself, so any other size indexes outside the
-        # sprite and reaches the tag as noise.
+    for canvas in await _async_canvases(hass, call):
+        # rotate is applied here, not by the device. A quarter turn is laid
+        # out on a transposed canvas and turned back below, so what is sent is
+        # always the panel's own size -- which is not optional: neither the
+        # Access Point nor a tag scales what it is given.
         if rotate in (90, 270):
-            width, height = tag_type.height, tag_type.width
+            width, height = canvas.height, canvas.width
         else:
-            width, height = tag_type.width, tag_type.height
+            width, height = canvas.width, canvas.height
 
         image = await generate_image(
             width=width,
             height=height,
             elements=elements,
             background=call.data["background"],
-            accent_color=_accent_color(tag_type),
+            accent_color=canvas.accent_color,
             session=async_get_clientsession(hass),
             data_provider=HADataProvider(hass),
             font_dirs=await hass.async_add_executor_job(
-                _font_search_dirs,
-                hass,
-                coordinator.config_entry.options.get(OPT_CUSTOM_FONT_DIRS),
+                _font_search_dirs, hass, canvas.options.get(OPT_CUSTOM_FONT_DIRS)
             ),
         )
 
@@ -410,20 +404,134 @@ async def _async_drawcustom(call: ServiceCall) -> None:
 
         # Shown on the tag's image entity either way, so a dry run is a
         # preview rather than a silent no-op.
-        coordinator.async_set_preview(mac, _to_png(image))
+        canvas.preview(_to_png(image))
+        if not dry_run:
+            await canvas.send(image)
 
-        if dry_run:
-            _LOGGER.debug("Dry run: rendered %sx%s for %s", width, height, mac)
-            continue
 
-        await coordinator.async_upload_image(
+@dataclass(frozen=True)
+class _Canvas:
+    """Somewhere a drawcustom call can render to.
+
+    An Access Point tag and a Bluetooth tag differ in where their geometry
+    comes from, what colour they can accent in, where a preview goes and how a
+    finished image reaches them -- and in nothing else. Building that
+    difference here keeps the drawing itself a single path.
+    """
+
+    width: int
+    height: int
+    accent_color: str
+    options: Mapping[str, Any]
+    preview: Callable[[bytes], None]
+    send: Callable[[Image], Awaitable[None]]
+
+
+async def _async_canvases(hass: HomeAssistant, call: ServiceCall) -> list[_Canvas]:
+    """Resolve what a call targets into things that can be drawn on."""
+    canvases: list[_Canvas] = []
+    for entry, mac in await _async_targets(hass, call):
+        runtime = entry.runtime_data
+        if isinstance(runtime, ATCRuntimeData):
+            canvases.append(_atc_canvas(hass, entry, call))
+        elif mac is not None and mac in runtime.data:
+            canvases.append(_tag_canvas(runtime, mac, call))
+
+    if not canvases:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="no_tags_targeted"
+        )
+    return canvases
+
+
+def _tag_canvas(coordinator: APCoordinator, mac: str, call: ServiceCall) -> _Canvas:
+    """A tag behind an Access Point, which queues the image and delivers it."""
+    tag_type = coordinator.tag_type(mac)
+    if tag_type is None:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="unknown_tag_type",
+            translation_placeholders={"mac": mac},
+        )
+    return _Canvas(
+        width=tag_type.width,
+        height=tag_type.height,
+        accent_color=_accent_color(tag_type),
+        options=coordinator.config_entry.options,
+        preview=partial(coordinator.async_set_preview, mac),
+        send=partial(
+            coordinator.async_upload_image,
             mac,
-            image,
             ttl=call.data["ttl"],
             lut=call.data["refresh_type"],
             dither_mode=call.data["dither"],
             color_scheme=_color_scheme(tag_type),
-        )
+        ),
+    )
+
+
+def _atc_canvas(
+    hass: HomeAssistant, entry: ATCConfigEntry, call: ServiceCall
+) -> _Canvas:
+    """A tag reached directly over Bluetooth.
+
+    Its geometry was read when the entry was set up, so nothing here has to
+    talk to the tag before drawing.
+    """
+    runtime = entry.runtime_data
+    panel = runtime.capabilities
+    return _Canvas(
+        width=panel.width,
+        height=panel.height,
+        accent_color=_ATC_ACCENT_COLORS.get(panel.color_scheme, "black"),
+        options=entry.options,
+        preview=runtime.coordinator.async_set_rendered,
+        send=partial(_async_send_to_atc, hass, entry, call.data["dither"]),
+    )
+
+
+# A Bluetooth tag carries no tag type, so what it can accent in comes from
+# what it said about its own panel.
+_ATC_ACCENT_COLORS = {
+    ATCColorScheme.BWR.value: "red",
+    ATCColorScheme.BWY.value: "yellow",
+    ATCColorScheme.BWRY.value: "red",
+}
+
+
+async def _async_send_to_atc(
+    hass: HomeAssistant, entry: ATCConfigEntry, dither_mode: DitherMode, image: Image
+) -> None:
+    """Hand an image to a Bluetooth tag, without waiting for it to arrive.
+
+    Sending takes tens of seconds, which no automation should block on. A
+    newer draw replaces an older still in flight rather than queueing behind
+    it: the older one's picture is already stale.
+    """
+    runtime = entry.runtime_data
+    if runtime.upload_task is not None and not runtime.upload_task.done():
+        runtime.upload_task.cancel()
+    runtime.upload_task = entry.async_create_background_task(
+        hass, _async_upload_to_atc(entry, image, dither_mode), name=f"{DOMAIN} upload"
+    )
+
+
+async def _async_upload_to_atc(
+    entry: ATCConfigEntry, image: Image, dither_mode: DitherMode
+) -> None:
+    """Send a rendered image over Bluetooth.
+
+    Detached from the action that asked for it, so a failure is logged rather
+    than raised at a caller already told the draw was accepted.
+    """
+    runtime = entry.runtime_data
+    try:
+        async with runtime.device:
+            await runtime.device.upload_image(
+                image, dither_mode=dither_mode, fit=FitMode.CONTAIN
+            )
+    except ATCError as err:
+        _LOGGER.error("Could not draw on %s: %s", runtime.coordinator.address, err)
 
 
 def _to_png(image: Image) -> bytes:
@@ -481,9 +589,20 @@ def _make_tag_command_handler(
     return handler
 
 
+async def _async_target_access_points(
+    hass: HomeAssistant, call: ServiceCall
+) -> list[APCoordinator]:
+    """Resolve what a call targets to Access Points, ignoring anything else."""
+    return [
+        entry.runtime_data
+        for entry, _ in await _async_targets(hass, call)
+        if isinstance(entry.runtime_data, APCoordinator)
+    ]
+
+
 async def _async_reboot_ap(call: ServiceCall) -> None:
     """Reboot every targeted Access Point."""
-    for coordinator, _ in await _async_targets(call.hass, call):
+    for coordinator in await _async_target_access_points(call.hass, call):
         await coordinator.async_reboot_ap()
 
 
@@ -492,7 +611,7 @@ async def _async_refresh_tag_types(call: ServiceCall) -> None:
 
     Useful after it downloads a definition it did not previously hold.
     """
-    for coordinator, _ in await _async_targets(call.hass, call):
+    for coordinator in await _async_target_access_points(call.hass, call):
         await coordinator.async_refresh_tag_types()
 
 

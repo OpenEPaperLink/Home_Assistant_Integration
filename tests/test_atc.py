@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
+from epaper_dithering import DitherMode
 from homeassistant.components.bluetooth import BluetoothChange
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from py_atc_ble_oepl import MANUFACTURER_ID
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -153,3 +156,157 @@ async def test_image_entity_shows_what_was_drawn(
     await hass.async_block_till_done()
 
     assert coordinator.rendered == b"\x89PNG-pretend"
+
+
+# ---------------------------------------------------------------------------
+# Drawing on a Bluetooth tag
+# ---------------------------------------------------------------------------
+
+
+async def _draw_on(
+    hass: HomeAssistant, entry: MockConfigEntry, **extra: object
+) -> None:
+    """Call drawcustom against a Bluetooth tag's device."""
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{entry.entry_id}_{entry.data[CONF_MAC_ADDRESS]}"), entry.entry_id
+    )
+    await hass.services.async_call(
+        DOMAIN,
+        "drawcustom",
+        {
+            "device_id": [device.id],
+            "payload": [
+                {
+                    "type": "rectangle",
+                    "x_start": 0,
+                    "y_start": 0,
+                    "x_end": 5,
+                    "y_end": 5,
+                }
+            ],
+            **extra,
+        },
+        blocking=True,
+    )
+
+
+async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_drawcustom_reaches_a_bluetooth_tag(
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
+) -> None:
+    """A Bluetooth tag is as valid a target as one behind an Access Point.
+
+    Targeting used to keep only Access Point entries, so this failed with
+    "no tags were targeted" -- a targeting complaint for a path that was
+    simply never wired up.
+    """
+    await _setup(hass, atc_config_entry)
+
+    await _draw_on(hass, atc_config_entry)
+    await hass.async_block_till_done()
+
+    mock_atc_tag.upload_image.assert_awaited_once()
+    # The geometry read at setup, in the orientation the panel displays.
+    assert mock_atc_tag.upload_image.await_args.args[0].size == (152, 200)
+
+
+async def test_quarter_turn_still_sends_the_panel_size(
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
+) -> None:
+    """Rotation is laid out on a transposed canvas and turned back."""
+    await _setup(hass, atc_config_entry)
+
+    await _draw_on(hass, atc_config_entry, rotate=90)
+    await hass.async_block_till_done()
+
+    assert mock_atc_tag.upload_image.await_args.args[0].size == (152, 200)
+
+
+async def test_dither_choice_reaches_the_tag(
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
+) -> None:
+    """Dithering targets what this panel can render."""
+    await _setup(hass, atc_config_entry)
+
+    await _draw_on(hass, atc_config_entry, dither="floyd_steinberg")
+    await hass.async_block_till_done()
+
+    assert (
+        mock_atc_tag.upload_image.await_args.kwargs["dither_mode"]
+        is DitherMode.FLOYD_STEINBERG
+    )
+
+
+async def test_dry_run_previews_without_sending(
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
+) -> None:
+    """Sending costs the tag battery and tens of seconds, so a dry run must not."""
+    await _setup(hass, atc_config_entry)
+
+    await _draw_on(hass, atc_config_entry, **{"dry-run": True})
+    await hass.async_block_till_done()
+
+    mock_atc_tag.upload_image.assert_not_awaited()
+    assert atc_config_entry.runtime_data.coordinator.rendered is not None
+
+
+async def test_the_action_does_not_wait_for_the_tag(
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
+) -> None:
+    """Sending takes tens of seconds, which no automation should block on."""
+    await _setup(hass, atc_config_entry)
+
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def _slow(*_args: object, **_kwargs: object) -> bool:
+        started.set()
+        await release.wait()
+        return True
+
+    mock_atc_tag.upload_image = AsyncMock(side_effect=_slow)
+
+    await _draw_on(hass, atc_config_entry)
+    await asyncio.wait_for(started.wait(), 1)
+
+    task = atc_config_entry.runtime_data.upload_task
+    assert task is not None and not task.done()
+
+    release.set()
+    await hass.async_block_till_done()
+
+
+async def test_a_newer_draw_replaces_one_still_in_flight(
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
+) -> None:
+    """The older picture is already stale, so it does not get to finish."""
+    await _setup(hass, atc_config_entry)
+
+    release = asyncio.Event()
+
+    async def _slow(*_args: object, **_kwargs: object) -> bool:
+        await release.wait()
+        return True
+
+    mock_atc_tag.upload_image = AsyncMock(side_effect=_slow)
+
+    await _draw_on(hass, atc_config_entry)
+    first = atc_config_entry.runtime_data.upload_task
+    await _draw_on(hass, atc_config_entry)
+    second = atc_config_entry.runtime_data.upload_task
+
+    assert first is not second
+    # Cancellation needs a turn of the loop to land, so it is waited for
+    # rather than asserted the instant it is requested.
+    for _ in range(10):
+        if first.done():
+            break
+        await asyncio.sleep(0)
+    assert first.cancelled()
+
+    release.set()
+    await hass.async_block_till_done()
