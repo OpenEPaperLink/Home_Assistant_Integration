@@ -5,6 +5,7 @@ import requests
 import logging
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from .runtime_data import OpenEPaperLinkBLERuntimeData
 
@@ -152,6 +153,32 @@ def get_mac_from_entity_id(entity_id: str) -> str:
     return entity_id.split(".")[1].upper()
 
 
+def get_device_by_identifier(
+        device_registry: dr.DeviceRegistry,
+        config_entry_id: str,
+        identifier: tuple[str, str],
+) -> dr.DeviceEntry | None:
+    """Look up a device by identifier within one config entry.
+
+    Home Assistant deprecated ``async_get_device(identifiers=...)`` because an
+    identifier is only unique inside a config entry. Newer versions provide
+    ``async_get_device_by_identifier``; older ones only have the old lookup, so
+    fall back to it there.
+
+    Args:
+        device_registry: Home Assistant device registry
+        config_entry_id: ID of the config entry that owns the device
+        identifier: Device identifier, for example ``(DOMAIN, tag_mac)``
+
+    Returns:
+        The matching device entry, or None if there is none
+    """
+    lookup = getattr(device_registry, "async_get_device_by_identifier", None)
+    if lookup is not None:
+        return lookup(identifier, config_entry_id)
+    return device_registry.async_get_device(identifiers={identifier})
+
+
 def is_ble_device(hass: HomeAssistant, entity_id: str) -> bool:
     """Check if entity represents a BLE device (vs AP/Hub device).
 
@@ -164,18 +191,19 @@ def is_ble_device(hass: HomeAssistant, entity_id: str) -> bool:
     Returns:
         bool: True if BLE device, False if Hub device or not found
     """
-    from homeassistant.helpers import device_registry as dr
-
     mac = entity_id.split(".")[1].upper()
     device_registry = dr.async_get(hass)
 
-    for device in device_registry.devices.values():
-        for identifier in device.identifiers:
-            if identifier[0] == DOMAIN:
-                device_mac = identifier[1]
-                if device_mac.startswith("ble_"):
-                    device_mac = device_mac[4:]
-                if device_mac.upper() == mac:
-                    return identifier[1].startswith("ble_")
+    for config_entry in hass.config_entries.async_entries(DOMAIN):
+        for device in dr.async_entries_for_config_entry(
+                device_registry, config_entry.entry_id
+        ):
+            for identifier in device.identifiers:
+                if identifier[0] == DOMAIN:
+                    device_mac = identifier[1]
+                    if device_mac.startswith("ble_"):
+                        device_mac = device_mac[4:]
+                    if device_mac.upper() == mac:
+                        return identifier[1].startswith("ble_")
 
     return False
