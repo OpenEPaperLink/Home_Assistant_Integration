@@ -17,7 +17,7 @@ from .coordinator import Hub
 from .runtime_data import OpenEPaperLinkConfigEntry, OpenEPaperLinkBLERuntimeData
 from .services import async_setup_services
 from .tag_types import get_tag_types_manager
-from .util import is_ble_entry
+from .util import get_device_by_identifier, is_ble_entry
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -365,8 +365,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntr
             # Dynamically update device firmware version from advertising data
             if advertising_data.fw_version:
                 device_registry = dr.async_get(hass)
-                device_entry = device_registry.async_get_device(
-                    identifiers={(DOMAIN, f"ble_{mac_address}")}
+                device_entry = get_device_by_identifier(
+                    device_registry, entry.entry_id, (DOMAIN, f"ble_{mac_address}")
                 )
                 new_fw_string = str(advertising_data.fw_version)
                 if device_entry and device_entry.sw_version != new_fw_string:
@@ -639,11 +639,6 @@ async def _send_welcome_image(
             _LOGGER.debug("Welcome image: drawcustom service not available")
             return
         device_registry = dr.async_get(hass)
-        devices = [
-            device
-            for device in device_registry.devices.values()
-            if entry_id in device.config_entries
-        ]
         for _ in range(20):
             devices = dr.async_entries_for_config_entry(device_registry, entry_id)
             if devices:
