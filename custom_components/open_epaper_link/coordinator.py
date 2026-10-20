@@ -20,6 +20,7 @@ from homeassistant.helpers import entity_registry as er
 import logging
 
 from .const import DOMAIN, SIGNAL_AP_UPDATE, SIGNAL_TAG_UPDATE, SIGNAL_TAG_IMAGE_UPDATE
+from .util import get_device_by_identifier
 from .tag_types import get_tag_types_manager, get_hw_string
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -628,8 +629,8 @@ class Hub:
             _LOGGER.debug("Tag name changed from '%s' to '%s'", old_name, tag_name)
             # Update device name in device registry
             device_registry = dr.async_get(self.hass)
-            device = device_registry.async_get_device(
-                identifiers={(DOMAIN, tag_mac)}
+            device = get_device_by_identifier(
+                device_registry, self.entry.entry_id, (DOMAIN, tag_mac)
             )
             if device:
                 device_registry.async_update_device(
@@ -730,8 +731,8 @@ class Hub:
 
             if should_fire:
                 device_registry = dr.async_get(self.hass)
-                device = device_registry.async_get_device(
-                    identifiers={(DOMAIN, tag_mac)}
+                device = get_device_by_identifier(
+                    device_registry, self.entry.entry_id, (DOMAIN, tag_mac)
                 )
                 if device:
                     self.hass.bus.async_fire(f"{DOMAIN}_event", {
