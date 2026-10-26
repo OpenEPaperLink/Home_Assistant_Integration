@@ -483,20 +483,23 @@ def _atc_canvas(
     return _Canvas(
         width=panel.width,
         height=panel.height,
-        accent_color=_ATC_ACCENT_COLORS.get(panel.color_scheme, "black"),
+        accent_color=_atc_accent_color(panel.color_scheme),
         options=entry.options,
         preview=runtime.coordinator.async_set_rendered,
         send=partial(_async_send_to_atc, hass, entry, call.data["dither"]),
     )
 
 
-# A Bluetooth tag carries no tag type, so what it can accent in comes from
-# what it said about its own panel.
-_ATC_ACCENT_COLORS = {
-    ATCColorScheme.BWR.value: "red",
-    ATCColorScheme.BWY.value: "yellow",
-    ATCColorScheme.BWRY.value: "red",
-}
+def _atc_accent_color(color_scheme: int) -> str:
+    """Return the colour a Bluetooth tag can accent in.
+
+    A Bluetooth tag carries no tag type, so this comes from the colour scheme
+    it reported for its own panel.
+    """
+    try:
+        return ATCColorScheme.from_value(color_scheme).accent_color
+    except ValueError:
+        return "black"
 
 
 async def _async_send_to_atc(

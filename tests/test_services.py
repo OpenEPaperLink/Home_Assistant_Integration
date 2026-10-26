@@ -27,6 +27,7 @@ from custom_components.open_epaper_link.services import (
     SCHEMA_SETLED,
     HADataProvider,
     _as_history_row,
+    _atc_accent_color,
     _color_scheme,
     _led_pattern,
     async_register_services,
@@ -178,6 +179,15 @@ def test_color_scheme_from_the_tag_type(
         },
     )
     assert _color_scheme(tag_type) is expected
+
+
+@pytest.mark.parametrize(
+    ("color_scheme", "expected"),
+    [(0, "black"), (1, "red"), (2, "yellow"), (3, "red"), (99, "black")],
+)
+def test_atc_accent_color_from_the_panel(color_scheme: int, expected: str) -> None:
+    """A Bluetooth tag accents in its panel's colour, and black if unknown."""
+    assert _atc_accent_color(color_scheme) == expected
 
 
 # ---------------------------------------------------------------------------

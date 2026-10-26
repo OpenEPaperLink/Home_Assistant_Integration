@@ -402,8 +402,7 @@ def _atc_name(
     none, which is common for these tags. Falling back to the hardware type
     plus the last two address octets is more use than a bare MAC.
     """
-    # Annotated because py-atc-ble-oepl ships no type information.
-    name: str | None = ATCProtocol.parse_device_name(discovery_info.name)
+    name = ATCProtocol.parse_device_name(discovery_info.name)
     if name and name != discovery_info.address:
         return name
     suffix = discovery_info.address.replace(":", "")[-4:]

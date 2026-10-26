@@ -1533,8 +1533,8 @@ dev = [
     { name = "habluetooth", specifier = "==6.26.5" },
     { name = "mypy", specifier = "==1.18.2" },
     { name = "odl-renderer", specifier = "==0.5.12" },
-    { name = "py-atc-ble-oepl", specifier = "==0.5.2" },
-    { name = "py-oepl", extras = ["dither"], specifier = "==0.7.0" },
+    { name = "py-atc-ble-oepl", specifier = "==0.6.0" },
+    { name = "py-oepl", extras = ["dither"], specifier = "==0.8.0" },
     { name = "pytest-homeassistant-custom-component", specifier = "==0.13.355" },
     { name = "ruff", specifier = "==0.16.2" },
     { name = "serialx", specifier = "==1.8.2" },
@@ -1750,7 +1750,7 @@ wheels = [
 
 [[package]]
 name = "py-atc-ble-oepl"
-version = "0.5.2"
+version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bleak" },
@@ -1759,22 +1759,22 @@ dependencies = [
     { name = "numpy" },
     { name = "pillow" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3f/95/070932cbd11384420322d9b807dc617e182e58e2d66b3ef615ac4476ddad/py_atc_ble_oepl-0.5.2.tar.gz", hash = "sha256:c38bae8aaf51c631fb39ddbaef6217d81210b0a87adfdaa7931139ebae56660e", size = 107675, upload-time = "2026-08-28T13:07:46.589Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/22/3f/ee6eb87a70a6e29afc1e2fe8f5190d4d08cd1b4554a0898443c8aaac049e/py_atc_ble_oepl-0.6.0.tar.gz", hash = "sha256:b05fc0ea268cbb0247a5ebfac6ab0f9ce1d3739d678b142dae4f473de19b485f", size = 108199, upload-time = "2026-10-26T22:02:46.154Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/cb/9deddb825f63c1739ab60661504868fc99844e95d1e164b1ace96ef0747c/py_atc_ble_oepl-0.5.2-py3-none-any.whl", hash = "sha256:21f4c1b50e48bb93f1400771c221e6ffc977935b66d6eb124e4ec658990133f6", size = 39494, upload-time = "2026-08-28T13:07:45.385Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/1c/64599d635384d9a2052854459b9b7acad16c7a07328bbc24893754fbc393/py_atc_ble_oepl-0.6.0-py3-none-any.whl", hash = "sha256:9c509e46c7429f0cb69c4f35b4826a0673de571f2f6e628b06969d310f735a73", size = 39884, upload-time = "2026-10-26T22:02:44.38Z" },
 ]
 
 [[package]]
 name = "py-oepl"
-version = "0.7.0"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "pillow" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/d4/a270895f713f2c62cafc4ea2f5da163ae13327e300c6de96030b164cb35c/py_oepl-0.7.0.tar.gz", hash = "sha256:1536f4216e1177e15d249a4948c35ffce267fbc30f4dd9c264d4dc11e6d5fe2c", size = 84565, upload-time = "2026-10-26T19:17:23.032Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/98/0c/03cae4a0806c5fefd0a71902f73b4c0337949c96f0af194b203f42b25934/py_oepl-0.8.0.tar.gz", hash = "sha256:f767dfd6d0ef568773f374e7b0510f7dd1dfe36aa92b95467167d39cb0552d41", size = 84839, upload-time = "2026-10-26T22:02:45.758Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/09/06/4e8aaa1e6c9fa0332442594fdd10c05d32729a466c7bea0a60cc730eeaea/py_oepl-0.7.0-py3-none-any.whl", hash = "sha256:e1d8f2f7226da544ecaaa46aaa652f62bf9c1fd8d51da850a03e7da88b772f73", size = 72100, upload-time = "2026-10-26T19:17:21.518Z" },
+    { url = "https://files.pythonhosted.org/packages/58/49/3e7afb2e5f3dceba6869bf171a646fab5dab1f0558a3b822c1f319c61241/py_oepl-0.8.0-py3-none-any.whl", hash = "sha256:54afcf7a27348afd69f1d95d09ce411768401ab0b9a0890a83c875d662a4188a", size = 72280, upload-time = "2026-10-26T22:02:44.411Z" },
 ]
 
 [package.optional-dependencies]
