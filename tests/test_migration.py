@@ -531,7 +531,7 @@ async def test_pre_4_0_entry_retries_until_the_ap_reports_its_mac(
     hass: HomeAssistant, mock_client: AsyncMock
 ) -> None:
     """Without the MAC the entry has no identity yet, so it waits for one."""
-    mock_client.get_wifi_config.side_effect = OEPLConnectionError("down")
+    mock_client.get_ap_mac.side_effect = OEPLConnectionError("down")
     entry = _pre_4_0_entry()
     entry.add_to_hass(hass)
 

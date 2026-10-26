@@ -76,15 +76,11 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         client = OEPLClient(host, session=async_get_clientsession(self.hass))
         try:
             info = await client.get_sysinfo()
-            wifi = await client.get_wifi_config()
+            mac = await client.get_ap_mac()
         except OEPLError as err:
-            _LOGGER.debug("Could not reach AP at %s: %s", host, err)
+            _LOGGER.debug("Could not identify the AP at %s: %s", host, err)
             return None
-
-        if not wifi.mac:
-            _LOGGER.debug("AP at %s reported no MAC address", host)
-            return None
-        return dr.format_mac(wifi.mac), info.alias
+        return dr.format_mac(mac), info.alias
 
     def _title(self) -> str:
         """Human-readable entry title.
@@ -405,11 +401,9 @@ def _atc_name(
     Home Assistant reports the address as the name when a device advertises
     none, which is common for these tags. Falling back to the hardware type
     plus the last two address octets is more use than a bare MAC.
-
-    ATC firmware sends its name with the C string terminator included, so the
-    trailing NUL is dropped before the name is shown anywhere.
     """
-    name = discovery_info.name.rstrip("\x00").strip()
+    # Annotated because py-atc-ble-oepl ships no type information.
+    name: str | None = ATCProtocol.parse_device_name(discovery_info.name)
     if name and name != discovery_info.address:
         return name
     suffix = discovery_info.address.replace(":", "")[-4:]

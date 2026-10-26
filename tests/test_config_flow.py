@@ -46,7 +46,7 @@ def mock_ap() -> AsyncMock:
     ) as client:
         instance = client.return_value
         instance.get_sysinfo.return_value = AsyncMock(alias="Kitchen AP")
-        instance.get_wifi_config.return_value = AsyncMock(mac=AP_MAC)
+        instance.get_ap_mac = AsyncMock(return_value=AP_MAC)
         yield instance
 
 

@@ -143,10 +143,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
             self.ap_config = await self.client.get_ap_config()
             tags = await self.client.get_tags()
             if not self.ap_mac:
-                wifi = await self.client.get_wifi_config()
-                if not wifi.mac:
-                    raise OEPLError("the Access Point reported no MAC address")
-                self.ap_mac = dr.format_mac(wifi.mac)
+                self.ap_mac = dr.format_mac(await self.client.get_ap_mac())
         except OEPLError as err:
             raise ConfigEntryNotReady(
                 translation_domain=DOMAIN,
