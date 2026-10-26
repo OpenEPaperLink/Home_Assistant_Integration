@@ -49,6 +49,8 @@ class TagImage(OpenEPaperLinkTagEntity, ImageEntity):
     a dashboard showing several tags does not re-pull unchanged images.
     """
 
+    _attr_content_type = "image/png"
+
     def __init__(self, coordinator: APCoordinator, mac: str) -> None:
         """Set up the entity."""
         super().__init__(coordinator, mac, "content")

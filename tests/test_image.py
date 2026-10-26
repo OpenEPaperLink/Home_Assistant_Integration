@@ -8,6 +8,7 @@ from homeassistant.components.bluetooth import BluetoothChange
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
 from custom_components.open_epaper_link.const import DOMAIN
 
@@ -103,3 +104,41 @@ async def test_advertisements_do_not_touch_a_drawn_atc_image(
         await hass.async_block_till_done()
 
     assert hass.states.get(entity_id).state == drawn
+
+
+async def test_tag_image_is_served_as_png(
+    hass: HomeAssistant,
+    hass_client: ClientSessionGenerator,
+    ap_config_entry: MockConfigEntry,
+    mock_client: AsyncMock,
+) -> None:
+    """The entity encodes PNG, so it must not be labelled JPEG."""
+    await _setup(hass, ap_config_entry)
+    ap_config_entry.runtime_data.async_set_preview(TAG_MAC, b"\x89PNG-pretend")
+    await hass.async_block_till_done()
+
+    client = await hass_client()
+    response = await client.get(f"/api/image_proxy/{_tag_image(hass, ap_config_entry)}")
+
+    assert response.status == 200
+    assert response.content_type == "image/png"
+
+
+async def test_atc_image_is_served_as_png(
+    hass: HomeAssistant,
+    hass_client: ClientSessionGenerator,
+    atc_config_entry: MockConfigEntry,
+    mock_atc_tag: MagicMock,
+) -> None:
+    """What is drawn on an ATC tag is kept as PNG too."""
+    await _setup(hass, atc_config_entry)
+    atc_config_entry.runtime_data.coordinator.async_set_rendered(b"\x89PNG-pretend")
+    await hass.async_block_till_done()
+
+    client = await hass_client()
+    response = await client.get(
+        f"/api/image_proxy/{_atc_image(hass, atc_config_entry)}"
+    )
+
+    assert response.status == 200
+    assert response.content_type == "image/png"

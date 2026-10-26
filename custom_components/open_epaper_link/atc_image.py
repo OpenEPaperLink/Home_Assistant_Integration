@@ -20,6 +20,8 @@ class ATCImage(ATCEntity, ImageEntity):
     one this integration last sent, so nothing is shown until something is.
     """
 
+    _attr_content_type = "image/png"
+
     def __init__(
         self, hass: HomeAssistant, coordinator: ATCCoordinator, entry_id: str
     ) -> None:
