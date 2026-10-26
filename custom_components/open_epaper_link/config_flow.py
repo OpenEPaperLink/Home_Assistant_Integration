@@ -405,8 +405,11 @@ def _atc_name(
     Home Assistant reports the address as the name when a device advertises
     none, which is common for these tags. Falling back to the hardware type
     plus the last two address octets is more use than a bare MAC.
+
+    ATC firmware sends its name with the C string terminator included, so the
+    trailing NUL is dropped before the name is shown anywhere.
     """
-    name = discovery_info.name
+    name = discovery_info.name.rstrip("\x00").strip()
     if name and name != discovery_info.address:
         return name
     suffix = discovery_info.address.replace(":", "")[-4:]

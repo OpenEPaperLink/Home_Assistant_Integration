@@ -289,6 +289,34 @@ async def test_bluetooth_discovery_prefers_the_advertised_name(
     assert result["description_placeholders"]["name"] == "Kitchen Label"
 
 
+async def test_bluetooth_discovery_drops_the_name_terminator(
+    hass: HomeAssistant, mock_setup_entry: AsyncMock
+) -> None:
+    """ATC firmware sends its name with the C string terminator attached.
+
+    Seen on real tags as "ATC_05D611\\x00", which then showed up in the
+    discovery card.
+    """
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_BLUETOOTH},
+        data=_atc_service_info(name="ATC_05D611\x00"),
+    )
+    assert result["description_placeholders"]["name"] == "ATC_05D611"
+
+
+async def test_bluetooth_discovery_names_a_tag_whose_name_is_only_padding(
+    hass: HomeAssistant, mock_setup_entry: AsyncMock
+) -> None:
+    """A name with nothing left after the terminator falls back like no name."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_BLUETOOTH},
+        data=_atc_service_info(name="\x00"),
+    )
+    assert result["description_placeholders"]["name"].startswith("ATC ")
+
+
 async def test_bluetooth_rejects_non_atc_devices(hass: HomeAssistant) -> None:
     """Another manufacturer's device is not one of ours."""
     info = _atc_service_info()
