@@ -91,8 +91,11 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
             config_entry=entry,
             update_interval=None,  # push-driven
         )
+        # Set first, so a setup that fails part way can still be shut down.
+        self._unsubs: list[Any] = []
         self.host: str = entry.data[CONF_HOST]
-        self.ap_mac: str = entry.data[CONF_AP_MAC]
+        # An entry made before 4.0 has no MAC yet; async_setup asks the AP.
+        self.ap_mac: str = entry.data.get(CONF_AP_MAC, "")
         self.client = OEPLClient(self.host, session=async_get_clientsession(hass))
 
         self.ap_info: APInfo | None = None
@@ -105,7 +108,6 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         # rendered something itself.
         self._previews: dict[str, bytes] = {}
         self._last_trigger: dict[tuple[str, str], datetime] = {}
-        self._unsubs: list[Any] = []
 
     # ------------------------------------------------------------------
     # Options
@@ -140,6 +142,11 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
             self.ap_info = await self.client.get_sysinfo()
             self.ap_config = await self.client.get_ap_config()
             tags = await self.client.get_tags()
+            if not self.ap_mac:
+                wifi = await self.client.get_wifi_config()
+                if not wifi.mac:
+                    raise OEPLError("the Access Point reported no MAC address")
+                self.ap_mac = dr.format_mac(wifi.mac)
         except OEPLError as err:
             raise ConfigEntryNotReady(
                 translation_domain=DOMAIN,

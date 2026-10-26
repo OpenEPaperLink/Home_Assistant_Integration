@@ -6,10 +6,14 @@ user's entire setup. Every old identifier shape gets an explicit case.
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from oepl import OEPLConnectionError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.open_epaper_link.const import (
@@ -482,3 +486,56 @@ async def test_retitling_cannot_fire_twice(hass: HomeAssistant) -> None:
     async_migrate_entry_title(hass, entry, "something-else")
 
     assert entry.title == "OpenEpaperLink-EEFF"
+
+
+# ---------------------------------------------------------------------------
+# Upgrading a pre-4.0 entry end to end
+# ---------------------------------------------------------------------------
+
+
+def _pre_4_0_entry() -> MockConfigEntry:
+    """An Access Point entry exactly as 3.x stored it: keyed on the host."""
+    return MockConfigEntry(
+        domain=DOMAIN,
+        title=f"OpenEPaperLink AP ({AP_HOST})",
+        unique_id=AP_HOST,
+        data={"host": AP_HOST},
+        version=4,
+        minor_version=1,
+    )
+
+
+async def test_pre_4_0_entry_sets_up_after_migrating(
+    hass: HomeAssistant, mock_client: AsyncMock
+) -> None:
+    """A 3.x entry loads, and is re-keyed onto the MAC the AP reports.
+
+    The migration cannot ask the AP for its MAC, so a 3.x entry reaches setup
+    without one. Setup used to read it from the entry regardless, failed with
+    KeyError, and left the entry permanently broken because the version had
+    already been bumped.
+    """
+    entry = _pre_4_0_entry()
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.version == 5
+    assert entry.unique_id == dr.format_mac(AP_MAC)
+    assert entry.data["ap_mac"] == dr.format_mac(AP_MAC)
+
+
+async def test_pre_4_0_entry_retries_until_the_ap_reports_its_mac(
+    hass: HomeAssistant, mock_client: AsyncMock
+) -> None:
+    """Without the MAC the entry has no identity yet, so it waits for one."""
+    mock_client.get_wifi_config.side_effect = OEPLConnectionError("down")
+    entry = _pre_4_0_entry()
+    entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.SETUP_RETRY

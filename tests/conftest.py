@@ -170,6 +170,9 @@ def mock_client() -> Generator[AsyncMock]:
                 {"alias": "Kitchen AP", "env": "ESP32_S3", "buildversion": "31"}
             )
             instance.get_tag_type.return_value = make_tag_type()
+            instance.get_wifi_config.return_value = MagicMock(
+                mac={AP_HOST: AP_MAC, PEER_HOST: PEER_MAC}.get(host, AP_MAC)
+            )
             instance.get_ap_config.return_value = make_ap_config()
             # Uploads go through client.tag(mac), which validates the image
             # against the tag's native resolution before sending. The handle
