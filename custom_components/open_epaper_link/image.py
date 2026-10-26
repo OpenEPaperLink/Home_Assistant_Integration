@@ -55,14 +55,25 @@ class TagImage(OpenEPaperLinkTagEntity, ImageEntity):
         ImageEntity.__init__(self, coordinator.hass)
         self._cached: bytes | None = None
         self._cached_hash: str | None = None
+        self._shown = self._what_is_shown()
         self._attr_image_last_updated = dt_util.utcnow()
+
+    def _what_is_shown(self) -> tuple[str | None, bytes | None]:
+        """Identify the picture this entity would serve right now."""
+        tag = self.tag
+        return (tag.hash if tag else None, self.coordinator.preview(self._mac))
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Invalidate the cache when the tag renders something new."""
-        tag = self.tag
-        if tag is not None and tag.hash != self._cached_hash:
-            self._cached = None
+        """Timestamp the image only when the picture itself changes.
+
+        The Access Point pushes several updates a minute, and the timestamp is
+        this entity's state, so moving it on each one wrote a state row every
+        few seconds per tag. Compared against what was last shown rather than
+        what was last fetched, because nothing is fetched until someone looks.
+        """
+        if (shown := self._what_is_shown()) != self._shown:
+            self._shown = shown
             self._attr_image_last_updated = dt_util.utcnow()
         super()._handle_coordinator_update()
 

@@ -26,12 +26,18 @@ class ATCImage(ATCEntity, ImageEntity):
         """Set up the entity."""
         super().__init__(coordinator, entry_id, ATC_IMAGE)
         ImageEntity.__init__(self, hass)
+        self._shown = coordinator.rendered
         self._attr_image_last_updated = dt_util.utcnow()
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Timestamp a newly drawn image so the frontend refetches it."""
-        if self.coordinator.rendered is not None:
+        """Timestamp a newly drawn image so the frontend refetches it.
+
+        Every advertisement also updates the coordinator, so this checks that
+        the image is a new one rather than timestamping it again on each.
+        """
+        if self.coordinator.rendered is not self._shown:
+            self._shown = self.coordinator.rendered
             self._attr_image_last_updated = dt_util.utcnow()
         super()._handle_coordinator_update()
 
