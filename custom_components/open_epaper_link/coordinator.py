@@ -32,6 +32,7 @@ from oepl import (
     TagCommand,
     TagType,
     WakeupReason,
+    ap_display_mac,
     build_hostname,
 )
 
@@ -570,6 +571,14 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         return self._tag_types.get(tag.hw_type) if tag else None
 
     @callback
+    def is_ap_display(self, mac: str) -> bool:
+        """Whether *mac* is this Access Point's own built-in display.
+
+        The display is listed as a tag, but has no battery, radio link or
+        sensors to report.
+        """
+        return mac.upper() == ap_display_mac(self.ap_mac)
+
     def tag_type_name(self, mac: str) -> str | None:
         """Return the hardware name for *mac*, for the device registry."""
         tag_type = self.tag_type(mac)
