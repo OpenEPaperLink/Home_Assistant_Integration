@@ -30,6 +30,7 @@ _LOGGER = logging.getLogger(__name__)
 ATC_PLATFORMS: list[Platform] = [
     Platform.IMAGE,
     Platform.SENSOR,
+    Platform.UPDATE,
 ]
 
 AP_PLATFORMS: list[Platform] = [

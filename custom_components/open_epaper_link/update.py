@@ -16,6 +16,7 @@ from typing import Any
 from homeassistant.components.update import (
     UpdateDeviceClass,
     UpdateEntity,
+    UpdateEntityDescription,
     UpdateEntityFeature,
 )
 from homeassistant.const import EntityCategory
@@ -31,7 +32,14 @@ from oepl import (
     format_radio_version,
     format_tag_firmware_version,
 )
+from py_atc_ble_oepl import ATCError, ATCFirmware
 
+from .atc_coordinator import (
+    ATCConfigEntry,
+    ATCFirmwareCoordinator,
+    ATCRuntimeData,
+    async_get_atc_firmware,
+)
 from .const import DOMAIN, TAG_UPDATE_LOCK
 from .coordinator import (
     APConfigEntry,
@@ -39,11 +47,15 @@ from .coordinator import (
     AvailableFirmware,
     ReleaseCoordinator,
 )
-from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
+from .entity import ATCEntity, OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 1
+
+# A tag running ATC firmware restarts into a new image a few seconds after
+# storing it; it then advertises the new version.
+_ATC_RESTART_TIMEOUT = 300
 
 # The share of a firmware install each stage takes up, as (start, end) percent.
 # Flashing dominates; the files are mostly unchanged and skipped.
@@ -56,10 +68,17 @@ _FIRMWARE_STAGES: dict[UpdateStage, tuple[int, int]] = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: APConfigEntry,
+    entry: APConfigEntry | ATCConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up update entities for an Access Point."""
+    """Set up update entities for an Access Point, or for an ATC tag."""
+    if isinstance(entry.runtime_data, ATCRuntimeData):
+        # Only over Bluetooth: an ATC tag an Access Point also lists gets no
+        # update there, so one tag is never updated two ways.
+        firmware = await async_get_atc_firmware(hass)
+        async_add_entities([ATCFirmwareUpdate(entry, firmware)])
+        return
+
     coordinator = entry.runtime_data
     releases = ReleaseCoordinator(hass, coordinator)
     # Not a first refresh: GitHub being unreachable must not keep the Access
@@ -388,6 +407,136 @@ class TagFirmwareUpdate(OpenEPaperLinkTagEntity, UpdateEntity):
             self._attr_in_progress = False
             self._attr_update_percentage = None
             self.async_write_ha_state()
+
+
+class ATCFirmwareUpdate(ATCEntity, UpdateEntity):
+    """The firmware of a tag running ATC firmware, updated over Bluetooth.
+
+    atc1441 publishes one image for every such tag. A tag that fails part way
+    through can need a wired flash to recover, so tags update one at a time,
+    together with those behind Access Points.
+    """
+
+    _attr_device_class = UpdateDeviceClass.FIRMWARE
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_supported_features = (
+        UpdateEntityFeature.INSTALL | UpdateEntityFeature.PROGRESS
+    )
+    _attr_title = "ATC_BLE_OEPL"
+
+    def __init__(self, entry: ATCConfigEntry, firmware: ATCFirmwareCoordinator) -> None:
+        """Set up the entity."""
+        super().__init__(
+            entry.runtime_data.coordinator,
+            entry.entry_id,
+            UpdateEntityDescription(key="firmware", translation_key="firmware"),
+        )
+        self._runtime = entry.runtime_data
+        self._firmware = firmware
+
+    async def async_added_to_hass(self) -> None:
+        """Also follow the firmware checks."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            self._firmware.async_add_listener(self._handle_coordinator_update)
+        )
+
+    @property
+    def published(self) -> ATCFirmware | None:
+        """The image atc1441 publishes, if it could be fetched."""
+        firmware: ATCFirmware | None = self._firmware.data
+        return firmware
+
+    @property
+    def installed_version(self) -> str | None:
+        """The firmware the tag advertises running."""
+        advertisement = self.advertisement
+        if advertisement is None:
+            return None
+        return format_tag_firmware_version(advertisement.fw_version)
+
+    @property
+    def latest_version(self) -> str | None:
+        """The published firmware, or the installed version if that is not newer."""
+        published, advertisement = self.published, self.advertisement
+        if published is None or published.version is None or advertisement is None:
+            return None
+        if published.version > advertisement.fw_version:
+            return format_tag_firmware_version(published.version)
+        return self.installed_version
+
+    def version_is_newer(self, latest_version: str, installed_version: str) -> bool:
+        """Whether *latest_version* is an update; it reads as installed otherwise."""
+        return latest_version != installed_version
+
+    @callback
+    def _async_progress(self, percent: int | None) -> None:
+        self._attr_in_progress = True
+        self._attr_update_percentage = percent
+        self.async_write_ha_state()
+
+    # The signature is Home Assistant's; there is one version to install.
+    async def async_install(
+        self,
+        version: str | None,  # noqa: ARG002
+        backup: bool,  # noqa: ARG002
+        **kwargs: Any,  # noqa: ARG002
+    ) -> None:
+        """Send the published firmware and wait for the tag to restart into it."""
+        firmware = self.published
+        if firmware is None or firmware.version is None:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="no_release"
+            )
+        lock = self.hass.data.setdefault(TAG_UPDATE_LOCK, asyncio.Lock())
+        self._async_progress(None)
+        device = self._runtime.device
+        try:
+            async with lock:
+                async with device:
+                    await device.update_firmware(
+                        firmware,
+                        progress_callback=lambda sent, total: self._async_progress(
+                            sent * 100 // total
+                        ),
+                    )
+                # Stored; it installs as it restarts, then advertises it.
+                self._async_progress(None)
+                await self._async_wait_for_version(firmware.version)
+        except (ATCError, TimeoutError) as err:
+            _LOGGER.warning("Updating %s failed: %s", self.entity_id, err)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="update_failed",
+                translation_placeholders={"error": str(err) or "no answer"},
+            ) from err
+        finally:
+            self._attr_in_progress = False
+            self._attr_update_percentage = None
+            self.async_write_ha_state()
+
+    async def _async_wait_for_version(self, version: int) -> None:
+        """Wait until the tag advertises *version*.
+
+        Raises:
+            TimeoutError: If it has not within a few minutes, as when it
+                refused the image and kept its own firmware.
+        """
+        reached = asyncio.Event()
+
+        @callback
+        def _check() -> None:
+            advertisement = self.advertisement
+            if advertisement is not None and advertisement.fw_version == version:
+                reached.set()
+
+        unsubscribe = self.coordinator.async_add_listener(_check)
+        try:
+            _check()
+            async with asyncio.timeout(_ATC_RESTART_TIMEOUT):
+                await reached.wait()
+        finally:
+            unsubscribe()
 
 
 def _as_int(value: str) -> int:
