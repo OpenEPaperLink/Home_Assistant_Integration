@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -17,9 +18,10 @@ from homeassistant.helpers.dispatcher import (
     async_dispatcher_connect,
     async_dispatcher_send,
 )
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 from oepl import (
+    DEFAULT_REPO,
     LUT,
     APConfig,
     APInfo,
@@ -28,6 +30,7 @@ from oepl import (
     LEDPattern,
     OEPLClient,
     OEPLError,
+    Release,
     Tag,
     TagCommand,
     TagType,
@@ -282,6 +285,11 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         self.online = connected
         if not connected:
             _LOGGER.warning("Lost connection to AP at %s", self.host)
+        else:
+            # It may have rebooted into new firmware, as after an update.
+            self.config_entry.async_create_background_task(
+                self.hass, self.async_refresh_ap_info(), "openepaperlink_ap_info"
+            )
         self.async_update_listeners()
 
     @callback
@@ -422,6 +430,21 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
                 translation_key="ap_command_failed",
                 translation_placeholders={"error": str(err)},
             ) from err
+
+    async def async_refresh_ap_info(self) -> None:
+        """Re-read what the Access Point reports about its hardware and firmware.
+
+        Its firmware version changes with an update, and its radio's with a
+        radio update, which does not reboot it.
+        """
+        try:
+            self.ap_info = await self.client.get_sysinfo()
+        except OEPLError as err:
+            _LOGGER.warning("Could not refresh AP info: %s", err)
+            return
+        # Carries the firmware version onto the device.
+        self._async_register_ap_device()
+        self.async_update_listeners()
 
     async def async_refresh_ap_config(self) -> None:
         """Re-read the Access Point configuration."""
@@ -592,3 +615,70 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         """Return the hardware name for *mac*, for the device registry."""
         tag_type = self.tag_type(mac)
         return tag_type.name if tag_type else None
+
+
+# GitHub allows 60 unauthenticated API requests an hour per address, shared
+# with everything else on the network.
+RELEASE_CHECK_INTERVAL = timedelta(hours=6)
+
+
+@dataclass(frozen=True)
+class AvailableFirmware:
+    """The newest firmware release for an Access Point."""
+
+    release: Release | None
+    # The radio firmware version that release carries for this board.
+    radio_version: int | None
+
+
+class ReleaseCoordinator(DataUpdateCoordinator[AvailableFirmware]):
+    """Checks GitHub for firmware releases for one Access Point.
+
+    The Access Point decides nothing about updates itself: its own update
+    page asks GitHub, for the repository and build it is configured with,
+    and py-oepl does the same.
+    """
+
+    config_entry: APConfigEntry
+
+    def __init__(self, hass: HomeAssistant, ap: APCoordinator) -> None:
+        """Set up the coordinator."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=f"{DOMAIN} {ap.host} releases",
+            config_entry=ap.config_entry,
+            update_interval=RELEASE_CHECK_INTERVAL,
+        )
+        self.ap = ap
+
+    @property
+    def repo(self) -> str:
+        """The repository the Access Point takes its updates from."""
+        config = self.ap.ap_config
+        return (config.repo if config else "") or DEFAULT_REPO
+
+    @property
+    def env(self) -> str:
+        """The build the Access Point is configured to update to."""
+        config, info = self.ap.ap_config, self.ap.ap_info
+        return (config.env if config else "") or (info.env if info else "")
+
+    async def _async_update_data(self) -> AvailableFirmware:
+        """Find the newest release for this Access Point's build."""
+        updates = self.ap.client.updates
+        try:
+            release = await updates.latest_release(self.env, self.repo)
+            chip = self.ap.ap_info.radio_chip if self.ap.ap_info else None
+            radio_version = (
+                await updates.radio_version(release, chip)
+                if release is not None and chip is not None
+                else None
+            )
+        except OEPLError as err:
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="release_check_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+        return AvailableFirmware(release, radio_version)

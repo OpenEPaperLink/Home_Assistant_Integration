@@ -271,6 +271,14 @@
       "subghzchannel": {
         "name": "Sub-GHz-Kanal"
       }
+    },
+    "update": {
+      "firmware": {
+        "name": "Firmware"
+      },
+      "radio_firmware": {
+        "name": "Funk-Firmware"
+      }
     }
   },
   "exceptions": {
@@ -282,6 +290,15 @@
     },
     "atc_failed": {
       "message": "Auf das Tag {address} konnte über Bluetooth nicht gezeichnet werden: {error}"
+    },
+    "release_check_failed": {
+      "message": "Firmware-Releases konnten nicht abgefragt werden: {error}."
+    },
+    "update_failed": {
+      "message": "Das Update ist fehlgeschlagen: {error}."
+    },
+    "no_release": {
+      "message": "Für diesen Access Point wurde kein Firmware-Release gefunden."
     }
   },
   "services": {

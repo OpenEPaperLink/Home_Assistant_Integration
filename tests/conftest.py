@@ -179,6 +179,13 @@ def mock_client() -> Generator[AsyncMock]:
             # against the tag's native resolution before sending. The handle
             # shares the client's upload mock so assertions can stay on
             # mock_client.upload_image, with the mac available via tag().
+            # Nothing to update unless a test says otherwise.
+            instance.updates = MagicMock(
+                latest_release=AsyncMock(return_value=None),
+                radio_version=AsyncMock(return_value=None),
+                install=AsyncMock(),
+                update_radio=AsyncMock(),
+            )
             instance.tag = MagicMock(
                 return_value=MagicMock(upload_image=instance.upload_image)
             )

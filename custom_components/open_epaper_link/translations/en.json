@@ -403,6 +403,14 @@
           }
         }
       }
+    },
+    "update": {
+      "firmware": {
+        "name": "Firmware"
+      },
+      "radio_firmware": {
+        "name": "Radio firmware"
+      }
     }
   },
   "exceptions": {
@@ -435,6 +443,15 @@
     },
     "atc_failed": {
       "message": "Could not draw on the tag {address} over Bluetooth: {error}"
+    },
+    "release_check_failed": {
+      "message": "Could not check for firmware releases: {error}."
+    },
+    "update_failed": {
+      "message": "The update failed: {error}."
+    },
+    "no_release": {
+      "message": "No firmware release for this Access Point was found."
     }
   },
   "selector": {

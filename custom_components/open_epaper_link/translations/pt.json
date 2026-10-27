@@ -181,11 +181,28 @@
       "reboot_ap": {
         "name": "Reiniciar AP"
       }
+    },
+    "update": {
+      "firmware": {
+        "name": "Firmware"
+      },
+      "radio_firmware": {
+        "name": "Firmware do rádio"
+      }
     }
   },
   "exceptions": {
     "ap_cannot_connect": {
       "message": "Não foi possível conectar ao AP em {host}: {error}."
+    },
+    "release_check_failed": {
+      "message": "Não foi possível verificar as versões do firmware: {error}."
+    },
+    "update_failed": {
+      "message": "A atualização falhou: {error}."
+    },
+    "no_release": {
+      "message": "Não foi encontrada nenhuma versão de firmware para este Access Point."
     }
   }
 }

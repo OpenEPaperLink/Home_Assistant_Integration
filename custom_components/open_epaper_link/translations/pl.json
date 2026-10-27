@@ -181,11 +181,28 @@
       "reboot_ap": {
         "name": "Uruchom ponownie AP"
       }
+    },
+    "update": {
+      "firmware": {
+        "name": "Oprogramowanie"
+      },
+      "radio_firmware": {
+        "name": "Oprogramowanie radia"
+      }
     }
   },
   "exceptions": {
     "ap_cannot_connect": {
       "message": "Nie można połączyć z AP pod adresem {host}: {error}"
+    },
+    "release_check_failed": {
+      "message": "Nie udało się sprawdzić wydań oprogramowania: {error}."
+    },
+    "update_failed": {
+      "message": "Aktualizacja nie powiodła się: {error}."
+    },
+    "no_release": {
+      "message": "Nie znaleziono wydania oprogramowania dla tego punktu dostępowego."
     }
   }
 }

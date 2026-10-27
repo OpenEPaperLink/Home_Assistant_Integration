@@ -172,6 +172,7 @@ async def test_all_platforms_create_entities(
         "sensor",
         "switch",
         "text",
+        "update",
     }
 
 
