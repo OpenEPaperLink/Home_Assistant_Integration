@@ -257,7 +257,12 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         if previous is not None and previous.hash != tag.hash:
             self._async_clear_preview(tag.mac)
 
-        if previous is not None and previous.alias != tag.alias:
+        # The display is named after the part it is, not an alias.
+        if (
+            previous is not None
+            and previous.alias != tag.alias
+            and not self.is_ap_display(tag.mac)
+        ):
             self._async_sync_device_name(tag)
 
         self._async_fire_trigger_event(tag)

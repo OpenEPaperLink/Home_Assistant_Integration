@@ -595,12 +595,18 @@ def _make_tag_command_handler(
 async def _async_target_access_points(
     hass: HomeAssistant, call: ServiceCall
 ) -> list[APCoordinator]:
-    """Resolve what a call targets to Access Points, ignoring anything else."""
-    return [
-        entry.runtime_data
-        for entry, _ in await _async_targets(hass, call)
-        if isinstance(entry.runtime_data, APCoordinator)
-    ]
+    """Resolve what a call targets to Access Points, ignoring anything else.
+
+    Each appears once, though targeting an Access Point also targets its
+    display and several of its tags may be targeted.
+    """
+    return list(
+        dict.fromkeys(
+            entry.runtime_data
+            for entry, _ in await _async_targets(hass, call)
+            if isinstance(entry.runtime_data, APCoordinator)
+        )
+    )
 
 
 async def _async_reboot_ap(call: ServiceCall) -> None:

@@ -55,6 +55,11 @@
       }
     }
   },
+  "device": {
+    "ap_display": {
+      "name": "Display"
+    }
+  },
   "entity": {
     "switch": {
       "preview": {

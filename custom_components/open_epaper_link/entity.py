@@ -7,6 +7,7 @@ from homeassistant.components.bluetooth.passive_update_coordinator import (
 )
 from homeassistant.helpers.device_registry import (
     CONNECTION_BLUETOOTH,
+    ChildDeviceInfo,
     DeviceInfo,
     async_get_device_id_by_identifier,
 )
@@ -69,20 +70,28 @@ class OpenEPaperLinkTagEntity(OpenEPaperLinkEntity):
         self._mac = mac
         entry_id = coordinator.config_entry.entry_id
         self._attr_unique_id = f"{entry_id}_{mac}_{key}"
+        # The coordinator registers the Access Point during setup, so this
+        # resolves by the time entities are built.
+        ap_device_id = async_get_device_id_by_identifier(
+            coordinator.hass,
+            (DOMAIN, f"{entry_id}_ap"),
+            config_entry_id=entry_id,
+        )
+        if coordinator.is_ap_display(mac):
+            # The display is part of the Access Point, not a tag it reaches,
+            # so it is a child device: it goes wherever the Access Point does.
+            self._attr_device_info = ChildDeviceInfo(
+                identifiers={(DOMAIN, f"{entry_id}_{mac}")},
+                parent_device_id=ap_device_id,
+                translation_key="ap_display",
+            )
+            return
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{mac}")},
             name=self._tag_name(),
             manufacturer="OpenEPaperLink",
             model=coordinator.tag_type_name(mac),
-            # via_device is deprecated and goes away in 2027.8: an identifier
-            # is only unique within a config entry, so resolving one to a
-            # parent is ambiguous. The coordinator registers the Access Point
-            # during setup, so this resolves by the time entities are built.
-            via_device_id=async_get_device_id_by_identifier(
-                coordinator.hass,
-                (DOMAIN, f"{entry_id}_ap"),
-                config_entry_id=entry_id,
-            ),
+            via_device_id=ap_device_id,
         )
 
     def _tag_name(self) -> str:

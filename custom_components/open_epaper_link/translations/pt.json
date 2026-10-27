@@ -38,6 +38,11 @@
       }
     }
   },
+  "device": {
+    "ap_display": {
+      "name": "Ecrã"
+    }
+  },
   "entity": {
     "switch": {
       "preview": {
