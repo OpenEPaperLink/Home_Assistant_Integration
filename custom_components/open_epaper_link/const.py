@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Final
+
+from homeassistant.util.hass_dict import HassKey
 
 DOMAIN: Final = "open_epaper_link"
 
@@ -68,3 +71,8 @@ REMOVED_SENSOR_KEYS: Final = frozenset(
 # uses the firmware threshold, is the reliable signal; this is an indicator.
 BATTERY_EMPTY_MV: Final = 2200
 BATTERY_FULL_MV: Final = 2600
+
+# One tag firmware update at a time across every Access Point. An Access Point
+# holds a queued image in memory whole, and the radio is shared with ordinary
+# image traffic.
+TAG_UPDATE_LOCK: HassKey[asyncio.Lock] = HassKey(f"{DOMAIN}_tag_update_lock")

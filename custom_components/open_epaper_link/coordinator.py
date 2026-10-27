@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -34,6 +34,7 @@ from oepl import (
     Release,
     Tag,
     TagCommand,
+    TagFirmware,
     TagType,
     WakeupReason,
     ap_display_mac,
@@ -648,6 +649,8 @@ class AvailableFirmware:
     release: Release | None
     # The radio firmware version that release carries for this board.
     radio_version: int | None
+    # The newest firmware for each tag, by MAC; None where there is none.
+    tags: dict[str, TagFirmware | None] = field(default_factory=dict)
 
 
 class ReleaseCoordinator(DataUpdateCoordinator[AvailableFirmware]):
@@ -694,10 +697,15 @@ class ReleaseCoordinator(DataUpdateCoordinator[AvailableFirmware]):
                 if release is not None and chip is not None
                 else None
             )
+            tags = {
+                mac: await updates.tag_firmware(tag, self.repo)
+                for mac, tag in self.ap.data.items()
+                if not self.ap.is_ap_display(mac)
+            }
         except OEPLError as err:
             raise UpdateFailed(
                 translation_domain=DOMAIN,
                 translation_key="release_check_failed",
                 translation_placeholders={"error": str(err)},
             ) from err
-        return AvailableFirmware(release, radio_version)
+        return AvailableFirmware(release, radio_version, tags)

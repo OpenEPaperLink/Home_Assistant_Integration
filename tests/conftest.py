@@ -185,6 +185,8 @@ def mock_client() -> Generator[AsyncMock]:
                 radio_version=AsyncMock(return_value=None),
                 install=AsyncMock(),
                 update_radio=AsyncMock(),
+                tag_firmware=AsyncMock(return_value=None),
+                update_tag=AsyncMock(),
             )
             instance.tag = MagicMock(
                 return_value=MagicMock(upload_image=instance.upload_image)

@@ -1,12 +1,14 @@
-"""Firmware updates for the Access Point and its radio.
+"""Firmware updates for the Access Point, its radio and its tags.
 
 The Access Point decides nothing about updates itself: its update page asks
 GitHub, and installs in a fixed order. py-oepl does both; these entities show
-the result and run the install.
+the result and run the install. Tags get their firmware through the Access
+Point when they next check in.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable
 from typing import Any
@@ -20,16 +22,23 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from oepl import OEPLError, Release, UpdateProgress, UpdateStage, format_radio_version
+from oepl import (
+    OEPLError,
+    Release,
+    TagFirmware,
+    UpdateProgress,
+    UpdateStage,
+    format_radio_version,
+)
 
-from .const import DOMAIN
+from .const import DOMAIN, TAG_UPDATE_LOCK
 from .coordinator import (
     APConfigEntry,
     APCoordinator,
     AvailableFirmware,
     ReleaseCoordinator,
 )
-from .entity import OpenEPaperLinkAPEntity
+from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,6 +69,32 @@ async def async_setup_entry(
     if coordinator.ap_info and coordinator.ap_info.radio_chip:
         entities.append(RadioFirmwareUpdate(coordinator, releases))
     async_add_entities(entities)
+
+    known: set[str] = set()
+
+    @callback
+    def _async_add_tag_updates() -> None:
+        """Add an update entity for each tag the repository has firmware for.
+
+        Tags it has none for, such as those running ATC firmware, would only
+        ever read as up to date.
+        """
+        data: AvailableFirmware | None = releases.data
+        if data is None:
+            return
+        new = {
+            mac
+            for mac, firmware in data.tags.items()
+            if firmware is not None and mac in coordinator.data
+        } - known
+        if new:
+            known.update(new)
+            async_add_entities(
+                TagFirmwareUpdate(coordinator, releases, mac) for mac in new
+            )
+
+    _async_add_tag_updates()
+    entry.async_on_unload(releases.async_add_listener(_async_add_tag_updates))
 
 
 class _ReleaseUpdate(OpenEPaperLinkAPEntity, UpdateEntity):
@@ -251,6 +286,107 @@ class RadioFirmwareUpdate(_ReleaseUpdate):
         # Flashing the radio does not reboot the Access Point, so nothing else
         # would tell it the radio's version changed.
         await self.coordinator.async_refresh_ap_info()
+
+
+class TagFirmwareUpdate(OpenEPaperLinkTagEntity, UpdateEntity):
+    """A tag's firmware, which it fetches through the Access Point.
+
+    A tag that fails part way through an update can need a tag flasher to
+    recover, so tags are updated one at a time across every Access Point.
+    """
+
+    _attr_device_class = UpdateDeviceClass.FIRMWARE
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_supported_features = (
+        UpdateEntityFeature.INSTALL | UpdateEntityFeature.PROGRESS
+    )
+
+    def __init__(
+        self, coordinator: APCoordinator, releases: ReleaseCoordinator, mac: str
+    ) -> None:
+        """Set up the entity."""
+        super().__init__(coordinator, mac, "firmware")
+        self.releases = releases
+
+    async def async_added_to_hass(self) -> None:
+        """Also follow the release checks."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            self.releases.async_add_listener(self._handle_coordinator_update)
+        )
+
+    @property
+    def firmware(self) -> TagFirmware | None:
+        """The newest firmware for this tag, if one was found."""
+        data: AvailableFirmware | None = self.releases.data
+        return data.tags.get(self._mac) if data else None
+
+    @property
+    def title(self) -> str | None:
+        """The firmware, as the repository names it."""
+        return self.firmware.name if self.firmware else None
+
+    @property
+    def installed_version(self) -> str | None:
+        """The firmware the tag reports running."""
+        tag = self.tag
+        return f"{tag.firmware_version:04X}" if tag else None
+
+    @property
+    def latest_version(self) -> str | None:
+        """The newest firmware, or the installed version if that is not newer."""
+        tag, firmware = self.tag, self.firmware
+        if tag is None or firmware is None:
+            return self.installed_version
+        if firmware.number > tag.firmware_version:
+            return firmware.version
+        return self.installed_version
+
+    def version_is_newer(self, latest_version: str, installed_version: str) -> bool:
+        """Whether *latest_version* is an update; it reads as installed otherwise."""
+        return latest_version != installed_version
+
+    @callback
+    def _async_progress(self, percent: int | None) -> None:
+        self._attr_in_progress = True
+        self._attr_update_percentage = percent
+        self.async_write_ha_state()
+
+    # The signature is Home Assistant's; there is one version to install.
+    async def async_install(
+        self,
+        version: str | None,  # noqa: ARG002
+        backup: bool,  # noqa: ARG002
+        **kwargs: Any,  # noqa: ARG002
+    ) -> None:
+        """Have the tag fetch and flash its firmware at its next check-in."""
+        firmware = self.firmware
+        if firmware is None:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="no_release"
+            )
+        lock = self.hass.data.setdefault(TAG_UPDATE_LOCK, asyncio.Lock())
+        # Indeterminate while waiting its turn and for the tag to check in.
+        self._async_progress(None)
+        try:
+            async with lock:
+                await self.coordinator.client.updates.update_tag(
+                    self._mac,
+                    firmware,
+                    repo=self.releases.repo,
+                    on_progress=lambda p: self._async_progress(p.percent),
+                )
+        except OEPLError as err:
+            _LOGGER.warning("Updating %s failed: %s", self.entity_id, err)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="update_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+        finally:
+            self._attr_in_progress = False
+            self._attr_update_percentage = None
+            self.async_write_ha_state()
 
 
 def _as_int(value: str) -> int:
