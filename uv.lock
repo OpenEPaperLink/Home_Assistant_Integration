@@ -1770,7 +1770,7 @@ dev = [
     { name = "mypy", specifier = "==1.18.2" },
     { name = "odl-renderer", specifier = "==0.5.12" },
     { name = "py-atc-ble-oepl", specifier = "==0.7.0" },
-    { name = "py-oepl", extras = ["dither"], specifier = "==0.8.0" },
+    { name = "py-oepl", extras = ["dither"], specifier = "==0.9.0" },
     { name = "pytest-homeassistant-custom-component", specifier = "==0.13.375" },
     { name = "ruff", specifier = "==0.16.2" },
     { name = "serialx", specifier = "==1.11.0" },
@@ -2060,15 +2060,15 @@ wheels = [
 
 [[package]]
 name = "py-oepl"
-version = "0.8.0"
+version = "0.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "pillow" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/98/0c/03cae4a0806c5fefd0a71902f73b4c0337949c96f0af194b203f42b25934/py_oepl-0.8.0.tar.gz", hash = "sha256:f767dfd6d0ef568773f374e7b0510f7dd1dfe36aa92b95467167d39cb0552d41", size = 84839, upload-time = "2026-10-26T22:02:45.758Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/22/19/23ee17b3a1d607b61b9002826afe942507952d3d0adf8fe8b1f6b6bb43ab/py_oepl-0.9.0.tar.gz", hash = "sha256:1433b6bf92017c0bf52c3f5330a3448603c903e70a87bc21dafb30e491a4ae42", size = 91870, upload-time = "2026-10-27T14:12:34.973Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/49/3e7afb2e5f3dceba6869bf171a646fab5dab1f0558a3b822c1f319c61241/py_oepl-0.8.0-py3-none-any.whl", hash = "sha256:54afcf7a27348afd69f1d95d09ce411768401ab0b9a0890a83c875d662a4188a", size = 72280, upload-time = "2026-10-26T22:02:44.411Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/ae/fe95c173be30a14671383e18e04d81ecfe87666b60ff143f529b45690c4b/py_oepl-0.9.0-py3-none-any.whl", hash = "sha256:8cb4327e29ee7a3588a7a7025bd6441c1c5d810d60fbea95b8b52a1c5aa9cfac", size = 79329, upload-time = "2026-10-27T14:12:33.659Z" },
 ]
 
 [package.optional-dependencies]
