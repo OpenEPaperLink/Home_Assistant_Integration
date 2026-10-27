@@ -115,7 +115,7 @@ async def _async_setup_atc_entry(hass: HomeAssistant, entry: ATCConfigEntry) -> 
     except ATCError as err:
         raise ConfigEntryNotReady(f"Could not interrogate {address}: {err}") from err
 
-    coordinator = ATCCoordinator(hass, address)
+    coordinator = ATCCoordinator(hass, address, entry.entry_id, device.device_config)
     entry.runtime_data = ATCRuntimeData(
         coordinator=coordinator,
         device=device,

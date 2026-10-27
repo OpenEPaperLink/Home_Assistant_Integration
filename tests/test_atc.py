@@ -310,3 +310,55 @@ async def test_a_newer_draw_replaces_one_still_in_flight(
 
     release.set()
     await hass.async_block_till_done()
+
+
+async def test_the_device_names_the_hardware(
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
+) -> None:
+    """From what the tag reported at setup, and the firmware it advertises."""
+    atc_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(atc_config_entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = atc_config_entry.runtime_data.coordinator
+    registry = dr.async_get(hass)
+
+    def device() -> dr.DeviceEntry:
+        found = registry.async_get_device_by_identifier(
+            (DOMAIN, f"{atc_config_entry.entry_id}_{ATC_ADDRESS}"),
+            atc_config_entry.entry_id,
+        )
+        assert found is not None
+        return found
+
+    assert device().manufacturer == "Hanshow"
+    assert device().model == "200 HS BWY SSD"
+    assert device().hw_version == "67"
+
+    # The test advertisement reports firmware 0x1234; an update changes it.
+    coordinator._async_handle_bluetooth_event(
+        atc_service_info(), BluetoothChange.ADVERTISEMENT
+    )
+    assert device().sw_version == "1234"
+    newer = atc_service_info()
+    newer.manufacturer_data[MANUFACTURER_ID] = bytes(
+        [2, 0x11, 0x00, 0x35, 0x12, 0, 0, 0x0C, 0x0B, 0xF8, 0]
+    )
+    coordinator._async_handle_bluetooth_event(newer, BluetoothChange.ADVERTISEMENT)
+    assert device().sw_version == "1235"
+
+
+async def test_a_tag_of_unknown_make_is_credited_to_openepaperlink(
+    hass: HomeAssistant, atc_config_entry: MockConfigEntry, mock_atc_tag: MagicMock
+) -> None:
+    """The WO types and the dynamic one do not name their maker."""
+    mock_atc_tag.device_config = MagicMock(screen_type=65535, hw_type=0x33)
+    atc_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(atc_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{atc_config_entry.entry_id}_{ATC_ADDRESS}"),
+        atc_config_entry.entry_id,
+    )
+    assert device is not None
+    assert (device.manufacturer, device.model) == ("OpenEPaperLink", None)

@@ -335,6 +335,8 @@ def mock_atc_tag() -> Generator[MagicMock]:
     )
     device.upload_image = AsyncMock(return_value=True)
     device.update_firmware = AsyncMock()
+    # As a real HS 2.00" BWY reports it: screen type 5, "200 HS BWY SSD".
+    device.device_config = MagicMock(screen_type=5, hw_type=0x67)
     module = "custom_components.open_epaper_link"
     with (
         patch(f"{module}.async_ble_device_from_address", return_value=MagicMock()),

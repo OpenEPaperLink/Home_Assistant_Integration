@@ -20,11 +20,15 @@ from homeassistant.helpers.device_registry import (
 from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from oepl import Tag, format_hw_type, format_tag_firmware_version
-from py_atc_ble_oepl import AdvertisingData
+from py_atc_ble_oepl import DEVICE_TYPES, AdvertisingData
+from py_atc_ble_oepl import guess_manufacturer as guess_atc_manufacturer
 
 from .atc_coordinator import ATCCoordinator
 from .const import DOMAIN
 from .coordinator import APCoordinator
+
+# The screen type of a tag configured by hand rather than from the type list.
+_ATC_DYNAMIC_TYPE = 65535
 
 
 class OpenEPaperLinkEntity(CoordinatorEntity[APCoordinator]):
@@ -164,10 +168,24 @@ class ATCEntity(PassiveBluetoothCoordinatorEntity[ATCCoordinator]):
         # Entry-scoped, matching the Access Point entities and what the
         # registry migration rewrites the old oepl_ble_ ids to.
         self._attr_unique_id = f"{entry_id}_{description.key}"
+        config = coordinator.device_config
+        screen_type = config.screen_type if config else None
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{coordinator.address}")},
             connections={(CONNECTION_BLUETOOTH, coordinator.address)},
-            manufacturer="OpenEPaperLink",
+            # The maker, guessed from the screen type's name where it says.
+            manufacturer=(
+                guess_atc_manufacturer(screen_type) if screen_type is not None else None
+            )
+            or "OpenEPaperLink",
+            model=(
+                DEVICE_TYPES[screen_type]
+                if screen_type in DEVICE_TYPES and screen_type != _ATC_DYNAMIC_TYPE
+                else None
+            ),
+            # As tags behind an Access Point show theirs; the firmware version
+            # is only known from advertisements and follows them.
+            hw_version=format_hw_type(config.hw_type) if config else None,
         )
 
     @property

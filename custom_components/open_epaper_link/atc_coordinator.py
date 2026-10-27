@@ -28,9 +28,11 @@ from homeassistant.components.bluetooth.passive_update_coordinator import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util.hass_dict import HassKey
+from oepl import format_tag_firmware_version
 from py_atc_ble_oepl import (
     FIRMWARE_URL,
     MANUFACTURER_ID,
@@ -39,6 +41,7 @@ from py_atc_ble_oepl import (
     ATCFirmware,
     ATCProtocol,
     DeviceCapabilities,
+    DeviceConfig,
     FirmwareError,
 )
 
@@ -73,7 +76,13 @@ class ATCUpdate:
 class ATCCoordinator(PassiveBluetoothDataUpdateCoordinator):
     """Tracks one ATC tag through its advertisements."""
 
-    def __init__(self, hass: HomeAssistant, address: str) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        address: str,
+        entry_id: str,
+        device_config: DeviceConfig | None = None,
+    ) -> None:
         """Initialise the coordinator."""
         super().__init__(
             hass,
@@ -83,6 +92,10 @@ class ATCCoordinator(PassiveBluetoothDataUpdateCoordinator):
             connectable=True,
         )
         self.data: ATCUpdate | None = None
+        self.entry_id = entry_id
+        # What the tag reported about itself at setup: its screen type and
+        # OEPL hardware type, which name the hardware on its device.
+        self.device_config = device_config
         # ATC tags cannot be read back the way an Access Point serves
         # /current/<mac>.raw, so the only picture we can show is the one we
         # last drew.
@@ -113,11 +126,29 @@ class ATCCoordinator(PassiveBluetoothDataUpdateCoordinator):
                     exc_info=True,
                 )
             else:
+                previous = self.data.advertisement if self.data else None
                 self.data = ATCUpdate(
                     address=service_info.address, advertisement=advertisement
                 )
+                if previous is None or previous.fw_version != advertisement.fw_version:
+                    self._async_sync_firmware_version(advertisement.fw_version)
 
         super()._async_handle_bluetooth_event(service_info, change)
+
+    @callback
+    def _async_sync_firmware_version(self, version: int) -> None:
+        """Show the firmware the tag advertises on its device.
+
+        It is only known from advertisements, and changes when it updates.
+        """
+        registry = dr.async_get(self.hass)
+        device = registry.async_get_device_by_identifier(
+            (DOMAIN, f"{self.entry_id}_{self.address}"), self.entry_id
+        )
+        if device is not None:
+            registry.async_update_device(
+                device.id, sw_version=format_tag_firmware_version(version)
+            )
 
 
 # atc1441 publishes new builds every few weeks; the image is about 120 KB.
