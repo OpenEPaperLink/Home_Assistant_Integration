@@ -20,7 +20,7 @@ dev = [
     # Runtime requirements, kept in sync with custom_components/open_epaper_link/manifest.json
     "odl-renderer==0.5.12",
     "py-atc-ble-oepl==0.7.0",
-    "py-oepl[dither]==0.10.0",
+    "py-oepl[dither]==0.11.0",
     # Home Assistant's bluetooth component and its transitive usb component,
     # needed to import them in tests. Versions match what this Home Assistant
     # release pins in their manifests.
