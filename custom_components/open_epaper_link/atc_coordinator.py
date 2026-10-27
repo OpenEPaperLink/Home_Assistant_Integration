@@ -151,8 +151,8 @@ class ATCCoordinator(PassiveBluetoothDataUpdateCoordinator):
             )
 
 
-# atc1441 publishes new builds every few weeks; the image is about 120 KB.
-ATC_FIRMWARE_CHECK_INTERVAL = timedelta(hours=6)
+# atc1441 publishes new builds every few weeks, so once a day is plenty.
+ATC_FIRMWARE_CHECK_INTERVAL = timedelta(days=1)
 ATC_FIRMWARE: HassKey[ATCFirmwareCoordinator] = HassKey(f"{DOMAIN}_atc_firmware")
 
 

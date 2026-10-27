@@ -659,9 +659,9 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         return tag_type.name if tag_type else None
 
 
-# GitHub allows 60 unauthenticated API requests an hour per address, shared
-# with everything else on the network.
-RELEASE_CHECK_INTERVAL = timedelta(hours=6)
+# Releases come every few weeks, so once a day is plenty, and GitHub allows 60
+# unauthenticated API requests an hour per address, shared with the network.
+RELEASE_CHECK_INTERVAL = timedelta(days=1)
 
 
 @dataclass(frozen=True)
