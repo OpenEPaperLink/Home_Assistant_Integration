@@ -27,7 +27,6 @@ from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from oepl import OEPLClient, OEPLError, build_hostname
 from py_atc_ble_oepl import (
     MANUFACTURER_ID,
-    AdvertisingData,
     ATCDevice,
     ATCError,
     ATCProtocol,
@@ -284,13 +283,23 @@ class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         if not raw:
             return self.async_abort(reason="not_supported")
         try:
-            advertisement = ATCProtocol.parse_advertising_data(raw)
+            ATCProtocol.parse_advertising_data(raw)
         except ValueError:
             _LOGGER.debug("Unparseable advertisement from %s", discovery_info.address)
             return self.async_abort(reason="not_supported")
+        # A receiver can attach a tag's advertisement to a neighbouring
+        # device; one naming itself as something else is not the tag.
+        if not ATCProtocol.is_device_name(discovery_info.name, discovery_info.address):
+            _LOGGER.debug(
+                "%s carries ATC data but is named %r",
+                discovery_info.address,
+                discovery_info.name,
+            )
+            return self.async_abort(reason="not_supported")
 
         self._atc_address = discovery_info.address
-        self._atc_name = _atc_name(discovery_info, advertisement)
+        # The name only arrives in the scan response, so it is often missing.
+        self._atc_name = ATCProtocol.device_name(discovery_info.address)
         self.context["title_placeholders"] = {"name": self._atc_name}
         return await self.async_step_bluetooth_confirm()
 
@@ -391,19 +400,3 @@ def _normalise_host(host: str) -> str:
         if host.startswith(scheme):
             host = host[len(scheme) :]
     return host.rstrip("/")
-
-
-def _atc_name(
-    discovery_info: BluetoothServiceInfoBleak, advertisement: AdvertisingData
-) -> str:
-    """Return a human-readable name for a discovered tag.
-
-    Home Assistant reports the address as the name when a device advertises
-    none, which is common for these tags. Falling back to the hardware type
-    plus the last two address octets is more use than a bare MAC.
-    """
-    name = ATCProtocol.parse_device_name(discovery_info.name)
-    if name and name != discovery_info.address:
-        return name
-    suffix = discovery_info.address.replace(":", "")[-4:]
-    return f"ATC {advertisement.hw_type:02X} ({suffix})"

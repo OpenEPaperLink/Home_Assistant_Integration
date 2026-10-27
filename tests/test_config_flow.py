@@ -267,26 +267,14 @@ async def test_bluetooth_discovery(
 async def test_bluetooth_discovery_names_unnamed_tags(
     hass: HomeAssistant, mock_setup_entry: AsyncMock
 ) -> None:
-    """Tags advertising no name get something better than a bare address.
+    """A tag whose name has not arrived gets the name its firmware gives it.
 
     Home Assistant reports the address as the name in that case.
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_BLUETOOTH}, data=_atc_service_info()
     )
-    assert result["description_placeholders"]["name"] == "ATC 11 (EE01)"
-
-
-async def test_bluetooth_discovery_prefers_the_advertised_name(
-    hass: HomeAssistant, mock_setup_entry: AsyncMock
-) -> None:
-    """A tag that does advertise a name keeps it."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN,
-        context={"source": SOURCE_BLUETOOTH},
-        data=_atc_service_info(name="Kitchen Label"),
-    )
-    assert result["description_placeholders"]["name"] == "Kitchen Label"
+    assert result["description_placeholders"]["name"] == "ATC_DDEE01"
 
 
 async def test_bluetooth_discovery_drops_the_name_terminator(
@@ -300,21 +288,26 @@ async def test_bluetooth_discovery_drops_the_name_terminator(
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": SOURCE_BLUETOOTH},
-        data=_atc_service_info(name="ATC_05D611\x00"),
+        data=_atc_service_info(name="ATC_DDEE01\x00"),
     )
-    assert result["description_placeholders"]["name"] == "ATC_05D611"
+    assert result["description_placeholders"]["name"] == "ATC_DDEE01"
 
 
-async def test_bluetooth_discovery_names_a_tag_whose_name_is_only_padding(
-    hass: HomeAssistant, mock_setup_entry: AsyncMock
+async def test_bluetooth_rejects_devices_named_as_something_else(
+    hass: HomeAssistant,
 ) -> None:
-    """A name with nothing left after the terminator falls back like no name."""
+    """A device that picked up a tag's advertisement is not the tag.
+
+    Seen with a Valve Index base station: a Bluetooth proxy attached a nearby
+    tag's ATC data to it, and it was offered as a tag.
+    """
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": SOURCE_BLUETOOTH},
-        data=_atc_service_info(name="\x00"),
+        data=_atc_service_info(name="LHB-5E72F725"),
     )
-    assert result["description_placeholders"]["name"].startswith("ATC ")
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "not_supported"
 
 
 async def test_bluetooth_rejects_non_atc_devices(hass: HomeAssistant) -> None:
