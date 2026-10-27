@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -57,6 +58,11 @@ if TYPE_CHECKING:
     from PIL.Image import Image
 
 _LOGGER = logging.getLogger(__name__)
+
+# How long to wait for the radio to report its version after a boot. It took
+# a few seconds on a real Access Point.
+RADIO_REPORT_ATTEMPTS = 6
+RADIO_REPORT_INTERVAL = 5
 
 type APConfigEntry = ConfigEntry[APCoordinator]
 
@@ -288,7 +294,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         else:
             # It may have rebooted into new firmware, as after an update.
             self.config_entry.async_create_background_task(
-                self.hass, self.async_refresh_ap_info(), "openepaperlink_ap_info"
+                self.hass, self._async_refresh_ap_info_after_boot(), "oepl_ap_info"
             )
         self.async_update_listeners()
 
@@ -445,6 +451,19 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         # Carries the firmware version onto the device.
         self._async_register_ap_device()
         self.async_update_listeners()
+
+    async def _async_refresh_ap_info_after_boot(self) -> None:
+        """Re-read the Access Point's info once its radio has reported in.
+
+        Straight after a boot the Access Point is reachable before its radio
+        has told it its version, and reports 0 until then.
+        """
+        for _ in range(RADIO_REPORT_ATTEMPTS):
+            await self.async_refresh_ap_info()
+            info = self.ap_info
+            if info is None or info.radio_chip is None or info.radio_version:
+                return
+            await asyncio.sleep(RADIO_REPORT_INTERVAL)
 
     async def async_refresh_ap_config(self) -> None:
         """Re-read the Access Point configuration."""

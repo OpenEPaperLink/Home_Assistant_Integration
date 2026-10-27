@@ -7,6 +7,7 @@ the result and run the install.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable
 from typing import Any
 
@@ -29,6 +30,8 @@ from .coordinator import (
     ReleaseCoordinator,
 )
 from .entity import OpenEPaperLinkAPEntity
+
+_LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 1
 
@@ -119,6 +122,7 @@ class _ReleaseUpdate(OpenEPaperLinkAPEntity, UpdateEntity):
         try:
             await install
         except OEPLError as err:
+            _LOGGER.warning("Updating %s failed: %s", self.entity_id, err)
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="update_failed",

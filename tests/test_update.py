@@ -178,6 +178,31 @@ async def test_reconnecting_reads_the_new_firmware_version(
     assert state.attributes[ATTR_INSTALLED_VERSION] == "3.0"
 
 
+async def test_the_radio_version_is_read_once_the_radio_reports_in(
+    hass: HomeAssistant,
+    ap_config_entry: MockConfigEntry,
+    mock_client: AsyncMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Seen on a real Access Point: straight after a boot the radio reads 0."""
+    monkeypatch.setattr(
+        "custom_components.open_epaper_link.coordinator.RADIO_REPORT_INTERVAL", 0
+    )
+    mock_client.get_sysinfo.return_value = _sysinfo(hasC6=1, ap_version=0x22)
+    await _setup(hass, ap_config_entry)
+    (on_connection_change,), _ = mock_client.on_connection_change.call_args
+
+    on_connection_change(False)
+    mock_client.get_sysinfo.side_effect = [
+        _sysinfo(hasC6=1, ap_version=0),
+        _sysinfo(hasC6=1, ap_version=0x24),
+    ]
+    on_connection_change(True)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(RADIO).attributes[ATTR_INSTALLED_VERSION] == "0024"
+
+
 async def test_no_radio_update_without_a_radio(
     hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
 ) -> None:
