@@ -281,7 +281,7 @@ async def test_via_device_link_survives(hass: HomeAssistant) -> None:
     tag = registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, TAG)},
-        via_device=(DOMAIN, "ap"),
+        via_device_id=ap.id,
         name="Tag",
     )
     assert registry.async_get(tag.id).via_device_id == ap.id
@@ -307,14 +307,14 @@ async def test_migration_is_idempotent(hass: HomeAssistant) -> None:
 
     async_migrate_registries(hass, entry)
     first_entities = {e.entity_id: e.unique_id for e in ent_reg.entities.values()}
-    first_devices = {d.id: d.identifiers for d in dev_reg.devices.values()}
+    first_devices = {d.id: d.identifiers for d in dev_reg.devices}
 
     async_migrate_registries(hass, entry)
 
     assert {
         e.entity_id: e.unique_id for e in ent_reg.entities.values()
     } == first_entities
-    assert {d.id: d.identifiers for d in dev_reg.devices.values()} == first_devices
+    assert {d.id: d.identifiers for d in dev_reg.devices} == first_devices
 
 
 async def test_other_integrations_untouched(hass: HomeAssistant) -> None:

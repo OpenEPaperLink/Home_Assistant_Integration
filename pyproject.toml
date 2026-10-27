@@ -14,7 +14,7 @@ dependencies = []
 # integration symlinked into its custom_components, because p-h-c-c and a real
 # HA install cannot share an environment.
 dev = [
-    "pytest-homeassistant-custom-component==0.13.355",
+    "pytest-homeassistant-custom-component==0.13.375",
     "mypy==1.18.2",
     "ruff==0.16.2",
     # Runtime requirements, kept in sync with custom_components/open_epaper_link/manifest.json
@@ -26,13 +26,13 @@ dev = [
     # release pins in their manifests.
     "aiousbwatcher==1.1.2",
     "bleak==3.0.2",
-    "bleak-retry-connector==4.6.3",
+    "bleak-retry-connector==4.7.1",
     "bluetooth-adapters==2.4.0",
     "bluetooth-auto-recovery==1.6.4",
-    "bluetooth-data-tools==1.29.18",
+    "bluetooth-data-tools==1.29.24",
     "dbus-fast==5.0.22",
-    "habluetooth==6.26.5",
-    "serialx==1.8.2",
+    "habluetooth==7.1.2",
+    "serialx==1.11.0",
 ]
 
 [tool.uv]

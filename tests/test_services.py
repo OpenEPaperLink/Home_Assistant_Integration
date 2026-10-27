@@ -281,8 +281,8 @@ async def test_targeting_a_tag_device(
     await hass.config_entries.async_setup(ap_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}"), ap_config_entry.entry_id
     )
     assert device is not None
 
@@ -322,8 +322,8 @@ async def test_targeting_the_access_point_device(
     await hass.config_entries.async_setup(ap_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_ap")}
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{ap_config_entry.entry_id}_ap"), ap_config_entry.entry_id
     )
 
     await hass.services.async_call(
@@ -375,8 +375,8 @@ async def test_dry_run_renders_without_uploading(
     await hass.config_entries.async_setup(ap_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}"), ap_config_entry.entry_id
     )
     await _draw(hass, device.id, **{"dry-run": True})
 
@@ -394,8 +394,8 @@ async def test_dry_run_shows_the_result_on_the_image_entity(
     coordinator = ap_config_entry.runtime_data
     assert coordinator.preview(TAG_MAC) is None
 
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}"), ap_config_entry.entry_id
     )
     await _draw(hass, device.id, **{"dry-run": True})
 
@@ -416,8 +416,8 @@ async def test_a_real_call_uploads_and_previews(
     await hass.config_entries.async_setup(ap_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}"), ap_config_entry.entry_id
     )
     await _draw(hass, device.id)
 
@@ -434,8 +434,8 @@ async def test_preview_is_dropped_once_the_tag_renders(
     await hass.async_block_till_done()
 
     coordinator = ap_config_entry.runtime_data
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}"), ap_config_entry.entry_id
     )
     await _draw(hass, device.id, **{"dry-run": True})
     assert coordinator.preview(TAG_MAC) is not None
@@ -454,8 +454,8 @@ async def test_upload_uses_the_tags_own_palette(
     await hass.config_entries.async_setup(ap_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}"), ap_config_entry.entry_id
     )
     await _draw(hass, device.id, dither="floyd_steinberg")
 
@@ -478,8 +478,8 @@ async def test_drawcustom_returns_nothing(
     await hass.config_entries.async_setup(ap_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}")}
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}"), ap_config_entry.entry_id
     )
     assert (
         await hass.services.async_call(
@@ -512,8 +512,8 @@ async def _setup_tag(hass: HomeAssistant, entry) -> str:
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, f"{entry.entry_id}_{TAG_MAC}")}
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{entry.entry_id}_{TAG_MAC}"), entry.entry_id
     )
     return device.id
 
