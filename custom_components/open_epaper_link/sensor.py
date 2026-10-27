@@ -15,22 +15,26 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     PERCENTAGE,
     EntityCategory,
+    Platform,
     UnitOfElectricPotential,
     UnitOfInformation,
     UnitOfTemperature,
     UnitOfTime,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from oepl import APStatus, Tag
 from oepl.enums import enum_label
 
 from .atc_coordinator import ATCConfigEntry, ATCRuntimeData
 from .atc_sensor import ATC_SENSORS, ATCSensor
-from .const import BATTERY_EMPTY_MV, BATTERY_FULL_MV, DOMAIN
+from .const import BATTERY_EMPTY_MV, BATTERY_FULL_MV
 from .coordinator import APConfigEntry, APCoordinator
-from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
+from .entity import (
+    OpenEPaperLinkAPEntity,
+    OpenEPaperLinkTagEntity,
+    async_remove_ap_display_entities,
+)
 
 PARALLEL_UPDATES = 0
 
@@ -39,9 +43,9 @@ PARALLEL_UPDATES = 0
 class TagSensorDescription(SensorEntityDescription):
     """Describes a sensor reading a value off a tag."""
 
-    # Something the tag itself measures. The Access Point's built-in display
-    # measures nothing and reports zeros, so it gets none of these.
-    measured: bool = False
+    # About a tag's own battery, radio or sleep cycle. The Access Point's
+    # built-in display has none of these and reports zeros, so it gets none.
+    tag_only: bool = False
     value_fn: Callable[[Tag], int | float | str | datetime | None]
 
 
@@ -73,7 +77,7 @@ def _battery_percentage(tag: Tag) -> float | None:
 TAG_SENSORS: tuple[TagSensorDescription, ...] = (
     TagSensorDescription(
         key="temperature",
-        measured=True,
+        tag_only=True,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -81,7 +85,7 @@ TAG_SENSORS: tuple[TagSensorDescription, ...] = (
     ),
     TagSensorDescription(
         key="battery_voltage",
-        measured=True,
+        tag_only=True,
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.MILLIVOLT,
@@ -90,7 +94,7 @@ TAG_SENSORS: tuple[TagSensorDescription, ...] = (
     ),
     TagSensorDescription(
         key="lqi",
-        measured=True,
+        tag_only=True,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
@@ -98,7 +102,7 @@ TAG_SENSORS: tuple[TagSensorDescription, ...] = (
     ),
     TagSensorDescription(
         key="rssi",
-        measured=True,
+        tag_only=True,
         device_class=SensorDeviceClass.SIGNAL_STRENGTH,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="dBm",
@@ -121,6 +125,7 @@ TAG_SENSORS: tuple[TagSensorDescription, ...] = (
     ),
     TagSensorDescription(
         key="next_checkin",
+        tag_only=True,
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
@@ -142,6 +147,7 @@ TAG_SENSORS: tuple[TagSensorDescription, ...] = (
     ),
     TagSensorDescription(
         key="wakeup_reason",
+        tag_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda tag: enum_label(tag.wakeup_reason),
@@ -299,7 +305,7 @@ async def async_setup_entry(
                 TagSensor(coordinator, mac, description)
                 for mac in new
                 for description in TAG_SENSORS
-                if not (description.measured and coordinator.is_ap_display(mac))
+                if not (description.tag_only and coordinator.is_ap_display(mac))
             )
             async_add_entities(
                 TagGeometrySensor(coordinator, mac, description)
@@ -313,27 +319,17 @@ async def async_setup_entry(
             )
             for mac in new:
                 if coordinator.is_ap_display(mac):
-                    _async_remove_ap_display_readings(hass, entry, mac)
+                    async_remove_ap_display_entities(
+                        hass,
+                        entry,
+                        mac,
+                        Platform.SENSOR,
+                        [d.key for d in TAG_SENSORS if d.tag_only]
+                        + ["battery_percentage"],
+                    )
 
     _async_add_new_tags()
     entry.async_on_unload(coordinator.async_add_listener(_async_add_new_tags))
-
-
-@callback
-def _async_remove_ap_display_readings(
-    hass: HomeAssistant, entry: APConfigEntry, mac: str
-) -> None:
-    """Remove readings registered for the display before it was recognised.
-
-    Earlier versions created them, and the registry keeps an entity whether or
-    not anything still provides it, so they would linger as unavailable.
-    """
-    registry = er.async_get(hass)
-    keys = [d.key for d in TAG_SENSORS if d.measured] + ["battery_percentage"]
-    for key in keys:
-        unique_id = f"{entry.entry_id}_{mac}_{key}"
-        if entity_id := registry.async_get_entity_id("sensor", DOMAIN, unique_id):
-            registry.async_remove(entity_id)
 
 
 class TagSensor(OpenEPaperLinkTagEntity, SensorEntity):

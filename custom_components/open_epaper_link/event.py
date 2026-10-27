@@ -22,6 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from homeassistant.components.event import EventEntity, EventEntityDescription
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -29,7 +30,7 @@ from oepl import TagCapability
 
 from .const import SIGNAL_TAG_INTERACTION
 from .coordinator import APConfigEntry, APCoordinator
-from .entity import OpenEPaperLinkTagEntity
+from .entity import OpenEPaperLinkTagEntity, async_remove_ap_display_entities
 
 PARALLEL_UPDATES = 0
 
@@ -58,8 +59,9 @@ EVENT_TYPES: tuple[TagEventDescription, ...] = (
 def _supported(coordinator: APCoordinator, mac: str, key: str) -> bool:
     """Whether *mac* should have an event entity of kind *key*."""
     if key == "gpio":
-        # No tag type or capability bit describes GPIO wake-up.
-        return True
+        # No tag type or capability bit describes GPIO wake-up. The Access
+        # Point's built-in display never wakes up, so it is never one.
+        return not coordinator.is_ap_display(mac)
     if key == "button":
         tag_type = coordinator.tag_type(mac)
         return bool(tag_type and tag_type.has_button)
@@ -70,7 +72,7 @@ def _supported(coordinator: APCoordinator, mac: str, key: str) -> bool:
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,  # noqa: ARG001  (signature fixed by Home Assistant)
+    hass: HomeAssistant,
     entry: APConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
@@ -89,6 +91,11 @@ async def async_setup_entry(
                 for description in EVENT_TYPES
                 if _supported(coordinator, mac, description.key)
             )
+            for mac in new:
+                if coordinator.is_ap_display(mac):
+                    async_remove_ap_display_entities(
+                        hass, entry, mac, Platform.EVENT, ["gpio"]
+                    )
 
     _async_add_new_tags()
     entry.async_on_unload(coordinator.async_add_listener(_async_add_new_tags))

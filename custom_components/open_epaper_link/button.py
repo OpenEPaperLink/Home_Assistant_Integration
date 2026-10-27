@@ -7,13 +7,17 @@ from dataclasses import dataclass
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.components.button.const import ButtonDeviceClass
-from homeassistant.const import EntityCategory
+from homeassistant.const import EntityCategory, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from oepl import TagCommand
 
 from .coordinator import APConfigEntry, APCoordinator
-from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
+from .entity import (
+    OpenEPaperLinkAPEntity,
+    OpenEPaperLinkTagEntity,
+    async_remove_ap_display_entities,
+)
 
 PARALLEL_UPDATES = 1
 
@@ -23,6 +27,9 @@ class TagButtonDescription(ButtonEntityDescription):
     """Describes a button that sends a command to a tag."""
 
     command: TagCommand
+    # Acts on a tag's own radio or sleep cycle, which the Access Point's
+    # built-in display does not have.
+    tag_only: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -48,17 +55,20 @@ TAG_BUTTONS: tuple[TagButtonDescription, ...] = (
     ),
     TagButtonDescription(
         key="reboot_tag",
+        tag_only=True,
         device_class=ButtonDeviceClass.RESTART,
         entity_category=EntityCategory.DIAGNOSTIC,
         command=TagCommand.REBOOT,
     ),
     TagButtonDescription(
         key="scan_channels",
+        tag_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
         command=TagCommand.SCAN,
     ),
     TagButtonDescription(
         key="deep_sleep",
+        tag_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
         command=TagCommand.DEEPSLEEP,
     ),
@@ -75,7 +85,7 @@ AP_BUTTONS: tuple[APButtonDescription, ...] = (
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,  # noqa: ARG001  (signature fixed by Home Assistant)
+    hass: HomeAssistant,
     entry: APConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
@@ -95,7 +105,17 @@ async def async_setup_entry(
                 TagButton(coordinator, mac, description)
                 for mac in new
                 for description in TAG_BUTTONS
+                if not (description.tag_only and coordinator.is_ap_display(mac))
             )
+            for mac in new:
+                if coordinator.is_ap_display(mac):
+                    async_remove_ap_display_entities(
+                        hass,
+                        entry,
+                        mac,
+                        Platform.BUTTON,
+                        [d.key for d in TAG_BUTTONS if d.tag_only],
+                    )
 
     _async_add_new_tags()
     entry.async_on_unload(coordinator.async_add_listener(_async_add_new_tags))

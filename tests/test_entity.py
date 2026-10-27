@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.open_epaper_link.const import DOMAIN
@@ -88,6 +89,79 @@ async def test_display_from_an_earlier_version_becomes_a_child_in_place(
     assert display is not None
     assert display.id == old.id
     assert display.parent_device_id == ap.id
+
+
+# What only a tag on its own battery, radio and sleep cycle has, by platform.
+TAG_ONLY = (
+    ("sensor", "battery_percentage"),
+    ("sensor", "battery_voltage"),
+    ("sensor", "temperature"),
+    ("sensor", "lqi"),
+    ("sensor", "rssi"),
+    ("sensor", "next_checkin"),
+    ("sensor", "wakeup_reason"),
+    ("button", "reboot_tag"),
+    ("button", "scan_channels"),
+    ("button", "deep_sleep"),
+    ("event", "gpio"),
+    ("text", "tag_alias"),
+)
+
+
+def _entity_id(
+    hass: HomeAssistant, entry: MockConfigEntry, platform: str, mac: str, key: str
+) -> str | None:
+    return er.async_get(hass).async_get_entity_id(
+        platform, DOMAIN, f"{entry.entry_id}_{mac}_{key}"
+    )
+
+
+async def test_display_gets_nothing_only_a_tag_has(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """The display has no battery, radio or sleep cycle, so nothing about them."""
+    mock_client.set_tags(make_tag(TAG_MAC), _ap_display())
+    ap_config_entry.add_to_hass(hass)
+    await _setup(hass, ap_config_entry)
+
+    for platform, key in TAG_ONLY:
+        entity = (platform, key)
+        assert (
+            _entity_id(hass, ap_config_entry, platform, AP_DISPLAY_MAC, key) is None
+        ), entity
+        assert _entity_id(hass, ap_config_entry, platform, TAG_MAC, key), entity
+
+    # What the Access Point says about the display still applies.
+    for platform, key in (
+        ("sensor", "last_seen"),
+        ("button", "force_refresh"),
+        ("image", "content"),
+    ):
+        assert _entity_id(hass, ap_config_entry, platform, AP_DISPLAY_MAC, key)
+
+
+async def test_display_entities_from_earlier_versions_are_removed(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """Entities created before the display was recognised do not linger."""
+    mock_client.set_tags(make_tag(TAG_MAC), _ap_display())
+    ap_config_entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    for platform, key in TAG_ONLY:
+        registry.async_get_or_create(
+            platform,
+            DOMAIN,
+            f"{ap_config_entry.entry_id}_{AP_DISPLAY_MAC}_{key}",
+            config_entry=ap_config_entry,
+        )
+
+    await _setup(hass, ap_config_entry)
+
+    for platform, key in TAG_ONLY:
+        entity = (platform, key)
+        assert (
+            _entity_id(hass, ap_config_entry, platform, AP_DISPLAY_MAC, key) is None
+        ), entity
 
 
 async def test_reboot_ap_reboots_once_with_its_display_targeted_too(

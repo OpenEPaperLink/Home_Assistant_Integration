@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from homeassistant.components.bluetooth.passive_update_coordinator import (
     PassiveBluetoothCoordinatorEntity,
 )
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import (
     CONNECTION_BLUETOOTH,
     ChildDeviceInfo,
@@ -108,6 +114,27 @@ class OpenEPaperLinkTagEntity(OpenEPaperLinkEntity):
     def available(self) -> bool:
         """Whether the Access Point is connected and still knows this tag."""
         return self.coordinator.online and self.tag is not None
+
+
+@callback
+def async_remove_ap_display_entities(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    mac: str,
+    platform: Platform,
+    keys: Iterable[str],
+) -> None:
+    """Remove entities registered for the display before it was recognised.
+
+    Earlier versions gave the Access Point's display everything a tag gets,
+    and the registry keeps an entity whether or not anything still provides
+    it, so they would linger as unavailable.
+    """
+    registry = er.async_get(hass)
+    for key in keys:
+        unique_id = f"{entry.entry_id}_{mac}_{key}"
+        if entity_id := registry.async_get_entity_id(platform, DOMAIN, unique_id):
+            registry.async_remove(entity_id)
 
 
 class ATCEntity(PassiveBluetoothCoordinatorEntity[ATCCoordinator]):

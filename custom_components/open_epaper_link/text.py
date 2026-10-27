@@ -9,7 +9,7 @@ are reserved for preferences that exist only in Home Assistant.
 from __future__ import annotations
 
 from homeassistant.components.text import TextEntity, TextMode
-from homeassistant.const import EntityCategory
+from homeassistant.const import EntityCategory, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -17,13 +17,17 @@ from oepl import OEPLError
 
 from .const import DOMAIN
 from .coordinator import APConfigEntry, APCoordinator
-from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
+from .entity import (
+    OpenEPaperLinkAPEntity,
+    OpenEPaperLinkTagEntity,
+    async_remove_ap_display_entities,
+)
 
 PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,  # noqa: ARG001  (signature fixed by Home Assistant)
+    hass: HomeAssistant,
     entry: APConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
@@ -39,7 +43,18 @@ async def async_setup_entry(
         """Create an alias entity for newly seen tags."""
         if new := set(coordinator.data) - known:
             known.update(new)
-            async_add_entities(TagAliasText(coordinator, mac) for mac in new)
+            # The Access Point's built-in display is named after the part it
+            # is, so an alias would change nothing visible.
+            async_add_entities(
+                TagAliasText(coordinator, mac)
+                for mac in new
+                if not coordinator.is_ap_display(mac)
+            )
+            for mac in new:
+                if coordinator.is_ap_display(mac):
+                    async_remove_ap_display_entities(
+                        hass, entry, mac, Platform.TEXT, ["tag_alias"]
+                    )
 
     _async_add_new_tags()
     entry.async_on_unload(coordinator.async_add_listener(_async_add_new_tags))
