@@ -29,6 +29,7 @@ from oepl import (
     UpdateProgress,
     UpdateStage,
     format_radio_version,
+    format_tag_firmware_version,
 )
 
 from .const import DOMAIN, TAG_UPDATE_LOCK
@@ -37,7 +38,6 @@ from .coordinator import (
     APCoordinator,
     AvailableFirmware,
     ReleaseCoordinator,
-    format_tag_firmware,
 )
 from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
 
@@ -331,7 +331,7 @@ class TagFirmwareUpdate(OpenEPaperLinkTagEntity, UpdateEntity):
     def installed_version(self) -> str | None:
         """The firmware the tag reports running."""
         tag = self.tag
-        return format_tag_firmware(tag.firmware_version) if tag else None
+        return format_tag_firmware_version(tag.firmware_version) if tag else None
 
     @property
     def latest_version(self) -> str | None:

@@ -11,7 +11,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.open_epaper_link.const import DOMAIN
 
-from .conftest import TAG_MAC, make_tag
+from .conftest import TAG_MAC, make_tag, make_tag_type
 
 # The tag MAC the test Access Point (aa:bb:cc:dd:ee:ff) gives its own display.
 AP_DISPLAY_MAC = "0000FFEEDDCCBBAA"
@@ -211,8 +211,26 @@ async def test_tag_devices_carry_their_firmware_and_hardware_type(
         return found
 
     assert (device().sw_version, device().hw_version) == ("0029", "01")
+    # The default tag type is an M2, which SoluM makes.
+    assert device().manufacturer == "SoluM"
 
     # An update reports the new version, which the device follows.
     ap_config_entry.runtime_data._handle_tag_update(make_tag(TAG_MAC, ver=0x2B))
     await hass.async_block_till_done()
     assert device().sw_version == "002B"
+
+
+async def test_a_tag_whose_maker_is_unknown_is_credited_to_openepaperlink(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """Some tag type names start with a radio rather than a maker."""
+    mock_client.get_tag_type.return_value = make_tag_type(name='TLSR BWR 2.13"')
+    mock_client.set_tags(make_tag(TAG_MAC))
+    ap_config_entry.add_to_hass(hass)
+    await _setup(hass, ap_config_entry)
+
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        _identifier(ap_config_entry, TAG_MAC), ap_config_entry.entry_id
+    )
+    assert device is not None
+    assert device.manufacturer == "OpenEPaperLink"

@@ -19,12 +19,12 @@ from homeassistant.helpers.device_registry import (
 )
 from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from oepl import Tag
+from oepl import Tag, format_hw_type, format_tag_firmware_version
 from py_atc_ble_oepl import AdvertisingData
 
 from .atc_coordinator import ATCCoordinator
 from .const import DOMAIN
-from .coordinator import APCoordinator, format_hw_type, format_tag_firmware
+from .coordinator import APCoordinator
 
 
 class OpenEPaperLinkEntity(CoordinatorEntity[APCoordinator]):
@@ -96,9 +96,11 @@ class OpenEPaperLinkTagEntity(OpenEPaperLinkEntity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{mac}")},
             name=self._tag_name(),
-            manufacturer="OpenEPaperLink",
+            manufacturer=coordinator.tag_manufacturer(mac),
             model=coordinator.tag_type_name(mac),
-            sw_version=format_tag_firmware(tag.firmware_version) if tag else None,
+            sw_version=(
+                format_tag_firmware_version(tag.firmware_version) if tag else None
+            ),
             hw_version=format_hw_type(tag.hw_type) if tag else None,
             via_device_id=ap_device_id,
         )

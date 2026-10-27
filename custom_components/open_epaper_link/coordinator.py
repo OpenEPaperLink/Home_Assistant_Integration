@@ -39,6 +39,7 @@ from oepl import (
     WakeupReason,
     ap_display_mac,
     build_hostname,
+    format_tag_firmware_version,
 )
 
 from .const import (
@@ -59,19 +60,6 @@ if TYPE_CHECKING:
     from PIL.Image import Image
 
 _LOGGER = logging.getLogger(__name__)
-
-def format_tag_firmware(version: int) -> str:
-    """A tag's firmware version as its images name it: 41 is "0029"."""
-    return f"{version:04X}"
-
-
-def format_hw_type(hw_type: int) -> str:
-    """A tag's hardware type as the Access Point writes it: "01", or "0103".
-
-    It names the tag type definition on the Access Point (/tagtypes/01.json).
-    """
-    return f"{hw_type:0{4 if hw_type > 0xFF else 2}X}"
-
 
 # How long to wait for the radio to report its version after a boot. It took
 # a few seconds on a real Access Point.
@@ -607,7 +595,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
             registry.async_update_device(
                 device.id,
                 name=tag.alias or tag.mac,
-                sw_version=format_tag_firmware(tag.firmware_version),
+                sw_version=format_tag_firmware_version(tag.firmware_version),
             )
 
     # ------------------------------------------------------------------
@@ -655,6 +643,15 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         sensors to report.
         """
         return mac.upper() == ap_display_mac(self.ap_mac)
+
+    def tag_manufacturer(self, mac: str) -> str:
+        """Who made *mac*'s hardware, guessed from its type, else OpenEPaperLink.
+
+        Tag type definitions do not say; py-oepl recognises the names that give
+        it away.
+        """
+        tag_type = self.tag_type(mac)
+        return (tag_type.manufacturer if tag_type else None) or "OpenEPaperLink"
 
     def tag_type_name(self, mac: str) -> str | None:
         """Return the hardware name for *mac*, for the device registry."""
