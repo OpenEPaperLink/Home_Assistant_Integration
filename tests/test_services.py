@@ -9,8 +9,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import probatio as vol
 import pytest
-import voluptuous as vol
 import yaml
 from epaper_dithering import ColorScheme, DitherMode
 from homeassistant.core import HomeAssistant, State

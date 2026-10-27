@@ -21,7 +21,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-import voluptuous as vol
+import probatio as vol
 from epaper_dithering import ColorScheme, DitherMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import (
