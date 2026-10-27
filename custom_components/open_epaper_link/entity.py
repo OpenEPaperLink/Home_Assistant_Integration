@@ -24,7 +24,7 @@ from py_atc_ble_oepl import AdvertisingData
 
 from .atc_coordinator import ATCCoordinator
 from .const import DOMAIN
-from .coordinator import APCoordinator
+from .coordinator import APCoordinator, format_hw_type, format_tag_firmware
 
 
 class OpenEPaperLinkEntity(CoordinatorEntity[APCoordinator]):
@@ -92,11 +92,14 @@ class OpenEPaperLinkTagEntity(OpenEPaperLinkEntity):
                 translation_key="ap_display",
             )
             return
+        tag = self.tag
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{mac}")},
             name=self._tag_name(),
             manufacturer="OpenEPaperLink",
             model=coordinator.tag_type_name(mac),
+            sw_version=format_tag_firmware(tag.firmware_version) if tag else None,
+            hw_version=format_hw_type(tag.hw_type) if tag else None,
             via_device_id=ap_device_id,
         )
 

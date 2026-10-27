@@ -60,6 +60,19 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+def format_tag_firmware(version: int) -> str:
+    """A tag's firmware version as its images name it: 41 is "0029"."""
+    return f"{version:04X}"
+
+
+def format_hw_type(hw_type: int) -> str:
+    """A tag's hardware type as the Access Point writes it: "01", or "0103".
+
+    It names the tag type definition on the Access Point (/tagtypes/01.json).
+    """
+    return f"{hw_type:0{4 if hw_type > 0xFF else 2}X}"
+
+
 # How long to wait for the radio to report its version after a boot. It took
 # a few seconds on a real Access Point.
 RADIO_REPORT_ATTEMPTS = 6
@@ -267,13 +280,17 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         if previous is not None and previous.hash != tag.hash:
             self._async_clear_preview(tag.mac)
 
-        # The display is named after the part it is, not an alias.
+        # The display is named after the part it is, and a child device has
+        # no firmware version of its own.
         if (
             previous is not None
-            and previous.alias != tag.alias
+            and (
+                previous.alias != tag.alias
+                or previous.firmware_version != tag.firmware_version
+            )
             and not self.is_ap_display(tag.mac)
         ):
-            self._async_sync_device_name(tag)
+            self._async_sync_device(tag)
 
         self._async_fire_trigger_event(tag)
         self.async_update_listeners()
@@ -573,8 +590,12 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         )
 
     @callback
-    def _async_sync_device_name(self, tag: Tag) -> None:
-        """Mirror an alias change from the AP into the device registry."""
+    def _async_sync_device(self, tag: Tag) -> None:
+        """Mirror a tag's alias and firmware version into the device registry.
+
+        Its firmware changes when it updates, and its alias whenever the
+        Access Point's web interface renames it.
+        """
         registry = dr.async_get(self.hass)
         # Identifiers are only unique within a config entry, so the lookup is
         # scoped to this one; the unscoped form resolves ambiguously.
@@ -583,7 +604,11 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
             self.config_entry.entry_id,
         )
         if device is not None:
-            registry.async_update_device(device.id, name=tag.alias or tag.mac)
+            registry.async_update_device(
+                device.id,
+                name=tag.alias or tag.mac,
+                sw_version=format_tag_firmware(tag.firmware_version),
+            )
 
     # ------------------------------------------------------------------
     # Tag types

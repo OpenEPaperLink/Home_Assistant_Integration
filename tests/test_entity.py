@@ -181,3 +181,38 @@ async def test_reboot_ap_reboots_once_with_its_display_targeted_too(
     )
 
     mock_client.reboot_ap.assert_awaited_once()
+
+
+async def test_tag_devices_carry_their_firmware_and_hardware_type(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """As the tag's firmware images and the AP's tag type files name them.
+
+    The 3.0 integration wrote the firmware as "0x41" for version 41, which
+    is 0x29, and put the panel resolution in the hardware version.
+    """
+    mock_client.set_tags(make_tag(TAG_MAC, ver=41, hw_type=0x01))
+    ap_config_entry.add_to_hass(hass)
+    registry = dr.async_get(hass)
+    registry.async_get_or_create(
+        config_entry_id=ap_config_entry.entry_id,
+        identifiers={_identifier(ap_config_entry, TAG_MAC)},
+        sw_version="0x41",
+        hw_version="296x128",
+    )
+    registry.async_config_entry_unloaded(ap_config_entry.entry_id)
+    await _setup(hass, ap_config_entry)
+
+    def device() -> dr.DeviceEntry:
+        found = registry.async_get_device_by_identifier(
+            _identifier(ap_config_entry, TAG_MAC), ap_config_entry.entry_id
+        )
+        assert found is not None
+        return found
+
+    assert (device().sw_version, device().hw_version) == ("0029", "01")
+
+    # An update reports the new version, which the device follows.
+    ap_config_entry.runtime_data._handle_tag_update(make_tag(TAG_MAC, ver=0x2B))
+    await hass.async_block_till_done()
+    assert device().sw_version == "002B"

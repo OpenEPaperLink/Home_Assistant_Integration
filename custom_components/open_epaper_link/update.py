@@ -37,6 +37,7 @@ from .coordinator import (
     APCoordinator,
     AvailableFirmware,
     ReleaseCoordinator,
+    format_tag_firmware,
 )
 from .entity import OpenEPaperLinkAPEntity, OpenEPaperLinkTagEntity
 
@@ -330,7 +331,7 @@ class TagFirmwareUpdate(OpenEPaperLinkTagEntity, UpdateEntity):
     def installed_version(self) -> str | None:
         """The firmware the tag reports running."""
         tag = self.tag
-        return f"{tag.firmware_version:04X}" if tag else None
+        return format_tag_firmware(tag.firmware_version) if tag else None
 
     @property
     def latest_version(self) -> str | None:
