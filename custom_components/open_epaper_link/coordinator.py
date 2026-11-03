@@ -38,6 +38,7 @@ from oepl import (
     TagType,
     WakeupReason,
     ap_display_mac,
+    bluetooth_address,
     build_hostname,
     format_tag_firmware_version,
 )
@@ -45,6 +46,7 @@ from oepl import (
 from .const import (
     CONF_AP_MAC,
     CONF_HOST,
+    CONF_MAC_ADDRESS,
     DEFAULT_BUTTON_DEBOUNCE,
     DEFAULT_NFC_DEBOUNCE,
     DOMAIN,
@@ -189,6 +191,9 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
             async_dispatcher_connect(
                 self.hass, SIGNAL_ENTRIES_CHANGED, self.async_reevaluate_ownership
             ),
+            async_dispatcher_connect(
+                self.hass, SIGNAL_ENTRIES_CHANGED, self.async_link_bluetooth_tags
+            ),
         ]
         await self.client.connect()
 
@@ -246,6 +251,40 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
     def async_reevaluate_ownership(self) -> None:
         """Re-run the ownership rule after a sibling entry loaded or unloaded."""
         self.async_set_updated_data(self._visible_tags(list(self.client.tags.values())))
+
+    @callback
+    def async_link_bluetooth_tags(self) -> None:
+        """Link the devices of tags that are also set up directly over Bluetooth.
+
+        A tag running ATC firmware can be listed by this Access Point and also
+        be an entry of its own. Home Assistant links devices of different
+        config entries that share a connection, so the tag's device here gets
+        the Bluetooth address its own entry has, for as long as that entry
+        exists. Only matching an entry counts: the MAC the Access Point gives
+        a tag does not say reliably whether it is a Bluetooth tag.
+        """
+        addresses = {
+            entry.data[CONF_MAC_ADDRESS].upper()
+            for entry in self.hass.config_entries.async_entries(DOMAIN)
+            if CONF_HOST not in entry.data and CONF_MAC_ADDRESS in entry.data
+        }
+        registry = dr.async_get(self.hass)
+        entry_id = self.config_entry.entry_id
+        for mac in self.data:
+            device = registry.async_get_device_by_identifier(
+                (DOMAIN, f"{entry_id}_{mac}"), entry_id
+            )
+            if device is None:
+                continue
+            linked = {c for c in device.connections if c[0] == dr.CONNECTION_BLUETOOTH}
+            address = bluetooth_address(mac)
+            wanted = (
+                {(dr.CONNECTION_BLUETOOTH, address)} if address in addresses else set()
+            )
+            if linked != wanted:
+                registry.async_update_device(
+                    device.id, new_connections=(device.connections - linked) | wanted
+                )
 
     # ------------------------------------------------------------------
     # WebSocket callbacks

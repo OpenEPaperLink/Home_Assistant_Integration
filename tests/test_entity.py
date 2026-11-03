@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -11,7 +11,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.open_epaper_link.const import DOMAIN
 
-from .conftest import TAG_MAC, make_tag, make_tag_type
+from .conftest import ATC_ADDRESS, TAG_MAC, make_tag, make_tag_type
 
 # The tag MAC the test Access Point (aa:bb:cc:dd:ee:ff) gives its own display.
 AP_DISPLAY_MAC = "0000FFEEDDCCBBAA"
@@ -234,3 +234,39 @@ async def test_a_tag_whose_maker_is_unknown_is_credited_to_openepaperlink(
     )
     assert device is not None
     assert device.manufacturer == "OpenEPaperLink"
+
+
+async def test_an_atc_tag_set_up_on_its_own_links_both_devices(
+    hass: HomeAssistant,
+    ap_config_entry: MockConfigEntry,
+    atc_config_entry: MockConfigEntry,
+    mock_client: AsyncMock,
+    mock_atc_tag: MagicMock,
+) -> None:
+    """Home Assistant links devices of different entries sharing a connection.
+
+    The Access Point's MAC for a Bluetooth tag ends in its Bluetooth address,
+    as upstream 3.0 reports FB:FA:6C:05:D6:11 as FDFFFBFA6C05D611.
+    """
+    behind_ap = "FDFF" + ATC_ADDRESS.replace(":", "")
+    mock_client.set_tags(make_tag(behind_ap, hw_type=0x67), make_tag(TAG_MAC))
+    ap_config_entry.add_to_hass(hass)
+    await _setup(hass, ap_config_entry)
+    registry = dr.async_get(hass)
+
+    def connections(mac: str) -> set[tuple[str, str]]:
+        device = registry.async_get_device_by_identifier(
+            _identifier(ap_config_entry, mac), ap_config_entry.entry_id
+        )
+        assert device is not None
+        return {c for c in device.connections if c[0] == dr.CONNECTION_BLUETOOTH}
+
+    # Nothing to link to before the tag has an entry of its own.
+    assert connections(behind_ap) == set()
+
+    atc_config_entry.add_to_hass(hass)
+    await _setup(hass, atc_config_entry)
+
+    assert connections(behind_ap) == {(dr.CONNECTION_BLUETOOTH, ATC_ADDRESS)}
+    # A radio tag is never given one.
+    assert connections(TAG_MAC) == set()

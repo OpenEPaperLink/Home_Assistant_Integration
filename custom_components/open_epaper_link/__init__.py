@@ -124,6 +124,8 @@ async def _async_setup_atc_entry(hass: HomeAssistant, entry: ATCConfigEntry) -> 
     await hass.config_entries.async_forward_entry_setups(entry, ATC_PLATFORMS)
     # Started last, so entities are subscribed before advertisements arrive.
     entry.async_on_unload(coordinator.async_start())
+    # An Access Point that also lists this tag links its device to this one.
+    async_dispatcher_send(hass, SIGNAL_ENTRIES_CHANGED)
     return True
 
 
