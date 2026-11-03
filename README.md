@@ -1,51 +1,107 @@
 # OpenEPaperLink integration for Home Assistant
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/OpenEpaperLink/Home_Assistant_Integration?style=for-the-badge)](https://github.com/OpenEpaperLink/Home_Assistant_Integration/releases)
-[![GitHub issues](https://img.shields.io/github/issues/OpenEpaperLink/Home_Assistant_Integration?style=for-the-badge)](https://github.com/OpenEpaperLink/Home_Assistant_Integration/issues)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/OpenEPaperLink/Home_Assistant_Integration?style=for-the-badge)](https://github.com/OpenEPaperLink/Home_Assistant_Integration/releases)
+[![GitHub issues](https://img.shields.io/github/issues/OpenEPaperLink/Home_Assistant_Integration?style=for-the-badge)](https://github.com/OpenEPaperLink/Home_Assistant_Integration/issues)
 
-[//]: # (Server Widget has to be enabled first)
-[//]: # (![Discord]&#40;https://img.shields.io/discord/717057001594683422?style=flat-square&#41;)
-
-
-
-Home Assistant Integration for the [OpenEPaperLink](https://github.com/jjwbruijn/OpenEPaperLink) project, enabling control and monitoring of electronic shelf labels (ESLs) through Home Assistant.
+Control and monitor electronic shelf labels (ESLs) running [OpenEPaperLink](https://github.com/OpenEPaperLink/OpenEPaperLink) firmware from Home Assistant: draw images on them, react to their buttons and NFC, and keep their firmware up to date.
 
 ## Requirements
 
-### Hardware
+- Home Assistant 2026.11 or newer.
+- At least one of:
+  - **An OpenEPaperLink Access Point** (ESP32-based) with tags connected to it.
+  - **Bluetooth tags running the [ATC_BLE_OEPL](https://github.com/atc1441/ATC_BLE_OEPL) firmware**, reachable from a Bluetooth adapter or proxy (for example ESPHome). No Access Point is needed.
 
-**AP-Based Setup:**
-- OpenEPaperLink Access Point (ESP32-based)
-- Compatible Electronic Shelf Labels connected to AP
+Both can be used side by side.
 
-**BLE-Based Setup (ATC firmware):**
-- BLE-compatible Electronic Shelf Labels with ATC BLE firmware
-- Home Assistant with Bluetooth adapter or proxy (e.g., ESPHome)
-- No separate AP required - direct device communication
+> **OpenDisplay users:** OpenDisplay (OEPL BLE) devices are not supported by this integration. They have their own:
+> - [**Core integration**](https://www.home-assistant.io/integrations/opendisplay): send images with the `upload_image` action
+> - [**Custom integration**](https://github.com/OpenDisplay/Home_Assistant_Integration): full support, including the `drawcustom` action
 
-**Mixed Setup:**
-- Both AP and BLE devices can coexist in the same Home Assistant instance
+## Installation
 
-> **OpenDisplay users:** OpenDisplay (OEPL BLE) devices are no longer supported by this integration. OpenDisplay now has dedicated integrations:
-> - [**Core integration**](https://www.home-assistant.io/integrations/opendisplay) — send images to the display via the `upload_image` action
-> - [**Custom integration**](https://github.com/OpenDisplay/Home_Assistant_Integration) — full support including the `drawcustom` action
+### Marketplace (recommended)
 
-## Features
+OpenEPaperLink is in the Home Assistant Marketplace. Open it under **Settings → Marketplace**, search for OpenEPaperLink and select **Install**, or use this button:
 
-### 🔌 Device Integration
-- Each tag and AP appears as a device in Home Assistant
-- Device triggers for buttons, NFC, and GPIO
-- Automatic tag discovery and configuration
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=OpenEPaperLink&repository=Home_Assistant_Integration)
 
-### ⚙️ Configuration Controls
-- AP settings management (WiFi, Bluetooth, language, etc.)
-- Tag inventory and blacklist management
+If you installed it through HACS before, Home Assistant moves it to the Marketplace automatically when you update to 2026.11.
 
-### 🎨 Display Controls
+### Manual
 
-#### drawcustom (Recommended)
-The most flexible and powerful service for creating custom displays. Supports:
+1. Download the source code of the [latest release](https://github.com/OpenEPaperLink/Home_Assistant_Integration/releases/latest).
+2. Copy its `custom_components/open_epaper_link` folder into your [`custom_components` folder](https://developers.home-assistant.io/docs/creating_integration_file_structure/#where-home-assistant-looks-for-integrations).
+3. Restart Home Assistant.
+
+## Setup
+
+### Access Points
+
+Access Points are discovered automatically on your network and show up under **Settings → Devices & services**. If yours is not found, for example because it is on another VLAN, add it by its address:
+
+[![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start?domain=open_epaper_link)
+
+Each Access Point is its own entry, so you can add as many as you have. In a mesh, each tag belongs to the Access Point it is connected to, and the other Access Points of the mesh are offered for setup once one of them is added.
+
+If an Access Point changes its address, use **Reconfigure** on its entry.
+
+### Bluetooth tags
+
+Bluetooth tags are discovered automatically once they run the right firmware and have their type set:
+
+1. **Flash the `ATC_BLE_OEPL` firmware.**
+   - Tags that were used with an OpenEPaperLink BLE Access Point can usually be flashed with the [web-based OTA flasher](https://atc1441.github.io/BLE_EPaper_OTA.html).
+   - Other tags usually need a wired flash. This video walks through it: [Universal E-Paper Firmware Flashing](https://youtu.be/9oKWkHGI-Yk).
+2. **Set the device type.** Connect to the tag with the [ATC_BLE_OEPL Image Upload tool](https://atc1441.github.io/ATC_BLE_OEPL_Image_Upload.html), choose the tag's model under **Set Type** (for example `12: 290 Gici BWR SSD`) and select **Set Type**.
+
+Each Bluetooth tag gets its own entry. Tags with their stock firmware are not discovered.
+
+### Options
+
+An Access Point's options have:
+
+- **Hidden tags**: tags to ignore. No entities are created for them.
+- **Button debounce**: ignore repeated button events within this many seconds. The Access Point repeats a wake-up reason on every check-in.
+- **NFC debounce**: the same for NFC scans.
+
+## Devices and entities
+
+- **Access Point**: its status (state, Wi-Fi, memory, tag counts), its settings (channel, brightness, quiet hours, language and more) and a reboot button.
+- **Display**: Access Points with a built-in screen have it as a part of the Access Point device, with the image it shows.
+- **Tags**: each tag is a device connected through its Access Point, with its image, battery, signal, temperature, check-in times and buttons to refresh, reboot or scan for channels. The manufacturer, hardware type and firmware version are on the device page.
+- **Bluetooth tags**: each is a device with its image, battery and temperature. A Bluetooth tag that is also connected to an Access Point appears in both places, and Home Assistant links the two devices.
+
+### Events
+
+Tags with buttons, NFC or GPIO get event entities (**Button**, **NFC**, **GPIO**) that fire when the tag wakes up for that reason. Use them as triggers in automations.
+
+### Firmware updates
+
+Firmware updates show up under **Settings → Updates**, like any other device's. Home Assistant checks for new releases once a day.
+
+- **Access Point firmware**, from the repository set in the Access Point's **Update repository**.
+- **Radio firmware**, for Access Points with a separate radio chip.
+- **Tag firmware**, for tags with a published firmware image. Only one tag is updated at a time.
+- **Bluetooth tag firmware**, sent over Bluetooth to tags set up as Bluetooth tags. Bluetooth tags that are only connected through an Access Point are not updated.
+
+## Actions
+
+| Action | What it does |
+| --- | --- |
+| `open_epaper_link.drawcustom` | Draw an image from a list of elements on one or more tags. |
+| `open_epaper_link.setled` | Flash the LED on tags that have one, in up to three colour groups. |
+| `open_epaper_link.force_refresh` | Make the tag redraw its current image. |
+| `open_epaper_link.clear_pending` | Discard an update the tag has not collected yet. |
+| `open_epaper_link.reboot_tag` | Restart the tag. |
+| `open_epaper_link.scan_channels` | Make the tag search the radio channels for an Access Point again. |
+| `open_epaper_link.reboot_ap` | Restart the Access Point. |
+| `open_epaper_link.refresh_tag_types` | Reload the tag hardware definitions from the Access Point. |
+
+### drawcustom
+
+`drawcustom` builds the image from elements:
+
 - Text with multiple fonts and styles
 - Shapes (rectangles, circles, lines)
 - Icons from Material Design Icons
@@ -54,106 +110,10 @@ The most flexible and powerful service for creating custom displays. Supports:
 - Plots of Home Assistant sensor data
 - Progress bars
 
-[View full drawcustom documentation](docs/drawcustom/supported_types.md)
+[Full drawcustom documentation](docs/drawcustom/supported_types.md)
 
-#### Legacy Services (Deprecated)
-The following services have been deprecated in favor of drawcustom:
-- **dlimg**: Download and display images from URLs
-- **lines5**: Display 5 lines of text (1.54" displays only)
-- **lines4**: Display 4 lines of text (2.9" displays only)
+#### Text
 
-These legacy services were removed in the 1.0 release. Please migrate to using drawcustom.
-
-### 🚦 Device Management
-- `clear_pending`: Clear pending updates
-- `force_refresh`: Force display refresh
-- `reboot_tag`: Reboot tag
-- `scan_channels`: Initiate channel scan
-- `reboot_ap`: Reboot the access point
-- Automatic tag detection and configuration
-- Support for tag blacklisting to ignore unwanted devices
-- Hardware capability detection for buttons, NFC, and GPIO features
-
-### 🔋 Battery Optimization
-
-To maximize tag battery life when using this integration:
-
-- **[Shorten latency during config](https://github.com/OpenEPaperLink/OpenEPaperLink/wiki/Tag-protocol-timing#shorten-latency-during-config) setting**: This setting can be set to `no` either directly on the AP's web interface or through the integration's AP device in Home Assistant.
-
-  If set to `yes`, tags will only sleep for 40 seconds between check-ins instead of using the configured longer sleep periods, reducing battery life.
-
-  This occurs because Home Assistant maintains a constant WebSocket connection to the AP, which the AP interprets as being in configuration mode.
-
-## Installation
-
-### ⚠️ Important: BLE Tag Firmware & Configuration
-For the integration to discover and control BLE-based e-paper tags, they **MUST** be running the correct firmware and be properly configured. Tags with their original stock firmware will **not** be discovered by Home Assistant.
-
-#### Step 1: Flash `ATC_BLE_OEPL` Firmware
-The flashing method depends on the tag model:
-- **For tags previously used with an OpenEPaperLink BLE AP:** The [web-based OTA flasher](https://atc1441.github.io/BLE_EPaper_OTA.html) can likely be used.
-- **For other tags:** A manual flash is often required. This video provides a comprehensive guide: [Universal E-Paper Firmware Flashing](https://youtu.be/9oKWkHGI-Yk).
-
-#### Step 2: Set the Device Type
-After flashing, the correct device type for the tag model **must** be set.
-1.  Connect to the tag using the [ATC_BLE_OEPL Image Upload tool](https://atc1441.github.io/ATC_BLE_OEPL_Image_Upload.html).
-2.  Use the "Set Type" dropdown to select the specific tag model (e.g., "`12: 290 Gici BWR SSD`").
-3.  Click the "Set Type" button.
-
-#### Getting Help
-For any issues, the `#atc_ble_oepl` and `#home_assistant` channel on the [OpenEPaperLink Discord](https://discord.com/invite/eRUHt4u5CZ) is a great resource for community support.
-
-Once flashed and configured, tags are discovered by HA automatically.
-
-### Option 1: HACS Installation (Recommended)
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=OpenEpaperLink&repository=Home_Assistant_Integration)
-
-### Option 2: Manual Installation
-1. Download the `open_epaper_link` folder from the [latest release](https://github.com/jonasniesner/open_epaper_link_homeassistant/releases/latest)
-2. Copy it to your [`custom_components` folder](https://developers.home-assistant.io/docs/creating_integration_file_structure/#where-home-assistant-looks-for-integrations)
-3. Restart Home Assistant
-
-## Configuration
-
-This step is only needed when using OpenEPaperLink in AP mode. When using a BLE-only setup, the tags will be detected automatically as soon as OpenEPaperLink has been installed.
-
-### Automatic Configuration
-Add OpenEPaperLink to your Home Assistant instance using this button:
-
-[![Add Integration](https://user-images.githubusercontent.com/31328123/189550000-6095719b-ca38-4860-b817-926b19de1b32.png)](https://my.home-assistant.io/redirect/config_flow_start?domain=open_epaper_link)
-
-### Manual Configuration
-1. Browse to your Home Assistant instance
-2. Go to Settings → Devices & Services
-3. Click the `Add Integration` button in the bottom right
-4. Search for and select "OpenEPaperLink"
-5. Follow the on-screen instructions
-
-### Integration Options
-After setup, you can configure additional options through the integration's option flow:
-
-#### Tag Management
-- **Blacklisted Tags**: Select tags to hide and ignore.
-- **Button Debounce Time**: Adjust sensitivity of button triggers (0.0-5.0 seconds)
-- **NFC Debounce Time**: Adjust sensitivity of NFC triggers (0.0-5.0 seconds)
-
-#### Device Discovery
-
-**AP Device Configuration:**
-- **Automatic Discovery** (recommended): APs are automatically discovered via DHCP when connected to the network
-- **Manual Setup** (fallback): Go to Settings → Integrations → Add Integration and enter your AP's IP address
-- ⚠️ **Single Hub Limitation**: Only one AP hub allowed per Home Assistant instance
-- All tags connected to the AP are automatically discovered
-
-**BLE Device Discovery:**
-- Automatic discovery via Bluetooth scanning
-- Devices appear when in range and advertising
-- Each BLE device creates a separate integration entry
-- No limit on number of BLE devices
-
-## Usage Examples
-
-### Basic Text Display
 ```yaml
 - type: "text"
   value: "Hello World!"
@@ -163,7 +123,8 @@ After setup, you can configure additional options through the integration's opti
   color: "red"
 ```
 
-### Progress Bar with Icon
+#### Progress bar with an icon
+
 ```yaml
 - type: "progress_bar"
   x_start: 10
@@ -180,7 +141,8 @@ After setup, you can configure additional options through the integration's opti
   size: 24
 ```
 
-### Sensor Display
+#### Sensor values
+
 ```yaml
 - type: "text"
   value: "Temperature: {{ states('sensor.temperature') }}°C"
@@ -195,67 +157,24 @@ After setup, you can configure additional options through the integration's opti
   size: 24
   color: "black"
 ```
-## Migrating to Version 1.0
 
-### Breaking Changes
+## Battery life
 
-1. **Service Changes**
-   - `dlimg`, `lines4`, and `lines5` services have been deprecated
-   - All image/text display should now use `drawcustom` service
-   - Service target now uses device ID instead of entity ID
-2. **Entity Changes**
-    - Entities for each device have also changed significantly
+Set the Access Point's [**Shorten latency during config**](https://github.com/OpenEPaperLink/OpenEPaperLink/wiki/Tag-protocol-timing#shorten-latency-during-config) setting to `no` in its web interface. Home Assistant keeps a connection to the Access Point open, which the Access Point treats as being configured. With the setting on `yes`, tags then check in every 40 seconds instead of sleeping for their configured time, and drain their batteries.
 
-**To make sure no potential bugs carry over from the old version, please remove the old integration and re-add it. This will ensure that all entities are correctly setup.**
+## Upgrading from 3.x
 
+4.0 is a rewrite. Your entries, devices and entity IDs are carried over automatically, so dashboards and most automations keep working. What changed:
 
-
-### Service Migration
-
-#### Text Display
-Old format (`lines5` service):
-```yaml
-line1: "Hello"
-line2: "World"
-```
-
-New format (`drawcustom` payload):
-```yaml
-- type: "text"
-  value: "Hello"
-  x: 10
-  y: 10
-  size: 24
-- type: "text"
-  value: "World"
-  x: 10
-  y: 40
-  size: 24
-```
-
-#### Image Display
-Old format (`dlimg` service):
-```yaml
-url: "https://example.com/image.jpg"
-x: 0
-y: 0
-xsize: 296
-ysize: 128
-```
-
-New format (`drawcustom` payload):
-```yaml
-- type: "dlimg"
-  url: "https://example.com/image.jpg"
-  x: 0
-  y: 0
-  xsize: 296
-  ysize: 128
-```
-
-The device selection, background color, rotation, and other options are now configured through dropdown menus in the service UI.
+- **Home Assistant 2026.11 or newer is required.**
+- **Device triggers are replaced by event entities.** Automations using the tag's button, NFC or GPIO device triggers, or the `open_epaper_link_event` event, need to use the new **Button**, **NFC** and **GPIO** entities instead.
+- **Removed sensors:** runtime, boot count, check-in count and block requests. They counted what Home Assistant saw rather than what the tag did, and were wrong after every restart. The **Update count** sensor comes from the Access Point and remains.
+- **Removed the LED light entity of Bluetooth tags.**
+- **Several Access Points** can now be added, one entry each.
+- **Entity names** follow Home Assistant's new naming: an entity is named for what it is, such as **Reboot** instead of **Reboot Tag**, and Home Assistant shows the device name next to it.
 
 ## Contributing
-- Feature requests and bug reports are welcome! Please open an issue on GitHub
-- Pull requests are encouraged
-- Join the [Discord server](https://discord.com/invite/eRUHt4u5CZ) to discuss ideas and get help
+
+- Feature requests and bug reports are welcome. Please [open an issue](https://github.com/OpenEPaperLink/Home_Assistant_Integration/issues).
+- Pull requests are encouraged.
+- Join the [OpenEPaperLink Discord](https://discord.com/invite/eRUHt4u5CZ) (`#home_assistant` and `#atc_ble_oepl`) to discuss ideas and get help.
