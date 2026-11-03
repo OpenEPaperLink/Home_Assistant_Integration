@@ -17,9 +17,9 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
-    PERCENTAGE,
     EntityCategory,
     UnitOfElectricPotential,
+    UnitOfRatio,
     UnitOfTemperature,
 )
 from py_atc_ble_oepl import AdvertisingData
@@ -40,7 +40,7 @@ ATC_SENSORS: tuple[ATCSensorDescription, ...] = (
         key="battery_percentage",
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         value_fn=lambda adv: adv.battery_pct,
     ),
     ATCSensorDescription(

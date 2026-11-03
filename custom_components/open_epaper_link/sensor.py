@@ -13,11 +13,11 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
-    PERCENTAGE,
     EntityCategory,
     Platform,
     UnitOfElectricPotential,
     UnitOfInformation,
+    UnitOfRatio,
     UnitOfTemperature,
     UnitOfTime,
 )
@@ -413,7 +413,7 @@ class TagBatterySensor(OpenEPaperLinkTagEntity, SensorEntity):
 
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = UnitOfRatio.PERCENTAGE
 
     def __init__(self, coordinator: APCoordinator, mac: str) -> None:
         """Set up the sensor."""
