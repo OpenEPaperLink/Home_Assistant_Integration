@@ -162,17 +162,6 @@ Firmware updates show up under **Settings → Updates**, like any other device's
 
 Set the Access Point's [**Shorten latency during config**](https://github.com/OpenEPaperLink/OpenEPaperLink/wiki/Tag-protocol-timing#shorten-latency-during-config) setting to `no` in its web interface. Home Assistant keeps a connection to the Access Point open, which the Access Point treats as being configured. With the setting on `yes`, tags then check in every 40 seconds instead of sleeping for their configured time, and drain their batteries.
 
-## Upgrading from 3.x
-
-4.0 is a rewrite. Your entries, devices and entity IDs are carried over automatically, so dashboards and most automations keep working. What changed:
-
-- **Home Assistant 2026.11 or newer is required.**
-- **Device triggers are replaced by event entities.** Automations using the tag's button, NFC or GPIO device triggers, or the `open_epaper_link_event` event, need to use the new **Button**, **NFC** and **GPIO** entities instead.
-- **Removed sensors:** runtime, boot count, check-in count and block requests. They counted what Home Assistant saw rather than what the tag did, and were wrong after every restart. The **Update count** sensor comes from the Access Point and remains.
-- **Removed the LED light entity of Bluetooth tags.**
-- **Several Access Points** can now be added, one entry each.
-- **Entity names** follow Home Assistant's new naming: an entity is named for what it is, such as **Reboot** instead of **Reboot Tag**, and Home Assistant shows the device name next to it.
-
 ## Contributing
 
 - Feature requests and bug reports are welcome. Please [open an issue](https://github.com/OpenEPaperLink/Home_Assistant_Integration/issues).
