@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import probatio as vol
-from epaper_dithering import ColorScheme, DitherMode
+from epaper_dithering import DitherMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import (
     HomeAssistant,
@@ -38,6 +38,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service import async_extract_entity_ids
 from odl_renderer import SourceKind, SourceNotAllowedError, generate_image
 from oepl import LUT, Color, LEDPattern, LEDSegment, TagCommand, TagType
+from oepl.dithering import as_displayed, dither_for_tag
 from PIL.Image import Image
 from py_atc_ble_oepl import ATCError, FitMode
 from py_atc_ble_oepl import ColorScheme as ATCColorScheme
@@ -115,20 +116,6 @@ def _dither(value: Any) -> DitherMode:
             f"Invalid dither: {value}. Expected one of "
             + ", ".join(mode.name.lower() for mode in DitherMode)
         ) from None
-
-
-def _color_scheme(tag_type: TagType) -> ColorScheme:
-    """Return the palette to dither for, from the tag's colour table."""
-    table = tag_type.color_table or {}
-    match "red" in table, "yellow" in table:
-        case True, True:
-            return ColorScheme.BWRY
-        case True, False:
-            return ColorScheme.BWR
-        case False, True:
-            return ColorScheme.BWY
-        case _:
-            return ColorScheme.MONO
 
 
 def _accent_color(tag_type: TagType) -> str:
@@ -398,9 +385,11 @@ async def _async_drawcustom(call: ServiceCall) -> None:
             # Positive is anticlockwise in PIL, matching the pre-4.0 action.
             image = image.rotate(rotate, expand=True)
 
+        image, shown = await hass.async_add_executor_job(canvas.finish, image)
+
         # Shown on the tag's image entity either way, so a dry run is a
         # preview rather than a silent no-op.
-        canvas.preview(_to_png(image))
+        canvas.preview(_to_png(shown))
         if not dry_run:
             await canvas.send(image)
 
@@ -421,6 +410,8 @@ class _Canvas:
     options: Mapping[str, Any]
     preview: Callable[[bytes], None]
     send: Callable[[Image], Awaitable[None]]
+    # Turns a drawing into what is sent and how the panel will show it.
+    finish: Callable[[Image], tuple[Image, Image]] = lambda image: (image, image)
 
 
 async def _async_canvases(hass: HomeAssistant, call: ServiceCall) -> list[_Canvas]:
@@ -460,10 +451,24 @@ def _tag_canvas(coordinator: APCoordinator, mac: str, call: ServiceCall) -> _Can
             mac,
             ttl=call.data["ttl"],
             lut=call.data["refresh_type"],
-            dither_mode=call.data["dither"],
-            color_scheme=_color_scheme(tag_type),
         ),
+        finish=partial(_dither_for_tag, tag_type, call.data["dither"]),
     )
+
+
+def _dither_for_tag(
+    tag_type: TagType, mode: DitherMode, image: Image
+) -> tuple[Image, Image]:
+    """Dither against the colours the tag's panel really shows.
+
+    The preview shows those colours too, so it looks like the tag will. With
+    no dithering each pixel takes the nearest colour on the Access Point, and
+    the drawing is shown as drawn.
+    """
+    if mode is DitherMode.NONE:
+        return image, image
+    dithered = dither_for_tag(image, tag_type, mode)
+    return dithered, as_displayed(dithered, tag_type)
 
 
 def _atc_canvas(

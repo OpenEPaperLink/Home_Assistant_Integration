@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+from epaper_dithering import DitherMode
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
@@ -58,7 +59,6 @@ from .const import (
 )
 
 if TYPE_CHECKING:
-    from epaper_dithering import ColorScheme, DitherMode
     from PIL.Image import Image
 
 _LOGGER = logging.getLogger(__name__)
@@ -418,13 +418,11 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         *,
         ttl: int = 0,
         lut: LUT | None = None,
-        dither_mode: DitherMode | None = None,
-        color_scheme: ColorScheme | None = None,
     ) -> None:
-        """Render *image* on a tag.
+        """Render *image*, already dithered, on a tag.
 
-        Dithering happens client-side, so py-oepl tells the Access Point not
-        to dither again.
+        The Access Point is told not to dither again, so it gives each pixel
+        the ink of its colour exactly.
 
         This goes through the tag handle rather than the client's own
         ``upload_image``, because the handle checks the image against the tag
@@ -443,8 +441,8 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
                 fit="strict",
                 ttl=ttl,
                 lut=lut,
-                dither_mode=dither_mode,
-                color_scheme=color_scheme,
+                dither_mode=DitherMode.NONE,
+                dither=0,
                 content_mode=ContentMode.HOME_ASSISTANT,
             )
         except ValueError as err:

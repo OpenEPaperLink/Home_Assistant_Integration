@@ -6,19 +6,20 @@ old calls must keep working. These pin the coercion.
 
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import probatio as vol
 import pytest
 import yaml
-from epaper_dithering import ColorScheme, DitherMode
+from epaper_dithering import DitherMode
 from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
-from oepl import LUT, LEDPattern, TagType
+from oepl import LUT, LEDPattern
 from PIL import Image as PILImage
 from PIL.Image import Image
 
@@ -29,12 +30,11 @@ from custom_components.open_epaper_link.services import (
     HADataProvider,
     _as_history_row,
     _atc_accent_color,
-    _color_scheme,
     _led_pattern,
     async_register_services,
 )
 
-from .conftest import TAG_MAC, make_tag
+from .conftest import TAG_MAC, make_tag, make_tag_type
 
 PAYLOAD = [{"type": "text", "value": "Hello", "x": 0, "y": 0}]
 
@@ -151,35 +151,6 @@ def test_payload_is_required() -> None:
     """There is nothing to draw without one."""
     with pytest.raises(vol.Invalid):
         SCHEMA_DRAWCUSTOM({"background": "white"})
-
-
-# ---------------------------------------------------------------------------
-# Colour scheme
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("colors", "expected"),
-    [
-        (["white", "black"], ColorScheme.MONO),
-        (["white", "black", "red"], ColorScheme.BWR),
-        (["white", "black", "yellow"], ColorScheme.BWY),
-        (["white", "black", "red", "yellow"], ColorScheme.BWRY),
-    ],
-)
-def test_color_scheme_from_the_tag_type(
-    colors: list[str], expected: ColorScheme
-) -> None:
-    """Dithering targets the palette the tag can actually render."""
-    tag_type = TagType.from_dict(
-        0x01,
-        {
-            "width": 296,
-            "height": 128,
-            "colortable": {name: [0, 0, 0] for name in colors},
-        },
-    )
-    assert _color_scheme(tag_type) is expected
 
 
 @pytest.mark.parametrize(
@@ -447,24 +418,53 @@ async def test_preview_is_dropped_once_the_tag_renders(
     assert coordinator.preview(TAG_MAC) is None
 
 
-async def test_upload_uses_the_tags_own_palette(
+async def test_upload_is_dithered_for_the_colours_the_panel_shows(
     hass: HomeAssistant, ap_config_entry, mock_client
 ) -> None:
-    """Dithering targets what the tag can render, not a fixed assumption."""
-    ap_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(ap_config_entry.entry_id)
-    await hass.async_block_till_done()
+    """Sent in colortable colours, previewed in the colours the panel shows.
 
-    device = dr.async_get(hass).async_get_device_by_identifier(
-        (DOMAIN, f"{ap_config_entry.entry_id}_{TAG_MAC}"), ap_config_entry.entry_id
+    A BWY panel's yellow looks like [200, 200, 0], so an area of exactly that
+    is drawn in yellow ink alone, and the preview shows it as the panel will.
+    """
+    mock_client.get_tag_type.return_value = make_tag_type(
+        colortable={
+            "white": [255, 255, 255],
+            "black": [0, 0, 0],
+            "yellow": [255, 255, 0],
+        },
+        perceptual={"yellow": [200, 200, 0]},
     )
-    await _draw(hass, device.id, dither="floyd_steinberg")
+    device_id = await _tag_device_id(hass, ap_config_entry)
+    payload = [
+        {
+            "type": "rectangle",
+            "x_start": 0,
+            "y_start": 0,
+            "x_end": 296,
+            "y_end": 128,
+            "fill": "#C8C800",
+            "outline": "#C8C800",
+        }
+    ]
 
-    kwargs = mock_client.upload_image.await_args.kwargs
-    assert kwargs["dither_mode"] is DitherMode.FLOYD_STEINBERG
-    # The fixture's tag type has no colour table beyond black and white.
-    assert kwargs["color_scheme"] is ColorScheme.MONO
-    assert kwargs["lut"] is LUT.DEFAULT
+    await hass.services.async_call(
+        DOMAIN,
+        "drawcustom",
+        {"device_id": [device_id], "payload": payload, "dither": "floyd_steinberg"},
+        blocking=True,
+    )
+
+    call = mock_client.upload_image.await_args
+    sent = call.args[0].convert("RGB")
+    assert {rgb for _count, rgb in sent.getcolors()} == {(255, 255, 0)}
+    # Dithered here, so neither py-oepl nor the Access Point dithers again.
+    assert call.kwargs["dither_mode"] is DitherMode.NONE
+    assert call.kwargs["dither"] == 0
+    assert call.kwargs["lut"] is LUT.DEFAULT
+
+    preview = ap_config_entry.runtime_data.preview(TAG_MAC)
+    shown = PILImage.open(BytesIO(preview)).convert("RGB")
+    assert {rgb for _count, rgb in shown.getcolors()} == {(200, 200, 0)}
 
 
 async def test_drawcustom_returns_nothing(
