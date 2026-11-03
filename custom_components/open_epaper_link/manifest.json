@@ -10,6 +10,9 @@
       "manufacturer_id": 4919
     }
   ],
+  "categories": [
+    "diy_makers"
+  ],
   "codeowners": [
     "@jonasniesner",
     "@g4bri3lDev"
