@@ -1718,7 +1718,7 @@ wheels = [
 
 [[package]]
 name = "odl-renderer"
-version = "0.5.12"
+version = "0.5.15"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1726,9 +1726,9 @@ dependencies = [
     { name = "qrcode", extra = ["pil"] },
     { name = "resize-image" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/23/14/b353f393a726e3bcfecaebc22a7dc9dc590bde29ab70d2423f6417541390/odl_renderer-0.5.12.tar.gz", hash = "sha256:c7cc048941b6948ef087db8bb03fbe16ea373e54af1b353784f11f88888ff0fe", size = 1115738, upload-time = "2026-07-06T18:21:50.219Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1f/55/e0a1acb8213c9ea2c56addd1120d2ee8cd23396dd44455605f45ad1a18fb/odl_renderer-0.5.15.tar.gz", hash = "sha256:c5b0f96ea1603c386cfa54633ee13bfacdda061303acbb56c167d55cd40861c6", size = 1128401, upload-time = "2026-10-13T14:07:46.439Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/85/03/6b88db9b336051fae4110f81c273b50eabe38bae6ba3059516315a2da413/odl_renderer-0.5.12-py3-none-any.whl", hash = "sha256:86054c32e75305ef2b77e31cab8398db9db8d2173277fcdb343455e8b8131769", size = 872107, upload-time = "2026-07-06T18:21:48.625Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/04/1c9411dc1590a0f19ee91ade49795ad98206126c88dd6854bb66f19cd288/odl_renderer-0.5.15-py3-none-any.whl", hash = "sha256:066d9df0ee50206a39ce919f0ecf1540df51db106d035eed96331529296879ab", size = 878608, upload-time = "2026-10-13T14:07:44.689Z" },
 ]
 
 [[package]]
@@ -1768,7 +1768,7 @@ dev = [
     { name = "dbus-fast", specifier = "==5.0.22" },
     { name = "habluetooth", specifier = "==7.1.2" },
     { name = "mypy", specifier = "==1.18.2" },
-    { name = "odl-renderer", specifier = "==0.5.12" },
+    { name = "odl-renderer", specifier = "==0.5.15" },
     { name = "py-atc-ble-oepl", specifier = "==0.9.0" },
     { name = "py-oepl", extras = ["dither"], specifier = "==0.12.0" },
     { name = "pytest-homeassistant-custom-component", specifier = "==0.13.375" },

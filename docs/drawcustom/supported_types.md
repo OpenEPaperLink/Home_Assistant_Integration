@@ -2,7 +2,7 @@
 
 `open_epaper_link.drawcustom` draws an image from a list of elements and sends it to one or more tags, either through their Access Point or directly to ATC tags over Bluetooth.
 
-> **The element reference lives in [odl-renderer](https://github.com/OpenDisplay/odl-renderer/blob/odl-renderer-v0.5.12/README.md).**
+> **The element reference lives in [odl-renderer](https://github.com/OpenDisplay/odl-renderer/blob/odl-renderer-v0.5.15/README.md).**
 > drawcustom renders the payload with the odl-renderer library, which defines every element type and the fields they share (`visible`, `rotation`, `mirror`, `pivot`, anchors, colours, coordinates). This page covers only what the integration adds: the action and its options, fonts, local files, templates and plots of Home Assistant history.
 
 <!-- Keep the odl-renderer links on this page in sync with the odl-renderer pin in manifest.json. -->
@@ -14,7 +14,7 @@
 - [Colours](#colours)
 - [Element types](#element-types)
 - [Fonts](#fonts)
-- [Local images](#local-images)
+- [Local files](#local-files)
 - [Plots](#plots)
 - [Templates](#templates)
 
@@ -67,7 +67,7 @@ Calls written for 3.x keep working: the old numeric `dither` (`0`, `1`, `2`) and
 
 ## Colours
 
-Colours are given by name (`black`, `white`, `red`, `yellow`, `gray`, …), shortcut (`b`, `w`, `r`, `y`), halftone (`half_red`, `hr`, …) or hex (`"#FF0000"`). The full list is in the [odl-renderer colour reference](https://github.com/OpenDisplay/odl-renderer/blob/odl-renderer-v0.5.12/README.md#colors).
+Colours are given by name (`black`, `white`, `red`, `yellow`, `gray`, …), shortcut (`b`, `w`, `r`, `y`), halftone (`half_red`, `hr`, …) or hex (`"#FF0000"`). The full list is in the [odl-renderer colour reference](https://github.com/OpenDisplay/odl-renderer/blob/odl-renderer-v0.5.15/README.md#colors).
 
 Use `accent` (or `a`, `half_accent`, `ha`) to draw in the tag's accent colour. It becomes red or yellow depending on the tag, which keeps one payload working on both. On a black and white tag, `accent` is black.
 
@@ -85,7 +85,7 @@ Use `accent` (or `a`, `half_accent`, `ha`) to draw in the tag's accent colour. I
 
 ## Element types
 
-The integration passes elements to odl-renderer unchanged. See the [odl-renderer element reference](https://github.com/OpenDisplay/odl-renderer/blob/odl-renderer-v0.5.12/README.md#element-types) for every field.
+The integration passes elements to odl-renderer unchanged. See the [odl-renderer element reference](https://github.com/OpenDisplay/odl-renderer/blob/odl-renderer-v0.5.15/README.md#element-types) for every field.
 
 | Type                | Purpose                                                                |
 |---------------------|------------------------------------------------------------------------|
@@ -107,7 +107,7 @@ The integration passes elements to odl-renderer unchanged. See the [odl-renderer
 | `diagram`           | Bar chart with labelled axes                                           |
 | `debug_grid`        | Coordinate grid for laying out a payload                               |
 
-Every element also takes `visible`, `rotation`, `mirror` and `pivot`, and positions can be given in pixels or percent with an [anchor](https://github.com/OpenDisplay/odl-renderer/blob/odl-renderer-v0.5.12/README.md#anchor).
+Every element also takes `visible`, `rotation`, `mirror` and `pivot`, and positions can be given in pixels or percent with an [anchor](https://github.com/OpenDisplay/odl-renderer/blob/odl-renderer-v0.5.15/README.md#anchor).
 
 ## Fonts
 
@@ -126,7 +126,7 @@ Every element also takes `visible`, `rotation`, `mirror` and `pivot`, and positi
   x: 10
   y: 50
 
-# An absolute path, used as is.
+# An absolute path, in a folder Home Assistant allows (see Local files).
 - type: text
   value: Custom font with a path
   font: /media/GothamBold-Rnd.ttf
@@ -144,20 +144,22 @@ None of them exist by default. Create the one you want to use, for example with 
 
 `ppb.ttf` and `rbm.ttf` come with odl-renderer and are always available. If a font cannot be found, a warning is logged and `ppb.ttf` is used instead.
 
-## Local images
+## Local files
 
-`dlimg` can load a file from Home Assistant's disk by giving an absolute path as its `url`. Home Assistant only allows folders listed under [`allowlist_external_dirs`](https://www.home-assistant.io/integrations/homeassistant/#allowlist_external_dirs), so add the folder there first:
+Images (`dlimg` with an absolute path as its `url`) and fonts given by absolute path can only be read from folders Home Assistant allows: `/config/www`, your media folders, and any folder listed under [`allowlist_external_dirs`](https://www.home-assistant.io/integrations/homeassistant/#allowlist_external_dirs). A file anywhere else is refused, and the action fails with an error naming it. Fonts found by name in the [font folders](#fonts) are not affected.
+
+To use another folder, add it to your configuration:
 
 ```yaml
 # configuration.yaml
 homeassistant:
   allowlist_external_dirs:
-    - /config/www/images
+    - /share/images
 ```
 
 ```yaml
 - type: dlimg
-  url: /config/www/images/logo.png
+  url: /share/images/logo.png
   x: 0
   y: 0
   xsize: 120
@@ -179,7 +181,7 @@ homeassistant:
       line_style: dashed
 ```
 
-The series, axis and legend options are in the [odl-renderer plot reference](https://github.com/OpenDisplay/odl-renderer/blob/odl-renderer-v0.5.12/README.md#plot). Entities excluded from the recorder have no history to plot.
+The series, axis and legend options are in the [odl-renderer plot reference](https://github.com/OpenDisplay/odl-renderer/blob/odl-renderer-v0.5.15/README.md#plot). Entities excluded from the recorder have no history to plot.
 
 ## Templates
 

@@ -33,7 +33,7 @@
     "py_atc_ble_oepl"
   ],
   "requirements": [
-    "odl-renderer==0.5.12",
+    "odl-renderer==0.5.15",
     "py-atc-ble-oepl==0.9.0",
     "py-oepl[dither]==0.12.0"
   ],

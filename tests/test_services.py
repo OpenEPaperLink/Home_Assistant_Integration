@@ -19,6 +19,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from oepl import LUT, LEDPattern, TagType
+from PIL import Image as PILImage
 from PIL.Image import Image
 
 from custom_components.open_epaper_link.const import DOMAIN
@@ -699,3 +700,88 @@ async def test_history_of_an_entity_with_no_rows(hass: HomeAssistant) -> None:
         )
 
     assert history == {"sensor.x": []}
+
+
+# ---------------------------------------------------------------------------
+# Local files
+#
+# odl-renderer opens any absolute path an element names. Only folders Home
+# Assistant allows may be read, for images and fonts alike.
+# ---------------------------------------------------------------------------
+
+
+async def _tag_device_id(hass: HomeAssistant, entry) -> str:
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{entry.entry_id}_{TAG_MAC}"), entry.entry_id
+    )
+    assert device is not None
+    return device.id
+
+
+def _png(path: Path) -> Path:
+    PILImage.new("RGB", (4, 4), "white").save(path)
+    return path
+
+
+@pytest.mark.parametrize(
+    "element",
+    [
+        {"type": "dlimg", "url": "{path}", "x": 0, "y": 0, "xsize": 4, "ysize": 4},
+        {"type": "text", "value": "Hi", "x": 0, "y": 0, "font": "{path}"},
+    ],
+    ids=["image", "font"],
+)
+async def test_a_file_outside_the_allowed_folders_is_refused(
+    hass: HomeAssistant, ap_config_entry, mock_client, tmp_path: Path, element: dict
+) -> None:
+    """Nothing is drawn, and the error names the path."""
+    path = str(_png(tmp_path / "secret.png"))
+    device_id = await _tag_device_id(hass, ap_config_entry)
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "drawcustom",
+            {
+                "device_id": [device_id],
+                "payload": [
+                    {
+                        key: value.format(path=path)
+                        if isinstance(value, str)
+                        else value
+                        for key, value in element.items()
+                    }
+                ],
+            },
+            blocking=True,
+        )
+
+    assert err.value.translation_key == "path_not_allowed"
+    assert err.value.translation_placeholders == {"path": path}
+    mock_client.upload_image.assert_not_awaited()
+
+
+async def test_an_image_in_an_allowed_folder_is_drawn(
+    hass: HomeAssistant, ap_config_entry, mock_client, tmp_path: Path
+) -> None:
+    """Folders in allowlist_external_dirs can be read."""
+    hass.config.allowlist_external_dirs.add(str(tmp_path))
+    path = str(_png(tmp_path / "logo.png"))
+    device_id = await _tag_device_id(hass, ap_config_entry)
+
+    await hass.services.async_call(
+        DOMAIN,
+        "drawcustom",
+        {
+            "device_id": [device_id],
+            "payload": [
+                {"type": "dlimg", "url": path, "x": 0, "y": 0, "xsize": 4, "ysize": 4}
+            ],
+        },
+        blocking=True,
+    )
+
+    mock_client.upload_image.assert_awaited_once()

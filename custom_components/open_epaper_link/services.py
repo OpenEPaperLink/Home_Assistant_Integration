@@ -36,7 +36,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service import async_extract_entity_ids
-from odl_renderer import generate_image
+from odl_renderer import SourceKind, SourceNotAllowedError, generate_image
 from oepl import LUT, Color, LEDPattern, LEDSegment, TagCommand, TagType
 from PIL.Image import Image
 from py_atc_ble_oepl import ATCError, FitMode
@@ -266,25 +266,14 @@ def _font_search_dirs(hass: HomeAssistant, extra: str | None) -> list[str]:
     return [path for path in candidates if Path(path).is_dir()]
 
 
-def _validate_local_paths(hass: HomeAssistant, elements: list[dict[str, Any]]) -> None:
-    """Reject local paths Home Assistant has not been told to allow.
+def _allow_source(hass: HomeAssistant, kind: SourceKind, source: str) -> bool:
+    """Let elements open only files in folders Home Assistant allows.
 
-    odl-renderer opens any path beginning with a slash without checking, so
-    this is load-bearing rather than a formality.
+    odl-renderer asks this before it opens any image or font by path, so
+    nothing an element names escapes ``allowlist_external_dirs``. URLs are
+    anyone's to fetch, as Home Assistant's own image entities do.
     """
-    for element in elements:
-        url = element.get("url")
-        if (
-            isinstance(url, str)
-            and url.startswith("/")
-            and not url.startswith("//")
-            and not hass.config.is_allowed_path(url)
-        ):
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="path_not_allowed",
-                translation_placeholders={"path": url},
-            )
+    return kind != "file" or hass.config.is_allowed_path(source)
 
 
 # ---------------------------------------------------------------------------
@@ -370,7 +359,6 @@ async def _async_drawcustom(call: ServiceCall) -> None:
     """
     hass = call.hass
     elements = call.data["payload"]
-    _validate_local_paths(hass, elements)
 
     rotate: int = call.data["rotate"]
     dry_run = call.data.get("dry-run", call.data.get("dry_run", False))
@@ -385,18 +373,26 @@ async def _async_drawcustom(call: ServiceCall) -> None:
         else:
             width, height = canvas.width, canvas.height
 
-        image = await generate_image(
-            width=width,
-            height=height,
-            elements=elements,
-            background=call.data["background"],
-            accent_color=canvas.accent_color,
-            session=async_get_clientsession(hass),
-            data_provider=HADataProvider(hass),
-            font_dirs=await hass.async_add_executor_job(
-                _font_search_dirs, hass, canvas.options.get(OPT_CUSTOM_FONT_DIRS)
-            ),
-        )
+        try:
+            image = await generate_image(
+                width=width,
+                height=height,
+                elements=elements,
+                background=call.data["background"],
+                accent_color=canvas.accent_color,
+                session=async_get_clientsession(hass),
+                data_provider=HADataProvider(hass),
+                font_dirs=await hass.async_add_executor_job(
+                    _font_search_dirs, hass, canvas.options.get(OPT_CUSTOM_FONT_DIRS)
+                ),
+                allow_source=partial(_allow_source, hass),
+            )
+        except SourceNotAllowedError as err:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="path_not_allowed",
+                translation_placeholders={"path": err.source},
+            ) from err
 
         if rotate:
             # Positive is anticlockwise in PIL, matching the pre-4.0 action.
