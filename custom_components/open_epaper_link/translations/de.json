@@ -46,7 +46,7 @@
   "entity": {
     "switch": {
       "preview": {
-        "name": "Bildervorschau im AP"
+        "name": "Bildervorschau am Access Point"
       },
       "ble": {
         "name": "Bluetooth LE"
@@ -173,7 +173,7 @@
         "name": "Inhalt aktualisieren erzwingen"
       },
       "reboot_tag": {
-        "name": "Tag neu starten"
+        "name": "Neu starten"
       },
       "scan_channels": {
         "name": "Kanäle scannen"
@@ -182,7 +182,7 @@
         "name": "Tiefschlaf"
       },
       "reboot_ap": {
-        "name": "AP neu starten"
+        "name": "Neu starten"
       }
     },
     "select": {

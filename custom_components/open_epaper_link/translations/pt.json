@@ -46,7 +46,7 @@
   "entity": {
     "switch": {
       "preview": {
-        "name": "Pré-visualizar Imagens no AP"
+        "name": "Pré-visualizar imagens no Access Point"
       },
       "ble": {
         "name": "Bluetooth LE"
@@ -170,7 +170,7 @@
         "name": "Forçar Atualização de Conteúdo"
       },
       "reboot_tag": {
-        "name": "Reiniciar Etiqueta"
+        "name": "Reiniciar"
       },
       "scan_channels": {
         "name": "Analisar Canais"
@@ -179,7 +179,7 @@
         "name": "Sono Profundo"
       },
       "reboot_ap": {
-        "name": "Reiniciar AP"
+        "name": "Reiniciar"
       }
     },
     "update": {

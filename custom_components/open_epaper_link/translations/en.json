@@ -63,16 +63,16 @@
   "entity": {
     "switch": {
       "preview": {
-        "name": "Preview Images on AP"
+        "name": "Preview images on the Access Point"
       },
       "ble": {
         "name": "Bluetooth LE"
       },
       "nightlyreboot": {
-        "name": "Nightly Reboot"
+        "name": "Nightly reboot"
       },
       "showtimestamp": {
-        "name": "Show Timestamp"
+        "name": "Show timestamp"
       }
     },
     "text": {
@@ -257,82 +257,82 @@
     },
     "sensor": {
       "ip": {
-        "name": "IP Address"
+        "name": "IP address"
       },
       "wifi_ssid": {
-        "name": "WiFi SSID"
+        "name": "Wi-Fi SSID"
       },
       "record_count": {
-        "name": "Tag Count"
+        "name": "Tag count"
       },
       "db_size": {
-        "name": "Database Size"
+        "name": "Database size"
       },
       "little_fs_free": {
-        "name": "LittleFS Free"
+        "name": "LittleFS free"
       },
       "ap_state": {
         "name": "State"
       },
       "run_state": {
-        "name": "Run State"
+        "name": "Run state"
       },
       "wifi_rssi": {
-        "name": "WiFi RSSI"
+        "name": "Wi-Fi RSSI"
       },
       "heap": {
-        "name": "Free Heap"
+        "name": "Free heap"
       },
       "uptime": {
         "name": "Uptime"
       },
       "low_battery_tag_count": {
-        "name": "Low Battery Tag Count"
+        "name": "Low battery tag count"
       },
       "timeout_tag_count": {
-        "name": "Timed out Tag Count"
+        "name": "Timed out tag count"
       },
       "ps_ram_free": {
-        "name": "PSRAM Free"
+        "name": "PSRAM free"
       },
       "temperature": {
         "name": "Temperature"
       },
       "battery_voltage": {
-        "name": "Battery Voltage"
+        "name": "Battery voltage"
       },
       "battery_percentage": {
-        "name": "Battery Percentage"
+        "name": "Battery percentage"
       },
       "last_seen": {
-        "name": "Last Seen"
+        "name": "Last seen"
       },
       "next_update": {
-        "name": "Next Update"
+        "name": "Next update"
       },
       "next_checkin": {
-        "name": "Next Checkin"
+        "name": "Next check-in"
       },
       "lqi": {
-        "name": "Link Quality Index"
+        "name": "Link quality index"
       },
       "rssi": {
         "name": "RSSI"
       },
       "pending_updates": {
-        "name": "Pending Updates"
+        "name": "Pending updates"
       },
       "content_mode": {
-        "name": "Content Mode"
+        "name": "Content mode"
       },
       "wakeup_reason": {
-        "name": "Wakeup Reason"
+        "name": "Wakeup reason"
       },
       "capabilities": {
         "name": "Capabilities"
       },
       "update_count": {
-        "name": "Update Count"
+        "name": "Update count"
       },
       "width": {
         "name": "Width"
@@ -353,22 +353,22 @@
     },
     "button": {
       "clear_pending": {
-        "name": "Clear Pending Updates"
+        "name": "Clear pending updates"
       },
       "force_refresh": {
-        "name": "Force Refresh Content"
+        "name": "Force refresh content"
       },
       "reboot_tag": {
-        "name": "Reboot Tag"
+        "name": "Reboot"
       },
       "scan_channels": {
-        "name": "Scan Channels"
+        "name": "Scan channels"
       },
       "deep_sleep": {
-        "name": "Deep Sleep"
+        "name": "Deep sleep"
       },
       "reboot_ap": {
-        "name": "Reboot AP"
+        "name": "Reboot"
       }
     },
     "event": {

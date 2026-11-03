@@ -46,7 +46,7 @@
   "entity": {
     "switch": {
       "preview": {
-        "name": "Podgląd obrazów na AP"
+        "name": "Podgląd obrazów na punkcie dostępowym"
       },
       "ble": {
         "name": "Bluetooth LE"
@@ -170,7 +170,7 @@
         "name": "Wymuś odświeżenie treści"
       },
       "reboot_tag": {
-        "name": "Uruchom ponownie tag"
+        "name": "Uruchom ponownie"
       },
       "scan_channels": {
         "name": "Skanuj kanały"
@@ -179,7 +179,7 @@
         "name": "Głęboki sen"
       },
       "reboot_ap": {
-        "name": "Uruchom ponownie AP"
+        "name": "Uruchom ponownie"
       }
     },
     "update": {
