@@ -10,7 +10,7 @@ Control and monitor electronic shelf labels (ESLs) running [OpenEPaperLink](http
 - Home Assistant 2026.11 or newer.
 - At least one of:
   - **An OpenEPaperLink Access Point** (ESP32-based) with tags connected to it.
-  - **Bluetooth tags running the [ATC_BLE_OEPL](https://github.com/atc1441/ATC_BLE_OEPL) firmware**, reachable from a Bluetooth adapter or proxy (for example ESPHome). No Access Point is needed.
+  - **ATC tags**: Bluetooth tags running the [ATC_BLE_OEPL](https://github.com/atc1441/ATC_BLE_OEPL) firmware, reachable from a Bluetooth adapter or proxy (for example ESPHome). No Access Point is needed.
 
 Both can be used side by side.
 
@@ -46,16 +46,16 @@ Each Access Point is its own entry, so you can add as many as you have. In a mes
 
 If an Access Point changes its address, use **Reconfigure** on its entry.
 
-### Bluetooth tags
+### ATC tags
 
-Bluetooth tags are discovered automatically once they run the right firmware and have their type set:
+ATC tags are discovered automatically over Bluetooth once they run the right firmware and have their type set:
 
 1. **Flash the `ATC_BLE_OEPL` firmware.**
    - Tags that were used with an OpenEPaperLink BLE Access Point can usually be flashed with the [web-based OTA flasher](https://atc1441.github.io/BLE_EPaper_OTA.html).
    - Other tags usually need a wired flash. This video walks through it: [Universal E-Paper Firmware Flashing](https://youtu.be/9oKWkHGI-Yk).
 2. **Set the device type.** Connect to the tag with the [ATC_BLE_OEPL Image Upload tool](https://atc1441.github.io/ATC_BLE_OEPL_Image_Upload.html), choose the tag's model under **Set Type** (for example `12: 290 Gici BWR SSD`) and select **Set Type**.
 
-Each Bluetooth tag gets its own entry. Tags with their stock firmware are not discovered.
+Each ATC tag gets its own entry. Tags with their stock firmware are not discovered.
 
 ### Options
 
@@ -70,7 +70,7 @@ An Access Point's options have:
 - **Access Point**: its status (state, Wi-Fi, memory, tag counts), its settings (channel, brightness, quiet hours, language and more) and a reboot button.
 - **Display**: Access Points with a built-in screen have it as a part of the Access Point device, with the image it shows.
 - **Tags**: each tag is a device connected through its Access Point, with its image, battery, signal, temperature, check-in times and buttons to refresh, reboot or scan for channels. The manufacturer, hardware type and firmware version are on the device page.
-- **Bluetooth tags**: each is a device with its image, battery and temperature. A Bluetooth tag that is also connected to an Access Point appears in both places, and Home Assistant links the two devices.
+- **ATC tags**: each is a device with its image, battery and temperature. An ATC tag that is also connected to an Access Point appears in both places, and Home Assistant links the two devices.
 
 ### Events
 
@@ -83,7 +83,7 @@ Firmware updates show up under **Settings → Updates**, like any other device's
 - **Access Point firmware**, from the repository set in the Access Point's **Update repository**.
 - **Radio firmware**, for Access Points with a separate radio chip.
 - **Tag firmware**, for tags with a published firmware image. Only one tag is updated at a time.
-- **Bluetooth tag firmware**, sent over Bluetooth to tags set up as Bluetooth tags. Bluetooth tags that are only connected through an Access Point are not updated.
+- **ATC tag firmware**, sent over Bluetooth to ATC tags set up on their own. ATC tags that are only connected through an Access Point are not updated.
 
 ## Actions
 
