@@ -157,14 +157,6 @@ class _ReleaseUpdate(OpenEPaperLinkAPEntity, UpdateEntity):
         """The release's notes, as written on GitHub."""
         return self.release.notes if self.release else None
 
-    def version_is_newer(self, latest_version: str, installed_version: str) -> bool:
-        """Whether *latest_version* is an update.
-
-        latest_version reads as the installed version unless the release is
-        an update, which py-oepl decides the way the Access Point's page does.
-        """
-        return latest_version != installed_version
-
     @callback
     def _async_progress(self, percent: int | None) -> None:
         self._attr_in_progress = True
@@ -208,13 +200,22 @@ class APFirmwareUpdate(_ReleaseUpdate):
 
     @property
     def latest_version(self) -> str | None:
-        """The newest release, or the installed version if that is not an update."""
+        """The newest release, or the installed version if none was found."""
+        if (release := self.release) is not None:
+            return release.tag
+        return self.installed_version if self.releases.data else None
+
+    @property
+    def has_update(self) -> bool:
+        """Whether the release is an update, as the Access Point's page decides it.
+
+        Release 3.00 is the firmware reporting 3.0, and only the build time tells
+        a development build from the release, so the versions cannot be compared.
+        """
         info, release = self.coordinator.ap_info, self.release
         if info is None or release is None:
-            return self.installed_version if self.releases.data else None
-        if release.is_update(info.build_version, _as_int(info.build_time)):
-            return release.tag
-        return info.build_version
+            return False
+        return release.is_update(info.build_version, _as_int(info.build_time))
 
     # The signature is Home Assistant's; there is one version to install.
     async def async_install(
@@ -269,17 +270,23 @@ class RadioFirmwareUpdate(_ReleaseUpdate):
 
     @property
     def latest_version(self) -> str | None:
-        """The release's radio firmware, or the installed one if not newer."""
+        """The release's radio firmware, or the installed one if it has none."""
         # None until a release check has succeeded, whatever the type says.
         data: AvailableFirmware | None = self.releases.data
         if data is None:
             return None
+        if data.radio_version is None:
+            return self.installed_version
+        return format_radio_version(data.radio_version)
+
+    @property
+    def has_update(self) -> bool:
+        """Whether the release's radio firmware is newer than the radio's."""
+        data: AvailableFirmware | None = self.releases.data
         info = self.coordinator.ap_info
         installed = info.radio_version if info else None
-        latest = data.radio_version
-        if latest is None or (installed and latest <= installed):
-            return self.installed_version
-        return format_radio_version(latest)
+        latest = data.radio_version if data else None
+        return bool(installed and latest and latest > installed)
 
     # The signature is Home Assistant's; there is one version to install.
     async def async_install(
@@ -354,17 +361,17 @@ class TagFirmwareUpdate(OpenEPaperLinkTagEntity, UpdateEntity):
 
     @property
     def latest_version(self) -> str | None:
-        """The newest firmware, or the installed version if that is not newer."""
+        """The newest firmware, or the installed version if none was found."""
+        firmware = self.firmware
+        return firmware.version if firmware else self.installed_version
+
+    @property
+    def has_update(self) -> bool:
+        """Whether the newest firmware is newer than the tag's."""
         tag, firmware = self.tag, self.firmware
         if tag is None or firmware is None:
-            return self.installed_version
-        if firmware.number > tag.firmware_version:
-            return firmware.version
-        return self.installed_version
-
-    def version_is_newer(self, latest_version: str, installed_version: str) -> bool:
-        """Whether *latest_version* is an update; it reads as installed otherwise."""
-        return latest_version != installed_version
+            return False
+        return firmware.number > tag.firmware_version
 
     @callback
     def _async_progress(self, percent: int | None) -> None:
@@ -457,17 +464,19 @@ class ATCFirmwareUpdate(ATCEntity, UpdateEntity):
 
     @property
     def latest_version(self) -> str | None:
-        """The published firmware, or the installed version if that is not newer."""
+        """The published firmware, if it could be fetched."""
+        published = self.published
+        if published is None or published.version is None:
+            return None
+        return format_tag_firmware_version(published.version)
+
+    @property
+    def has_update(self) -> bool:
+        """Whether the published firmware is newer than the tag's."""
         published, advertisement = self.published, self.advertisement
         if published is None or published.version is None or advertisement is None:
-            return None
-        if published.version > advertisement.fw_version:
-            return format_tag_firmware_version(published.version)
-        return self.installed_version
-
-    def version_is_newer(self, latest_version: str, installed_version: str) -> bool:
-        """Whether *latest_version* is an update; it reads as installed otherwise."""
-        return latest_version != installed_version
+            return False
+        return published.version > advertisement.fw_version
 
     @callback
     def _async_progress(self, percent: int | None) -> None:

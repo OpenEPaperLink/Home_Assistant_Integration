@@ -112,6 +112,21 @@ async def test_a_current_tag_is_up_to_date(
     assert hass.states.get(entity_id).state == STATE_OFF
 
 
+async def test_a_tag_newer_than_the_published_firmware_is_no_update(
+    hass: HomeAssistant,
+    atc_config_entry: MockConfigEntry,
+    mock_atc_tag: MagicMock,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """The latest version stays the published one, without offering a downgrade."""
+    entity_id = await _setup(hass, atc_config_entry, aioclient_mock, installed=0x80)
+
+    state = hass.states.get(entity_id)
+    assert state.state == STATE_OFF
+    assert state.attributes[ATTR_INSTALLED_VERSION] == "0080"
+    assert state.attributes[ATTR_LATEST_VERSION] == "007D"
+
+
 async def test_an_unreachable_image_leaves_the_latest_version_unknown(
     hass: HomeAssistant,
     atc_config_entry: MockConfigEntry,

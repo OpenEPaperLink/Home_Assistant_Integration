@@ -87,7 +87,8 @@ async def test_the_installed_release_is_no_update(
 
     state = hass.states.get(FIRMWARE)
     assert state.state == STATE_OFF
-    assert state.attributes[ATTR_LATEST_VERSION] == "3.0"
+    assert state.attributes[ATTR_INSTALLED_VERSION] == "3.0"
+    assert state.attributes[ATTR_LATEST_VERSION] == "3.00"
 
 
 async def test_no_release_found_is_up_to_date(
@@ -258,6 +259,21 @@ async def test_radio_already_current_is_no_update(
     assert hass.states.get(RADIO).state == STATE_OFF
 
 
+async def test_a_newer_radio_than_the_release_is_no_update(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """The latest version stays the release's, without offering a downgrade."""
+    mock_client.get_sysinfo.return_value = _sysinfo(hasC6=1, ap_version=0x25)
+    mock_client.updates.latest_release.return_value = _release()
+    mock_client.updates.radio_version.return_value = 0x24
+    await _setup(hass, ap_config_entry)
+
+    state = hass.states.get(RADIO)
+    assert state.state == STATE_OFF
+    assert state.attributes[ATTR_INSTALLED_VERSION] == "0025"
+    assert state.attributes[ATTR_LATEST_VERSION] == "0024"
+
+
 # ---------------------------------------------------------------------------
 # Tags
 # ---------------------------------------------------------------------------
@@ -292,6 +308,20 @@ async def test_a_current_tag_is_up_to_date(
     await _setup(hass, ap_config_entry)
 
     assert hass.states.get(TAG_UPDATE).state == STATE_OFF
+
+
+async def test_a_tag_newer_than_the_published_firmware_is_no_update(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """The latest version stays the published one, without offering a downgrade."""
+    mock_client.set_tags(make_tag(TAG_MAC, ver=0x2A))
+    mock_client.updates.tag_firmware.return_value = TAG_FIRMWARE
+    await _setup(hass, ap_config_entry)
+
+    state = hass.states.get(TAG_UPDATE)
+    assert state.state == STATE_OFF
+    assert state.attributes[ATTR_INSTALLED_VERSION] == "002A"
+    assert state.attributes[ATTR_LATEST_VERSION] == "0029"
 
 
 async def test_no_update_entity_where_there_is_no_firmware(
