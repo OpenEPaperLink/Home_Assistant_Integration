@@ -1,142 +1,94 @@
+"""Switches for boolean Access Point settings."""
+
 from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
+from homeassistant.components.switch.const import SwitchDeviceClass
+from homeassistant.const import EntityCategory
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
+from .coordinator import APConfigEntry, APCoordinator
+from .entity import OpenEPaperLinkAPEntity
 
 PARALLEL_UPDATES = 1
 
-from dataclasses import dataclass
-
-from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass, SwitchEntityDescription
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import EntityCategory
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-
-from .const import DOMAIN
-from .entity import OpenEPaperLinkAPEntity
-from .runtime_data import OpenEPaperLinkConfigEntry
-
-import logging
-
-_LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, kw_only=True)
-class OpenEPaperLinkSwitchDescription(SwitchEntityDescription):
-    """Switch description with explicit default enable flag."""
+class APSwitchDescription(SwitchEntityDescription):
+    """Describes a boolean Access Point setting.
 
-    description: str
-    entity_registry_enabled_default: bool = False
+    ``key`` is both the translation key and the wire key the Access Point
+    expects, which is why they are not spelled separately.
+    """
 
 
-# Define switch configurations
-SWITCH_ENTITIES: tuple[OpenEPaperLinkSwitchDescription, ...] = (
-    OpenEPaperLinkSwitchDescription(
-        key="preview",
-        translation_key="preview",
-        name="Preview Images",
-        description="Enable/disable preview images on the AP",
-        entity_registry_enabled_default=True,
-    ),
-    OpenEPaperLinkSwitchDescription(
-        key="ble",
-        translation_key="ble",
-        name="Bluetooth",
-        description="Enable/disable Bluetooth",
-        entity_registry_enabled_default=True,
-    ),
-    OpenEPaperLinkSwitchDescription(
-        key="nightlyreboot",
-        translation_key="nightlyreboot",
-        name="Nightly Reboot",
-        description="Enable/disable automatic nightly reboot of the AP",
-        entity_registry_enabled_default=True,
-    ),
-    OpenEPaperLinkSwitchDescription(
-        key="showtimestamp",
-        translation_key="showtimestamp",
-        name="Show Timestamp",
-        description="Enable/disable showing timestamps on ESLs",
-        entity_registry_enabled_default=True,
-    ),
+AP_SWITCHES: tuple[APSwitchDescription, ...] = (
+    APSwitchDescription(key="preview", entity_category=EntityCategory.CONFIG),
+    APSwitchDescription(key="nightlyreboot", entity_category=EntityCategory.CONFIG),
+    APSwitchDescription(key="showtimestamp", entity_category=EntityCategory.CONFIG),
+    APSwitchDescription(key="ble", entity_category=EntityCategory.CONFIG),
 )
-"""Configuration for all switch entities to create for the AP."""
+
+# The APConfig attribute behind each wire key.
+_ATTRIBUTES = {
+    "preview": "preview",
+    "nightlyreboot": "nightly_reboot",
+    "showtimestamp": "show_timestamp",
+    "ble": "ble_enabled",
+}
 
 
-class APConfigSwitch(OpenEPaperLinkAPEntity, SwitchEntity):
-    """Switch entity for AP configuration."""
+async def async_setup_entry(
+    hass: HomeAssistant,  # noqa: ARG001  (signature fixed by Home Assistant)
+    entry: APConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
+    """Set up Access Point switches."""
+    coordinator = entry.runtime_data
+    async_add_entities(
+        APSwitch(coordinator, description)
+        for description in AP_SWITCHES
+        # Bluetooth cannot be switched on hardware that does not have it.
+        if description.key != "ble"
+        or (coordinator.ap_config and coordinator.ap_config.has_ble)
+    )
 
-    entity_description: OpenEPaperLinkSwitchDescription
 
-    def __init__(self, hub, description: OpenEPaperLinkSwitchDescription) -> None:
-        """Initialize the switch entity."""
-        super().__init__(hub)
+class APSwitch(OpenEPaperLinkAPEntity, SwitchEntity):
+    """A boolean Access Point setting."""
+
+    entity_description: APSwitchDescription
+    _attr_device_class = SwitchDeviceClass.SWITCH
+
+    def __init__(
+        self, coordinator: APCoordinator, description: APSwitchDescription
+    ) -> None:
+        """Set up the switch."""
+        super().__init__(coordinator, description.key)
         self.entity_description = description
-        self._key = description.key
-        self._attr_unique_id = f"{hub.entry.entry_id}_{description.key}"
-        self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_translation_key = description.translation_key or description.key
-        self._description = description.description
-        self._attr_device_class = SwitchDeviceClass.SWITCH
-        self._attr_entity_registry_enabled_default = description.entity_registry_enabled_default
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        return self._hub.online and self._key in self._hub.ap_config
 
     @property
     def is_on(self) -> bool | None:
-        """Return True if entity is on."""
-        if not self.available:
+        """Return whether the setting is enabled."""
+        config = self.coordinator.ap_config
+        if config is None:
             return None
-        return bool(int(self._hub.ap_config.get(self._key, 0)))
+        return bool(getattr(config, _ATTRIBUTES[self.entity_description.key]))
 
-    async def async_turn_on(self, **kwargs) -> None:
-        """Turn the entity on."""
-        await self._hub.set_ap_config_item(self._key, 1)
+    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: ARG002
+        """Enable the setting."""
+        await self._async_set(True)
 
-    async def async_turn_off(self, **kwargs) -> None:
-        """Turn the entity off."""
-        await self._hub.set_ap_config_item(self._key, 0)
+    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: ARG002
+        """Disable the setting."""
+        await self._async_set(False)
 
-    async def async_added_to_hass(self) -> None:
-        """Register callbacks when entity is added to Home Assistant."""
-        await super().async_added_to_hass()
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                f"{DOMAIN}_ap_config_update",
-                self._handle_update,
-            )
+    async def _async_set(self, value: bool) -> None:
+        """Write the setting to the Access Point."""
+        await self.coordinator.async_set_ap_config_item(
+            self.entity_description.key, int(value)
         )
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry,
-                            async_add_entities: AddEntitiesCallback) -> None:
-    """Set up switch entities for AP configuration.
-
-    Creates switch entities for all defined AP configuration options
-    based on the SWITCH_ENTITIES definition list.
-
-    For each defined switch:
-
-    1. Creates an APConfigSwitch instance with appropriate configuration
-    2. Ensures the AP configuration is loaded before creating entities
-    3. Adds all created entities to Home Assistant
-
-    Args:
-        hass: Home Assistant instance
-        entry: Configuration entry
-        async_add_entities: Callback to register new entities
-    """
-    hub = entry.runtime_data
-
-    # Wait for initial AP config to be loaded
-    if not hub.ap_config:
-        await hub.async_update_ap_config()
-
-    entities = []
-
-    # Create switch entities from configuration
-    for description in SWITCH_ENTITIES:
-        entities.append(APConfigSwitch(hub, description))
-
-    async_add_entities(entities)

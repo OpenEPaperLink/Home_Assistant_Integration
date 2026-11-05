@@ -1,33 +1,18 @@
 drawcustom:
-  name: Draw Custom Image
-  description: Draws a custom image on one or more ESL tags
   target:
   fields:
     payload:
-      name: Payload
-      description: Payload to draw, see documentation for examples
       required: true
       example: >
         [{"type": "text", "value": "Hello World!", "x": 0, "y": 0, "size": 40}]
       selector:
         object:
     background:
-      name: Background color
-      description: Background color (black, white, accent, red, yellow)
-      required: true
-      example: white
+      default: white
       selector:
         select:
-          options:
-            - "white"
-            - "black"
-            - "accent"
-            - "red"
-            - "yellow"
+          options: ["white", "black", "accent", "red", "yellow"]
     rotate:
-      name: Rotation
-      description: Rotation in degrees (0, 90, 180, 270)
-      required: true
       default: 0
       selector:
         number:
@@ -35,262 +20,164 @@ drawcustom:
           max: 270
           step: 90
     dither:
-      name: Dither
-      description: Dithering option to use
-      required: true
-      default: 2
+      default: ordered
       selector:
         select:
+          translation_key: dither
           options:
-            - label: "No dithering"
-              value: "0"
-            - label: "Burkes (best for photos)"
-              value: "1"
-            - label: "Ordered (best for halftone colors)"
-              value: "2"
+            - none
+            - burkes
+            - ordered
+            - floyd_steinberg
+            - atkinson
+            - stucki
+            - sierra
+            - sierra_lite
+            - jarvis_judice_ninke
+            - dizzy
+    refresh_type:
+      default: adaptive
+      selector:
+        select:
+          translation_key: refresh_type
+          options:
+            - adaptive
+            - full
+            - fast
+            - fast_no_red
     ttl:
-      name: Time to live
-      description: >
-        How long the tag will sleep before checking in again (in seconds).
-        
-        Notes:
-        - The TTL applies only once after each image update
-        - Setting a very long TTL means you cannot update the tag again until that time has passed
-      required: true
       default: 60
       selector:
         number:
           min: 0
           max: 86400
           unit_of_measurement: seconds
-    refresh_type:
-      name: Refresh type
-      description: >
-        E-paper display refresh mode.
-        
-        - Full: Best quality (~2s), full screen refresh.
-        
-        - Fast: Moderate quality (~1s), quick update.
-        
-        - Partial: Fastest (~0.3s), may show ghosting.
-        
-        - Partial2: Alternative partial mode.
-        
-        Note: ATC BLE tags do not support this parameter.
-      required: false
-      default: "0"
-      selector:
-        select:
-          options:
-            - label: "Full (best quality)"
-              value: "0"
-            - label: "Fast (moderate quality)"
-              value: "1"
-            - label: "Partial (fastest)"
-              value: "2"
-            - label: "Partial2 (alternative partial)"
-              value: "3"
     dry-run:
-      name: Dry run
-      description: Generate image but don't send to device
-      required: true
       default: false
       selector:
         boolean:
 
 setled:
-  name: Set LED Pattern
-  description: >
-    Sets the LED flash pattern; brightness controls flash on-time (0–15, higher = longer on-time);
-    missing color2/3 are skipped.
-    See https://github.com/OpenEPaperLink/OpenEPaperLink/wiki/Led-control for details.
   target:
   fields:
     mode:
-      name: Mode
-      description: LED mode (off or flash)
-      required: true
       default: flash
       selector:
         select:
-          options:
-            - "off"
-            - "flash"
+          options: ["off", "flash"]
     brightness:
-      name: Brightness
-      description: LED flash on-time nibble (0–15). Higher = longer on-time; start low to save battery.
-      required: false
       default: 1
       selector:
         number:
           min: 1
           max: 16
-          step: 1
-          mode: slider
     repeats:
-      name: Repeats
-      description: Number of times to repeat the pattern
-      required: false
       default: 2
       selector:
         number:
           min: 1
-          max: 255
-          step: 1
-          mode: slider
+          max: 256
     color1:
-      name: Color 1
-      description: First color in the pattern
-      required: false
       default: [255, 0, 0]
       selector:
         color_rgb:
-    flashSpeed1:
-      name: Flash Speed 1
-      description: Flash speed for first color (seconds)
-      required: false
+    flash_speed1:
       default: 0.2
       selector:
         number:
           min: 0
           max: 1.5
           step: 0.1
-          unit_of_measurement: "s"
-          mode: slider
-    flashCount1:
-      name: Flash Count 1
-      description: Number of flashes for first color
-      required: false
+          unit_of_measurement: seconds
+    flash_count1:
       default: 2
       selector:
         number:
           min: 0
           max: 15
-          step: 1
-          mode: slider
     delay1:
-      name: Delay 1
-      description: Delay after first color
-      required: false
       default: 0.1
       selector:
         number:
           min: 0
           max: 25.5
           step: 0.1
-          unit_of_measurement: "s"
-          mode: slider
+          unit_of_measurement: seconds
     color2:
-      name: Color 2
-      description: Optional second color; omit to skip this group.
-      required: false
+      advanced: true
       default: [0, 255, 0]
       selector:
         color_rgb:
-    flashSpeed2:
-      name: Flash Speed 2
-      description: Flash speed for second color (seconds)
-      required: false
+    flash_speed2:
+      advanced: true
       default: 0.2
       selector:
         number:
           min: 0
           max: 1.5
           step: 0.1
-          unit_of_measurement: "s"
-          mode: slider
-    flashCount2:
-      name: Flash Count 2
-      description: Number of flashes for second color (0 skips this color).
-      required: false
+          unit_of_measurement: seconds
+    flash_count2:
+      advanced: true
       default: 2
       selector:
         number:
           min: 0
           max: 15
-          step: 1
-          mode: slider
     delay2:
-      name: Delay 2
-      description: Delay after second color
-      required: false
+      advanced: true
       default: 0.1
       selector:
         number:
           min: 0
           max: 25.5
           step: 0.1
-          unit_of_measurement: "s"
-          mode: slider
+          unit_of_measurement: seconds
     color3:
-      name: Color 3
-      description: Optional third color; omit to skip this group.
-      required: false
+      advanced: true
       default: [0, 0, 255]
       selector:
         color_rgb:
-    flashSpeed3:
-      name: Flash Speed 3
-      description: Flash speed for third color (seconds)
-      required: false
+    flash_speed3:
+      advanced: true
       default: 0.2
       selector:
         number:
           min: 0
           max: 1.5
           step: 0.1
-          unit_of_measurement: "s"
-          mode: slider
-    flashCount3:
-      name: Flash Count 3
-      description: Number of flashes for third color (0 skips this color).
-      required: false
+          unit_of_measurement: seconds
+    flash_count3:
+      advanced: true
       default: 2
       selector:
         number:
           min: 0
           max: 15
-          step: 1
-          mode: slider
     delay3:
-      name: Delay 3
-      description: Delay after third color
-      required: false
+      advanced: true
       default: 0
       selector:
         number:
           min: 0
           max: 25.5
           step: 0.1
-          unit_of_measurement: "s"
-          mode: slider
+          unit_of_measurement: seconds
 
 clear_pending:
-  name: Clear Pending
-  description: Clears the pending status for one or more ESL tags
   target:
 
 force_refresh:
-  name: Force Refresh
-  description: Forces one or more ESL tags to refresh their display
   target:
 
 reboot_tag:
-  name: Reboot Tag
-  description: Reboots one or more ESL tags
   target:
 
 scan_channels:
-  name: Scan Channels
-  description: Makes one or more ESL tags scan for channels
   target:
 
 reboot_ap:
-  name: Reboot AP
-  description: Reboots the AP
   target:
 
 refresh_tag_types:
-  name: Refresh Tag Types
-  description: Force refresh of tag type definitions from GitHub
   target:

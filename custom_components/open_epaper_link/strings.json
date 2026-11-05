@@ -1,228 +1,344 @@
 {
   "config": {
     "step": {
-      "bluetooth_confirm": {
-        "title": "Set up BLE Tag",
-        "description": "Set up **{name}**?\n\n**Details:**\n- Address: {address}\n- Signal: {rssi} dBm\n- Battery: {battery}\n- Firmware: {fw_version}\n- Config Version: {config_version}"
+      "user": {
+        "title": "Connect to an Access Point",
+        "description": "Access Points are normally found automatically. Add one by address only if it cannot be discovered, for example on a separate VLAN.",
+        "data": {
+          "host": "Host"
+        },
+        "data_description": {
+          "host": "Hostname or IP address of the Access Point."
+        }
       },
-      "dhcp_confirm": {
-        "title": "Set up {hostname} ({ip})",
-        "description": "An OpenEPaperLink access point was discovered on the network.\n\n**Device Details:**\n- Hostname: {hostname}\n- IP Address: {ip}\n- MAC Address: {mac}\n\nShould this access point be added to Home Assistant?"
+      "discovery_confirm": {
+        "title": "Add Access Point",
+        "description": "Do you want to add the Access Point {name} at {host}?"
       },
       "reconfigure": {
-        "title": "Update Access Point",
-        "description": "Update the OpenEPaperLink access point address.",
+        "title": "Change Access Point address",
+        "description": "Point this entry at a different address. It must still be the same physical Access Point.",
         "data": {
-          "host": "Host or IP"
-        },
-        "data_description": {
-          "host": "Hostname or IP of the OpenEPaperLink access point."
+          "host": "Host"
         }
       },
-      "user": {
-        "data": {
-          "host": "Host or IP"
-        },
-        "data_description": {
-          "host": "Hostname or IP of the OpenEPaperLink access point. Do not include http/https."
-        }
+      "bluetooth_confirm": {
+        "title": "Add tag",
+        "description": "Do you want to add the tag {name} ({address})?"
       }
     },
     "error": {
-      "interrogation_failed": "Failed to connect to device and retrieve display information. Error: {error}. Retry or check device connectivity.",
-      "invalid_device_config": "Device returned invalid configuration data. Please reconfigure the device or update its firmware."
+      "cannot_connect": "Failed to connect"
     },
     "abort": {
-      "single_instance_allowed": "Only one OpenEPaperLink hub can be configured. Multiple BLE devices are supported, but only one AP hub is allowed.",
-      "unsupported_protocol": "Unsupported BLE firmware protocol. Only ATC firmware is supported.",
-      "invalid_advertising_data": "Could not parse device advertising data. Please ensure the device is using compatible firmware.",
-      "no_reconfigure_ble": "BLE devices do not support reconfiguration. Remove and re-add the device if you need to change its settings.",
-      "cannot_connect": "Failed to connect to the discovered access point. Please check the device is online and reachable on the network."
+      "already_configured": "This Access Point is already configured",
+      "cannot_connect": "Failed to connect",
+      "reconfigure_successful": "Address updated",
+      "wrong_ap": "That address belongs to a different Access Point. Add it as a new entry instead.",
+      "not_supported": "This Bluetooth device is not an OpenEPaperLink tag"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Tag Management",
-        "description": "Select tags to blacklist. Blacklisted tags will be hidden and ignored.",
+        "title": "Options",
         "data": {
-          "blacklisted_tags": "Blacklisted Tags",
-          "button_debounce": "Button Debounce Time (seconds)",
-          "nfc_debounce": "NFC Debounce Time (seconds)",
-          "custom_font_dirs": "Custom Font Directories"
+          "blacklisted_tags": "Hidden tags",
+          "button_debounce": "Button debounce (seconds)",
+          "nfc_debounce": "NFC debounce (seconds)"
         },
         "data_description": {
-          "blacklisted_tags": "Tags to hide; blacklisted tags will not update or trigger services.",
-          "button_debounce": "Delay before another button press is accepted (seconds).",
-          "nfc_debounce": "Delay before another NFC tap is accepted (seconds).",
-          "custom_font_dirs": "Comma-separated directories containing additional fonts for generated images."
+          "blacklisted_tags": "Tags to hide; no entities are created for them.",
+          "button_debounce": "Ignore repeated button events within this window. The Access Point repeats a wake-up reason on every check-in.",
+          "nfc_debounce": "Ignore repeated NFC scans within this window."
         }
       }
-    },
-    "abort": {
-      "no_options_ble": "No configurable options are available for BLE devices. BLE devices are managed automatically and do not require additional configuration."
+    }
+  },
+  "device": {
+    "ap_display": {
+      "name": "Display"
     }
   },
   "entity": {
     "switch": {
       "preview": {
-        "name": "Preview Images on AP"
+        "name": "Preview images on the Access Point"
       },
       "ble": {
         "name": "Bluetooth LE"
       },
       "nightlyreboot": {
-        "name": "Nightly Reboot"
+        "name": "Nightly reboot"
       },
       "showtimestamp": {
-        "name": "Show Timestamp"
+        "name": "Show timestamp"
       }
     },
     "text": {
       "alias": {
         "name": "Alias"
       },
-      "repo": {
-        "name": "Repository"
-      },
       "tag_alias": {
         "name": "Alias"
+      },
+      "repo": {
+        "name": "Update repository"
       }
     },
     "select": {
       "channel": {
-        "name": "Channel"
+        "name": "Channel",
+        "state": {
+          "auto": "Automatic",
+          "11": "11",
+          "15": "15",
+          "20": "20",
+          "25": "25",
+          "26": "26"
+        }
       },
       "led": {
-        "name": "RGB LED brightness"
+        "name": "RGB LED brightness",
+        "state": {
+          "off": "Off",
+          "10": "10%",
+          "25": "25%",
+          "50": "50%",
+          "75": "75%",
+          "100": "100%"
+        }
       },
       "tft": {
-        "name": "TFT Brightness"
+        "name": "TFT brightness",
+        "state": {
+          "off": "Off",
+          "10": "10%",
+          "25": "25%",
+          "50": "50%",
+          "75": "75%",
+          "100": "100%"
+        }
       },
       "maxsleep": {
-        "name": "Maximum sleep"
+        "name": "Maximum sleep",
+        "state": {
+          "shortest": "Shortest (40 sec)",
+          "5": "5 min",
+          "10": "10 min",
+          "30": "30 min",
+          "60": "1 hour"
+        }
       },
       "lock": {
-        "name": "Lock tag inventory"
-      },
-      "wifipower": {
-        "name": "WiFi Power"
-      },
-      "language": {
-        "name": "Language"
+        "name": "Lock tag inventory",
+        "state": {
+          "open": "Open: accept any tag",
+          "locked": "Locked: reject new tags",
+          "learning": "Learning: only accept booting tags"
+        }
       },
       "discovery": {
-        "name": "Discovery method"
+        "name": "Discovery method",
+        "state": {
+          "multicast": "Multicast",
+          "broadcast": "Broadcast"
+        }
+      },
+      "wifipower": {
+        "name": "Wi-Fi power",
+        "state": {
+          "2_0": "2.0 dBm",
+          "5_0": "5.0 dBm",
+          "7_0": "7.0 dBm",
+          "8_5": "8.5 dBm",
+          "11_0": "11.0 dBm",
+          "13_0": "13.0 dBm",
+          "15_0": "15.0 dBm",
+          "17_0": "17.0 dBm",
+          "18_5": "18.5 dBm",
+          "19_0": "19.0 dBm",
+          "19_5": "19.5 dBm"
+        }
+      },
+      "language": {
+        "name": "Language",
+        "state": {
+          "en": "English",
+          "nl": "Nederlands",
+          "de": "Deutsch",
+          "no": "Norsk",
+          "fr": "Français",
+          "cz": "Čeština",
+          "sk": "Slovenčina",
+          "pl": "Polski",
+          "es": "Español",
+          "sv": "Svenska",
+          "dk": "Dansk",
+          "et": "Eesti"
+        }
       },
       "subghzchannel": {
-        "name": "Sub-GHz Channel"
+        "name": "Sub-GHz channel",
+        "state": {
+          "disabled": "Disabled",
+          "100": "864.000 MHz (Europe)",
+          "101": "865.006 MHz (Europe)",
+          "102": "866.014 MHz (Europe)",
+          "103": "867.020 MHz (Europe)",
+          "104": "868.027 MHz (Europe)",
+          "105": "869.034 MHz (Europe)",
+          "200": "903.000 MHz (US)",
+          "201": "907.027 MHz (US)",
+          "202": "911.054 MHz (US)",
+          "203": "915.083 MHz (US)",
+          "204": "919.110 MHz (US)",
+          "205": "923.138 MHz (US)"
+        }
       },
       "sleeptime1": {
-        "name": "No updates between 1 (from)"
+        "name": "Quiet hours from",
+        "state": {
+          "00": "00:00",
+          "01": "01:00",
+          "02": "02:00",
+          "03": "03:00",
+          "04": "04:00",
+          "05": "05:00",
+          "06": "06:00",
+          "07": "07:00",
+          "08": "08:00",
+          "09": "09:00",
+          "10": "10:00",
+          "11": "11:00",
+          "12": "12:00",
+          "13": "13:00",
+          "14": "14:00",
+          "15": "15:00",
+          "16": "16:00",
+          "17": "17:00",
+          "18": "18:00",
+          "19": "19:00",
+          "20": "20:00",
+          "21": "21:00",
+          "22": "22:00",
+          "23": "23:00"
+        }
       },
       "sleeptime2": {
-        "name": "No updates between 2 (to)"
+        "name": "Quiet hours to",
+        "state": {
+          "00": "00:00",
+          "01": "01:00",
+          "02": "02:00",
+          "03": "03:00",
+          "04": "04:00",
+          "05": "05:00",
+          "06": "06:00",
+          "07": "07:00",
+          "08": "08:00",
+          "09": "09:00",
+          "10": "10:00",
+          "11": "11:00",
+          "12": "12:00",
+          "13": "13:00",
+          "14": "14:00",
+          "15": "15:00",
+          "16": "16:00",
+          "17": "17:00",
+          "18": "18:00",
+          "19": "19:00",
+          "20": "20:00",
+          "21": "21:00",
+          "22": "22:00",
+          "23": "23:00"
+        }
       }
     },
     "sensor": {
       "ip": {
-        "name": "IP Address"
+        "name": "IP address"
       },
       "wifi_ssid": {
-        "name": "WiFi SSID"
+        "name": "Wi-Fi SSID"
       },
       "record_count": {
-        "name": "Tag Count"
+        "name": "Tag count"
       },
       "db_size": {
-        "name": "Database Size"
+        "name": "Database size"
       },
       "little_fs_free": {
-        "name": "LittleFS Free"
+        "name": "LittleFS free"
       },
       "ap_state": {
         "name": "State"
       },
       "run_state": {
-        "name": "Run State"
+        "name": "Run state"
       },
       "wifi_rssi": {
-        "name": "WiFi RSSI"
+        "name": "Wi-Fi RSSI"
       },
       "heap": {
-        "name": "Free Heap"
-      },
-      "sys_time": {
-        "name": "System Time"
+        "name": "Free heap"
       },
       "uptime": {
         "name": "Uptime"
       },
       "low_battery_tag_count": {
-        "name": "Low Battery Tag Count"
+        "name": "Low battery tag count"
       },
       "timeout_tag_count": {
-        "name": "Timed out Tag Count"
+        "name": "Timed out tag count"
       },
       "ps_ram_free": {
-        "name": "PSRAM Free"
+        "name": "PSRAM free"
       },
       "temperature": {
         "name": "Temperature"
       },
       "battery_voltage": {
-        "name": "Battery Voltage"
+        "name": "Battery voltage"
       },
       "battery_percentage": {
-        "name": "Battery Percentage"
+        "name": "Battery percentage"
       },
       "last_seen": {
-        "name": "Last Seen"
+        "name": "Last seen"
       },
       "next_update": {
-        "name": "Next Update"
+        "name": "Next update"
       },
       "next_checkin": {
-        "name": "Next Checkin"
+        "name": "Next check-in"
       },
       "lqi": {
-        "name": "Link Quality Index"
+        "name": "Link quality index"
       },
       "rssi": {
         "name": "RSSI"
       },
       "pending_updates": {
-        "name": "Pending Updates"
+        "name": "Pending updates"
       },
       "content_mode": {
-        "name": "Content Mode"
+        "name": "Content mode"
       },
       "wakeup_reason": {
-        "name": "Wakeup Reason"
+        "name": "Wakeup reason"
       },
       "capabilities": {
         "name": "Capabilities"
       },
       "update_count": {
-        "name": "Update Count"
+        "name": "Update count"
       },
       "width": {
         "name": "Width"
       },
       "height": {
         "name": "Height"
-      },
-      "runtime": {
-        "name": "Runtime"
-      },
-      "boot_count": {
-        "name": "Boot Count"
-      },
-      "checkin_count": {
-        "name": "Checkin Count"
-      },
-      "block_requests": {
-        "name": "Block Transfer Requests"
       }
     },
     "image": {
@@ -237,120 +353,261 @@
     },
     "button": {
       "clear_pending": {
-        "name": "Clear Pending Updates"
+        "name": "Clear pending updates"
       },
       "force_refresh": {
-        "name": "Force Refresh Content"
+        "name": "Force refresh content"
       },
       "reboot_tag": {
-        "name": "Reboot Tag"
+        "name": "Reboot"
       },
       "scan_channels": {
-        "name": "Scan Channels"
+        "name": "Scan channels"
       },
       "deep_sleep": {
-        "name": "Deep Sleep"
+        "name": "Deep sleep"
       },
       "reboot_ap": {
-        "name": "Reboot AP"
+        "name": "Reboot"
+      }
+    },
+    "event": {
+      "button": {
+        "name": "Button",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "button1": "Button 1",
+              "button2": "Button 2"
+            }
+          }
+        }
       },
-      "refresh_tag_types": {
-        "name": "Refresh Tag Types"
+      "nfc": {
+        "name": "NFC",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "nfc": "Scanned"
+            }
+          }
+        }
       },
-      "refresh_config": {
-        "name": "Refresh Configuration"
+      "gpio": {
+        "name": "GPIO",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "gpio": "Triggered"
+            }
+          }
+        }
       }
     },
     "update": {
       "firmware": {
         "name": "Firmware"
+      },
+      "radio_firmware": {
+        "name": "Radio firmware"
       }
     }
   },
-  "issues": {
-    "camera_migration_needed": {
-      "title": "Camera entities migrated",
-      "description": "OpenEPaperLink migrated {count} camera entities to image entities. Update your dashboards and automations to use the new image entities. Removed entities: {entities}"
+  "exceptions": {
+    "ap_cannot_connect": {
+      "message": "Could not connect to the Access Point at {host}: {error}."
+    },
+    "ap_command_failed": {
+      "message": "The Access Point rejected the command: {error}."
+    },
+    "tag_command_failed": {
+      "message": "The Access Point rejected the command for this tag: {error}."
+    },
+    "path_not_allowed": {
+      "message": "{path} is not in an allowed directory. Add it to allowlist_external_dirs in your configuration."
+    },
+    "unknown_tag_type": {
+      "message": "The Access Point has no tag type definition for {mac}, so its display size is unknown."
+    },
+    "no_tags_targeted": {
+      "message": "No OpenEPaperLink tags were targeted."
+    },
+    "no_led_segments": {
+      "message": "No LED colour groups were enabled; set a flash count above zero for at least one."
+    },
+    "image_size_mismatch": {
+      "message": "The image for tag {mac} does not match the size its display expects, so the Access Point would render it as noise: {error}"
+    },
+    "atc_not_in_range": {
+      "message": "The tag {address} is not currently reachable over Bluetooth. These tags sleep between advertisements, so it may simply not be awake yet."
+    },
+    "atc_failed": {
+      "message": "Could not draw on the tag {address} over Bluetooth: {error}"
+    },
+    "release_check_failed": {
+      "message": "Could not check for firmware releases: {error}."
+    },
+    "update_failed": {
+      "message": "The update failed: {error}."
+    },
+    "no_release": {
+      "message": "No firmware release for this Access Point was found."
     }
   },
-  "exceptions": {
-    "ble_device_not_detected": { "message": "BLE device {name} ({mac_address}) not detected in Bluetooth range." },
-    "ap_cannot_connect": { "message": "Cannot connect to AP at {host}: {error}" },
-    "ap_failed_load_tags": { "message": "Failed to load tags from AP at {host}: {error}" },
-    "ap_timeout_action": { "message": "Timeout during {action}." },
-    "ap_network_error_action": { "message": "Network error during {action}: {error}" },
-    "ap_failed_action_http": { "message": "Failed to {action}: HTTP {status_code} - {response_text}" },
-    "device_not_found": { "message": "Device {device_id} not found." },
-    "device_no_identifiers": { "message": "No identifiers found for device {device_id}." },
-    "device_not_oepl": { "message": "Device {device_id} is not an OpenEPaperLink device." },
-    "no_targets_specified": { "message": "No target devices specified. Please provide device_id, label_id, or area_id." },
-    "ap_offline": { "message": "OpenEPaperLink AP is offline. Please check your network connection and AP status." },
-    "error_processing_device": { "message": "Unexpected error processing device {entity_id}: {error}" },
-    "ble_upload_bt_disabled": { "message": "Cannot upload to BLE device {entity_id}: Bluetooth integration is disabled or no scanners available." },
-    "ble_no_metadata": { "message": "No metadata found for BLE device {entity_id}." },
-    "ble_upload_failed": { "message": "BLE image upload failed for {entity_id}." },
-    "ble_direct_write_failed": { "message": "BLE direct write upload failed for {entity_id}." },
-    "ble_direct_write_not_supported": { "message": "Direct write is not supported." },
-    "image_upload_status": { "message": "Image upload failed for {entity_id} with status code: {status_code}." },
-    "image_upload_timeout": { "message": "Image upload timed out for {entity_id} after {attempts} attempts." },
-    "image_upload_network": { "message": "Network error uploading image for {entity_id}: {error}." },
-    "image_upload_failed": { "message": "Failed to upload image for {entity_id}: {error}." },
-    "unexpected_upload": { "message": "Unexpected upload error for {entity_id}: {error}." },
-    "unexpected_ble_upload": { "message": "Unexpected error during BLE upload to {entity_id}: {error}." },
-    "unexpected_ble_direct_write": { "message": "Unexpected error during BLE direct write to {entity_id}: {error}." },
-    "ap_tag_alias_update_failed": { "message": "Failed to update tag alias for {tag_mac}: AP returned HTTP {status_code} - {response_text}." },
-    "ap_tag_alias_timeout": { "message": "Timeout updating tag alias for {tag_mac}. Please check network connectivity to the AP." },
-    "ap_tag_alias_network": { "message": "Network error updating tag alias for {tag_mac}: {error}." },
-    "ap_tag_alias_unexpected": { "message": "Unexpected error updating tag alias for {tag_mac}: {error}." },
-    "ap_offline_core": { "message": "OpenEPaperLink AP is offline." },
-    "invalid_entity_id_format": { "message": "Invalid entity ID format: {entity_id}." },
-    "tag_not_registered": { "message": "Tag {tag_mac} is not registered with the AP. If the tag has checked in, try restarting Home Assistant." },
-    "tag_blacklisted": { "message": "Tag {tag_mac} is currently blacklisted. Remove it from the blacklist in integration options to use it." },
-    "tag_inconsistent": { "message": "Inconsistent state: Tag {tag_mac} is known but has no data. Please report this as a bug." },
-    "tag_no_hw_type": { "message": "No hardware type found for tag {tag_mac}. Please wait for the tag to complete its next check-in." },
-    "tag_unknown_hw_type": { "message": "Unknown hardware type {hw_type} for tag {tag_mac}. Try refreshing tag types from the integration options." },
-    "invalid_canvas_dimensions": { "message": "Invalid canvas dimensions {width}x{height} for {entity_id}. Device metadata may be corrupt or missing. Try reloading the integration or re-adding the device." },
-    "ble_tag_info_unexpected": { "message": "Unexpected error getting tag type for {entity_id}: {error}." },
-    "ble_tag_info_unexpected_ble": { "message": "Unexpected error getting BLE tag type for {entity_id}: {error}." },
-    "qr_generation_failed": { "message": "Failed to generate QR code: {error}." },
-    "image_entity_not_found": { "message": "Image entity {entity_id} not found." },
-    "image_entity_no_url": { "message": "No image URL found for entity {entity_id}." },
-    "image_download_failed": { "message": "Failed to download image: HTTP {status_code}." },
-    "image_data_uri_invalid": { "message": "Invalid data URI: {error}." },
-    "image_process_failed": { "message": "Failed to process image: {error}." },
-    "font_load_failed": { "message": "Could not load any font. This indicates a problem with the integration installation." },
-    "plot_duration_invalid": { "message": "duration must be greater than 0 seconds." },
-    "plot_no_data": { "message": "No recorded data found for {entity_id}." },
-    "plot_no_valid_points": { "message": "No valid data points found." },
-    "plot_yaxis_invalid": { "message": "yaxis.tick_every must be greater than 0." },
-    "plot_xlegend_invalid": { "message": "xlegend.interval must be greater than 0." },
-    "plot_draw_failed": { "message": "Failed to draw plot: {error}." },
-    "plot_bar_invalid": { "message": "Invalid bar data for diagram: {error}." },
-    "mdi_metadata_failed": { "message": "Failed to load MDI metadata: {error}." },
-    "icon_name_invalid": { "message": "Invalid icon name: {icon_name}." },
-    "icon_draw_failed": { "message": "Failed to draw icon: {error}." },
-    "icon_draw_failed_named": { "message": "Failed to draw icon {icon_name}: {error}." },
-    "led_on_failed": { "message": "Failed to turn on LED." },
-    "led_on_error": { "message": "Error turning on LED: {error}." },
-    "led_off_failed": { "message": "Failed to turn off LED." },
-    "led_off_error": { "message": "Error turning off LED: {error}." },
-    "tagtypes_load_failed": { "message": "Failed to load tag type definitions. No stored data available. Check network connectivity or GitHub access." },
-    "tagtypes_refresh_failed": { "message": "Failed to refresh tag type definitions. Check network connectivity or GitHub access." },
-    "no_hub_configured": { "message": "No AP hub configured. Only BLE devices found." },
-    "ble_slots_unavailable": { "message": "No available Bluetooth connection slots for {mac_address}. Add more ESPHome Bluetooth proxies near this device or wait for existing connections to free up. Details: {error}." },
-    "ble_device_not_found": { "message": "Device {mac_address} not found." },
-    "ble_characteristic_not_resolved": { "message": "Could not resolve characteristic for service {service_uuid}." },
-    "ble_connection_failed": { "message": "Failed to connect to {mac_address}: {error}." },
-    "ble_write_char_missing": { "message": "Write characteristic not available." },
-    "ble_timeout": { "message": "No response received from {mac_address} within {timeout}s." },
-    "ble_operation_failed": { "message": "BLE operation {operation} failed after {attempts} attempts: {error}." },
-    "ble_operation_retry": { "message": "BLE operation {operation} failed on attempt {attempt}: {error}. Retrying in {delay}s..." },
-    "ble_protocol_invalid_response_length": { "message": "Invalid display info response length: {length} (expected at least {expected_length})." },
-    "ble_protocol_invalid_command_id": { "message": "Invalid command ID in response: {command_id}." },
-    "ble_protocol_payload_too_short": { "message": "Display info payload too short." },
-    "config_flow_invalid_config": { "message": "Device returned invalid configuration data." },
-    "config_flow_missing_config": { "message": "Device returned no configuration data." },
-    "refresh_config_failed": { "message": "Failed to refresh configuration: {error}." },
-    "multiple_errors": { "message": "Multiple errors occurred:\n{errors}" }
+  "selector": {
+    "dither": {
+      "options": {
+        "none": "None",
+        "burkes": "Burkes",
+        "ordered": "Ordered",
+        "floyd_steinberg": "Floyd-Steinberg",
+        "atkinson": "Atkinson",
+        "stucki": "Stucki",
+        "sierra": "Sierra",
+        "sierra_lite": "Sierra Lite",
+        "jarvis_judice_ninke": "Jarvis, Judice & Ninke",
+        "dizzy": "Dizzy"
+      }
+    },
+    "refresh_type": {
+      "options": {
+        "adaptive": "Adaptive (recommended)",
+        "full": "Always full refresh",
+        "fast": "Fast",
+        "fast_no_red": "Fast, skipping red"
+      }
+    }
+  },
+  "services": {
+    "drawcustom": {
+      "name": "Draw custom image",
+      "description": "Draws an image built from a list of elements on one or more tags.",
+      "fields": {
+        "payload": {
+          "name": "Payload",
+          "description": "The elements to draw, in order. See the documentation for the available element types and their options."
+        },
+        "background": {
+          "name": "Background colour",
+          "description": "Colour to fill the display with before drawing."
+        },
+        "rotate": {
+          "name": "Rotation",
+          "description": "Degrees to rotate the finished image. Applied before sending, so the payload can be laid out sideways for a tag mounted that way. The tag's own configured rotation still applies on top of it."
+        },
+        "dither": {
+          "name": "Dithering",
+          "description": "Algorithm used to reduce the image to the colours the tag can actually show. Ordered suits flat graphics; the error-diffusion algorithms suit photographs."
+        },
+        "refresh_type": {
+          "name": "Refresh type",
+          "description": "How the tag redraws. Adaptive uses quick refreshes and does one full refresh a night to clear ghosting, which is much easier on the battery than refreshing fully every time."
+        },
+        "ttl": {
+          "name": "Time to live",
+          "description": "How long the tag sleeps before checking in again. Applies once, after this update. A long value means you cannot update the tag again until it elapses."
+        },
+        "dry-run": {
+          "name": "Dry run",
+          "description": "Render the image and show it on the tag's image entity without sending it to the tag."
+        }
+      }
+    },
+    "setled": {
+      "name": "Set LED pattern",
+      "description": "Flashes the LED on tags that have one. Up to three colour groups play in turn, and the whole pattern repeats.",
+      "fields": {
+        "mode": {
+          "name": "Mode",
+          "description": "Flash the pattern, or stop a running one."
+        },
+        "brightness": {
+          "name": "Brightness",
+          "description": "How long the LED stays on within each flash. Higher is brighter and uses more battery."
+        },
+        "repeats": {
+          "name": "Repeats",
+          "description": "How many times the whole pattern plays."
+        },
+        "color1": {
+          "name": "Colour 1",
+          "description": "Colour of the first group."
+        },
+        "flash_speed1": {
+          "name": "Flash speed 1",
+          "description": "Length of each flash in the first group."
+        },
+        "flash_count1": {
+          "name": "Flash count 1",
+          "description": "How many times the first group flashes. Zero skips the group."
+        },
+        "delay1": {
+          "name": "Delay 1",
+          "description": "Pause after the first group."
+        },
+        "color2": {
+          "name": "Colour 2",
+          "description": "Colour of the second group."
+        },
+        "flash_speed2": {
+          "name": "Flash speed 2",
+          "description": "Length of each flash in the second group."
+        },
+        "flash_count2": {
+          "name": "Flash count 2",
+          "description": "How many times the second group flashes. Zero skips the group."
+        },
+        "delay2": {
+          "name": "Delay 2",
+          "description": "Pause after the second group."
+        },
+        "color3": {
+          "name": "Colour 3",
+          "description": "Colour of the third group."
+        },
+        "flash_speed3": {
+          "name": "Flash speed 3",
+          "description": "Length of each flash in the third group."
+        },
+        "flash_count3": {
+          "name": "Flash count 3",
+          "description": "How many times the third group flashes. Zero skips the group."
+        },
+        "delay3": {
+          "name": "Delay 3",
+          "description": "Pause after the third group."
+        }
+      }
+    },
+    "clear_pending": {
+      "name": "Clear pending update",
+      "description": "Discards an update the tag has not collected yet.",
+      "fields": {}
+    },
+    "force_refresh": {
+      "name": "Force refresh",
+      "description": "Makes the tag redraw its current image.",
+      "fields": {}
+    },
+    "reboot_tag": {
+      "name": "Reboot tag",
+      "description": "Restarts the tag.",
+      "fields": {}
+    },
+    "scan_channels": {
+      "name": "Scan channels",
+      "description": "Makes the tag search the radio channels again for an Access Point.",
+      "fields": {}
+    },
+    "reboot_ap": {
+      "name": "Reboot Access Point",
+      "description": "Restarts the Access Point.",
+      "fields": {}
+    },
+    "refresh_tag_types": {
+      "name": "Refresh tag types",
+      "description": "Reloads tag hardware definitions from the Access Point. Useful after it downloads one it did not previously hold.",
+      "fields": {}
+    }
   }
 }
