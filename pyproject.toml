@@ -17,6 +17,8 @@ dependencies = []
 dev = [
     # No 2026.11.0 of it is on PyPI yet; see override-dependencies below.
     "pytest-homeassistant[bluetooth]==2026.11.0b6",
+    # Coverage in CI; pytest-homeassistant does not bring it.
+    "pytest-cov==7.1.0",
     "mypy==1.18.2",
     "ruff==0.16.2",
     # Runtime requirements, kept in sync with custom_components/open_epaper_link/manifest.json
