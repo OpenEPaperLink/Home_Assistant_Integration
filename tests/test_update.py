@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.components.update import (
@@ -16,6 +16,7 @@ from homeassistant.components.update import (
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from oepl import APInfo, OEPLConnectionError, OEPLUpdateError, Release, TagFirmware
 from oepl.update import UpdateProgress, UpdateStage
 from pytest_homeassistant.common import MockConfigEntry
@@ -322,6 +323,26 @@ async def test_a_tag_newer_than_the_published_firmware_is_no_update(
     assert state.state == STATE_OFF
     assert state.attributes[ATTR_INSTALLED_VERSION] == "002A"
     assert state.attributes[ATTR_LATEST_VERSION] == "0029"
+
+
+async def test_renaming_the_entity_id_keeps_the_entity(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """The entity changes in place, rather than being removed and added again."""
+    mock_client.set_tags(make_tag(TAG_MAC, ver=0x27))
+    mock_client.updates.tag_firmware.return_value = TAG_FIRMWARE
+    await _setup(hass, ap_config_entry)
+    entity = hass.data["entity_components"]["update"].get_entity(TAG_UPDATE)
+
+    with patch.object(entity, "async_added_to_hass") as added:
+        er.async_get(hass).async_update_entity(
+            TAG_UPDATE, new_entity_id="update.renamed"
+        )
+        await hass.async_block_till_done()
+
+    added.assert_not_called()
+    assert hass.states.get(TAG_UPDATE) is None
+    assert hass.states.get("update.renamed").state == STATE_ON
 
 
 async def test_no_update_entity_where_there_is_no_firmware(

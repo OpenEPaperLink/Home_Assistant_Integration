@@ -148,6 +148,11 @@ class _ReleaseUpdate(OpenEPaperLinkAPEntity, UpdateEntity):
         data = self.releases.data
         return data.release if data else None
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Nothing here depends on the entity ID, so it can change in place."""
+        super().async_entity_id_changed(old_entity_id)
+
     @property
     def release_url(self) -> str | None:
         """Link to the release."""
@@ -348,6 +353,11 @@ class TagFirmwareUpdate(OpenEPaperLinkTagEntity, UpdateEntity):
         data: AvailableFirmware | None = self.releases.data
         return data.tags.get(self._mac) if data else None
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Nothing here depends on the entity ID, so it can change in place."""
+        super().async_entity_id_changed(old_entity_id)
+
     @property
     def title(self) -> str | None:
         """The firmware, as the repository names it."""
@@ -453,6 +463,11 @@ class ATCFirmwareUpdate(ATCEntity, UpdateEntity):
         """The image atc1441 publishes, if it could be fetched."""
         firmware: ATCFirmware | None = self._firmware.data
         return firmware
+
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Nothing here depends on the entity ID, so it can change in place."""
+        super().async_entity_id_changed(old_entity_id)
 
     @property
     def installed_version(self) -> str | None:

@@ -128,6 +128,11 @@ class TagEvent(OpenEPaperLinkTagEntity, EventEntity):
         )
 
     @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Nothing here depends on the entity ID, so it can change in place."""
+        super().async_entity_id_changed(old_entity_id)
+
+    @callback
     def _handle_interaction(self, event_type: str) -> None:
         """Record an interaction of our kind."""
         if event_type not in (self.entity_description.event_types or ()):
