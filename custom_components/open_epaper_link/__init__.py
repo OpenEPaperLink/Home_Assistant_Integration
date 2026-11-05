@@ -66,10 +66,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:  # noqa:
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry
-) -> bool:
+) -> None:
     """Set up an Access Point or an ATC tag from a config entry."""
     if not _is_ap_entry(entry):
-        return await _async_setup_atc_entry(hass, entry)
+        await _async_setup_atc_entry(hass, entry)
+        return
 
     coordinator = APCoordinator(hass, entry)
     await coordinator.async_setup()
@@ -88,10 +89,9 @@ async def async_setup_entry(
     # Sibling entries re-run the mesh ownership rule when this one appears, so
     # a tag stops being shown twice as soon as its own AP is added.
     async_dispatcher_send(hass, SIGNAL_ENTRIES_CHANGED)
-    return True
 
 
-async def _async_setup_atc_entry(hass: HomeAssistant, entry: ATCConfigEntry) -> bool:
+async def _async_setup_atc_entry(hass: HomeAssistant, entry: ATCConfigEntry) -> None:
     """Set up a tag running ATC firmware.
 
     The tag is interrogated once here for its panel geometry, which cannot
@@ -126,34 +126,32 @@ async def _async_setup_atc_entry(hass: HomeAssistant, entry: ATCConfigEntry) -> 
     entry.async_on_unload(coordinator.async_start())
     # An Access Point that also lists this tag links its device to this one.
     async_dispatcher_send(hass, SIGNAL_ENTRIES_CHANGED)
-    return True
 
 
 async def async_unload_entry(
     hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry
-) -> bool:
+) -> None:
     """Unload a config entry."""
     if not _is_ap_entry(entry):
-        return await hass.config_entries.async_unload_platforms(entry, ATC_PLATFORMS)
+        await hass.config_entries.async_unload_platforms_or_raise(entry, ATC_PLATFORMS)
+        return
 
-    unloaded = await hass.config_entries.async_unload_platforms(entry, AP_PLATFORMS)
-    if unloaded:
-        await entry.runtime_data.async_shutdown()
-        # Remaining entries may now own tags this one was claiming.
-        async_dispatcher_send(hass, SIGNAL_ENTRIES_CHANGED)
-    return unloaded
+    await hass.config_entries.async_unload_platforms_or_raise(entry, AP_PLATFORMS)
+    await entry.runtime_data.async_shutdown()
+    # Remaining entries may now own tags this one was claiming.
+    async_dispatcher_send(hass, SIGNAL_ENTRIES_CHANGED)
 
 
 async def async_migrate_entry(
     hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry
-) -> bool:
+) -> None:
     """Migrate an entry from the pre-4.0 identifier scheme.
 
     Only registry and stored-data changes happen here. Re-keying the entry onto
     the AP's MAC needs to talk to the AP, so it runs during setup instead.
     """
     if entry.version >= 5:
-        return True
+        return
 
     _LOGGER.debug(
         "Migrating config entry %s from version %s", entry.entry_id, entry.version
@@ -161,7 +159,6 @@ async def async_migrate_entry(
     async_migrate_entry_data(hass, entry, ap_mac=None)
     async_migrate_registries(hass, entry)
     hass.config_entries.async_update_entry(entry, version=5)
-    return True
 
 
 async def _async_update_listener(

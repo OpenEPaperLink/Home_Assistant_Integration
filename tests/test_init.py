@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -67,6 +67,23 @@ async def test_unload(
 
     assert ap_config_entry.state is ConfigEntryState.NOT_LOADED
     mock_client.disconnect.assert_awaited()
+
+
+async def test_a_failed_unload_leaves_the_client_connected(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """A platform refusing to unload stops the entry from being torn down."""
+    ap_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(ap_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with patch.object(
+        hass.config_entries, "async_unload_platforms", return_value=False
+    ):
+        assert not await hass.config_entries.async_unload(ap_config_entry.entry_id)
+
+    assert ap_config_entry.state is ConfigEntryState.FAILED_UNLOAD
+    mock_client.disconnect.assert_not_awaited()
 
 
 async def test_devices_are_entry_scoped(
