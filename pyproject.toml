@@ -6,43 +6,42 @@ requires-python = ">=3.14.2"
 dependencies = []
 
 [dependency-groups]
-# The test environment. pytest-homeassistant-custom-component pins a compatible
-# homeassistant, pytest and pytest-asyncio itself; pinning those separately is
-# what causes the usual resolution conflicts, so it is the only pin here.
+# The test environment. pytest-homeassistant comes with Home Assistant, shares its
+# version, and pins a compatible pytest and pytest-asyncio itself; pinning those
+# separately is what causes the usual resolution conflicts. Its bluetooth extra
+# brings what Home Assistant's bluetooth and usb components need to be imported.
 #
 # Home Assistant itself is run from a separate HA core checkout with this
-# integration symlinked into its custom_components, because p-h-c-c and a real
-# HA install cannot share an environment.
+# integration symlinked into its custom_components, because the test package and
+# a real HA install cannot share an environment.
 dev = [
-    "pytest-homeassistant-custom-component==0.13.375",
+    # No 2026.11.0 of it is on PyPI yet; see override-dependencies below.
+    "pytest-homeassistant[bluetooth]==2026.11.0b6",
     "mypy==1.18.2",
     "ruff==0.16.2",
     # Runtime requirements, kept in sync with custom_components/open_epaper_link/manifest.json
     "odl-renderer==0.5.15",
     "py-atc-ble-oepl==0.9.0",
     "py-oepl[dither]==0.13.0",
-    # Home Assistant's bluetooth component and its transitive usb component,
-    # needed to import them in tests. Versions match what this Home Assistant
-    # release pins in their manifests.
-    "aiousbwatcher==1.1.2",
+    # Pinned by Home Assistant's bluetooth manifest, but not by the extra above.
     "bleak==3.0.2",
-    "bleak-retry-connector==4.7.1",
-    "bluetooth-adapters==2.4.0",
-    "bluetooth-auto-recovery==1.6.4",
-    "bluetooth-data-tools==1.29.24",
     "dbus-fast==5.0.22",
-    "habluetooth==7.1.2",
-    "serialx==1.11.0",
 ]
 
 [tool.uv]
 # A Home Assistant integration is not an installable package.
 package = false
+# Test against the release, not the beta the test package pins. Drop this and bump
+# the pin above once pytest-homeassistant 2026.11.0 is published.
+override-dependencies = ["homeassistant==2026.11.0"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "function"
+# Let Home Assistant install its httpx alias before respx is imported.
+addopts = "-p no:respx"
+pythonpath = ["."]
+testpaths = ["tests"]
 
 [tool.ruff]
 target-version = "py314"

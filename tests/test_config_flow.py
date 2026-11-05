@@ -17,7 +17,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from oepl import OEPLConnectionError
 from py_atc_ble_oepl import MANUFACTURER_ID
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.open_epaper_link.const import (
     CONF_AP_MAC,

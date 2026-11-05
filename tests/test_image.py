@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 from homeassistant.components.bluetooth import BluetoothChange
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
+from pytest_homeassistant.common import MockConfigEntry
+from pytest_homeassistant.typing import ClientSessionGenerator
 
 from custom_components.open_epaper_link.const import DOMAIN
 

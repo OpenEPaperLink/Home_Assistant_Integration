@@ -9,7 +9,7 @@ import pytest
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from oepl import APConfig, APInfo, OEPLConnectionError, Tag, TagType
 from py_atc_ble_oepl import MANUFACTURER_ID, DeviceCapabilities
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.open_epaper_link.const import (
     CONF_AP_MAC,
@@ -23,17 +23,6 @@ AP_MAC = "aa:bb:cc:dd:ee:ff"
 TAG_MAC = "00000335042F3E10"
 PEER_HOST = "192.0.2.20"
 PEER_MAC = "aa:bb:cc:dd:ee:aa"
-
-
-@pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(
-    enable_custom_integrations: None,
-) -> None:
-    """Load custom_components/ in every test.
-
-    Without this the integration is invisible to the test hass instance.
-    """
-    return
 
 
 @pytest.fixture
