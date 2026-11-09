@@ -1287,6 +1287,7 @@ dependencies = [
     { name = "yarl" },
     { name = "zeroconf" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/f2/13/ab2c1e18f48341791a77520a869cdb12f1cebd3e6e292ddf2061891b0fc6/homeassistant-2026.11.0.tar.gz", hash = "sha256:5a5e6af380793d53ab37fd9ce5b7a7e00a408a7258923fe75d0610e31a394468", size = 42012362, upload-time = "2026-11-05T13:03:49.664Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/28/0a/10c900142dfff3c8bda64e75d0077519c4ee9a3e0f18aabc67c023ac079f/homeassistant-2026.11.0-py3-none-any.whl", hash = "sha256:7ca5fbde9dea879ac7723949fc84347aac5182e6309c357b2e4973fd391b00f7", size = 67607712, upload-time = "2026-11-04T18:00:10.238Z" },
 ]
@@ -1643,7 +1644,7 @@ dev = [
     { name = "mypy", specifier = "==1.18.2" },
     { name = "odl-renderer", specifier = "==0.5.15" },
     { name = "py-atc-ble-oepl", specifier = "==0.9.0" },
-    { name = "py-oepl", extras = ["dither"], specifier = "==0.13.0" },
+    { name = "py-oepl", extras = ["dither"], specifier = "==0.13.1" },
     { name = "pytest-cov", specifier = "==7.1.0" },
     { name = "pytest-homeassistant", extras = ["bluetooth"], specifier = "==2026.11.0b6" },
     { name = "ruff", specifier = "==0.16.2" },
@@ -1901,15 +1902,15 @@ wheels = [
 
 [[package]]
 name = "py-oepl"
-version = "0.13.0"
+version = "0.13.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "pillow" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/27/5d/50ae61c762f54e505ab1be29c2633920e8eb36a9b11ec9ca9b8b67d3724a/py_oepl-0.13.0.tar.gz", hash = "sha256:c1759f2a1e6f8f53f2a6b75d7c7c63ea7bcb609b5b89c177876dbc4b0bd1dd63", size = 98900, upload-time = "2026-11-03T18:52:37.187Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/9b/6fca4d0e9c7e6d2e4dd4aa2689de3020392153dc6f241e9b9da5840119b1/py_oepl-0.13.1.tar.gz", hash = "sha256:e0493264688a707b5deb9afedba2abd622c7949b968f42018675b2ed1b82baeb", size = 99268, upload-time = "2026-11-09T15:28:05.596Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/7c/50841bb05c68ce906d19e5567481895843e5f3a18c77869734924f0f2e16/py_oepl-0.13.0-py3-none-any.whl", hash = "sha256:4fc2ed2d27810174edc634c4c546b7cc8dbb2fbfe6a3d7606e96bfc15d810d2c", size = 85659, upload-time = "2026-11-03T18:52:35.921Z" },
+    { url = "https://files.pythonhosted.org/packages/49/83/4930bb9027afb9c9c687ef51894bdc913115cec998a63cf28162f535295c/py_oepl-0.13.1-py3-none-any.whl", hash = "sha256:5d07343a9630388e2eb6bf3d0be2d633530d1fb83c0855b74820c2f9b82cc26b", size = 85877, upload-time = "2026-11-09T15:28:04.136Z" },
 ]
 
 [package.optional-dependencies]

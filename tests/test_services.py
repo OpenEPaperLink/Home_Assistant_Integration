@@ -418,6 +418,61 @@ async def test_preview_is_dropped_once_the_tag_renders(
     assert coordinator.preview(TAG_MAC) is None
 
 
+@pytest.mark.parametrize("dither", ["none", "ordered", "floyd_steinberg"])
+async def test_black_on_white_is_sent_as_black_on_white(
+    hass: HomeAssistant, ap_config_entry, mock_client, dither: str
+) -> None:
+    """Seen on M2 2.9" tags: their colortable lists white first.
+
+    py-oepl 0.13.0 swapped black and white for every such tag, red staying put.
+    """
+    mock_client.get_tag_type.return_value = make_tag_type(
+        colortable={"white": [255, 255, 255], "black": [0, 0, 0], "red": [255, 0, 0]}
+    )
+    device_id = await _tag_device_id(hass, ap_config_entry)
+    payload = [
+        {
+            "type": "rectangle",
+            "x_start": 0,
+            "y_start": 0,
+            "x_end": 20,
+            "y_end": 20,
+            "fill": "black",
+            "outline": "black",
+        },
+        {
+            "type": "rectangle",
+            "x_start": 40,
+            "y_start": 0,
+            "x_end": 60,
+            "y_end": 20,
+            "fill": "red",
+            "outline": "red",
+        },
+    ]
+
+    await hass.services.async_call(
+        DOMAIN,
+        "drawcustom",
+        {
+            "device_id": [device_id],
+            "background": "white",
+            "payload": payload,
+            "dither": dither,
+        },
+        blocking=True,
+    )
+
+    sent = mock_client.upload_image.await_args.args[0].convert("RGB")
+    preview = PILImage.open(
+        BytesIO(ap_config_entry.runtime_data.preview(TAG_MAC))
+    ).convert("RGB")
+    for image in (sent, preview):
+        assert image.getpixel((150, 100)) == (255, 255, 255)
+        assert image.getpixel((10, 10)) == (0, 0, 0)
+        assert image.getpixel((50, 10)) == (255, 0, 0)
+
+
 async def test_upload_is_dithered_for_the_colours_the_panel_shows(
     hass: HomeAssistant, ap_config_entry, mock_client
 ) -> None:
