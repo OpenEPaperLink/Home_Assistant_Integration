@@ -478,8 +478,8 @@ async def test_upload_is_dithered_for_the_colours_the_panel_shows(
 ) -> None:
     """Sent in colortable colours, previewed in the colours the panel shows.
 
-    A BWY panel's yellow looks like [200, 200, 0], so an area of exactly that
-    is drawn in yellow ink alone, and the preview shows it as the panel will.
+    Yellow is drawn in yellow ink alone, and the preview shows it as the
+    panel will: a BWY panel's yellow looks like [200, 200, 0].
     """
     mock_client.get_tag_type.return_value = make_tag_type(
         colortable={
@@ -497,8 +497,8 @@ async def test_upload_is_dithered_for_the_colours_the_panel_shows(
             "y_start": 0,
             "x_end": 296,
             "y_end": 128,
-            "fill": "#C8C800",
-            "outline": "#C8C800",
+            "fill": "yellow",
+            "outline": "yellow",
         }
     ]
 
