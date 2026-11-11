@@ -1,396 +1,654 @@
+"""Actions for the OpenEPaperLink integration.
+
+The declarative renderer behind ``drawcustom`` lives in odl-renderer, which has
+no Home Assistant coupling of its own. What stays here is the part that
+genuinely needs Home Assistant: recorder history for plots, font locations and
+path validation.
+
+``drawcustom`` and ``setled`` payloads are hand-written YAML living in people's
+automations, so unlike the rest of this rewrite these actions keep accepting
+the pre-4.0 call shape and coerce it.
+"""
+
 from __future__ import annotations
 
 import logging
-from functools import wraps
-from typing import Final, Any, Callable
+from collections.abc import Awaitable, Callable, Coroutine, Mapping
+from dataclasses import dataclass
+from datetime import datetime
+from functools import partial
+from io import BytesIO
+from pathlib import Path
+from typing import Any
 
-from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ServiceValidationError, HomeAssistantError
+import probatio as vol
+from epaper_dithering import DitherMode
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    State,
+    callback,
+)
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.dispatcher import async_dispatcher_send
-from .coordinator import Hub
-from .ble import BLEConnectionError, BLETimeoutError, BLEProtocolError
-from .const import DOMAIN, SIGNAL_TAG_IMAGE_UPDATE
-from .imagegen import ImageGen
-from .tag_types import get_tag_types_manager
-from .upload import create_upload_queues, DITHER_DEFAULT, upload_to_ble_block, upload_to_hub
-from .util import is_ble_entry, get_hub_from_hass, rgb_to_rgb332, int_to_hex_string, \
-    is_ble_device, get_mac_from_entity_id
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.service import async_extract_entity_ids
+from odl_renderer import SourceKind, SourceNotAllowedError, generate_image
+from oepl import LUT, Color, LEDPattern, LEDSegment, TagCommand, TagType
+from oepl.dithering import as_displayed, dither_for_tag
+from PIL.Image import Image
+from py_atc_ble_oepl import ATCError, FitMode
+from py_atc_ble_oepl import ColorScheme as ATCColorScheme
 
-_LOGGER: Final = logging.getLogger(__name__)
+from .atc_coordinator import ATCConfigEntry, ATCRuntimeData
+from .const import DOMAIN, OPT_CUSTOM_FONT_DIRS
+from .coordinator import APCoordinator
+
+_LOGGER = logging.getLogger(__name__)
+
+# Commands that act on a single tag. Each was also a service before 4.0 and
+# stays one, because automations call them.
+TAG_COMMAND_SERVICES = {
+    "clear_pending": TagCommand.CLEAR,
+    "force_refresh": TagCommand.REFRESH,
+    "reboot_tag": TagCommand.REBOOT,
+    "scan_channels": TagCommand.SCAN,
+}
+
+_TARGET_FIELDS: dict[Any, Any] = {
+    vol.Optional("entity_id", default=[]): cv.entity_ids_or_uuids,
+    vol.Optional("device_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
+    vol.Optional("area_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
+    vol.Optional("label_id", default=[]): vol.All(cv.ensure_list, [cv.string]),
+}
 
 
+# ---------------------------------------------------------------------------
+# Value coercion
+# ---------------------------------------------------------------------------
 
-async def async_setup_services(hass: HomeAssistant) -> None:
+
+def _refresh_type(value: Any) -> LUT:
+    """Accept refresh names and the pre-4.0 numeric values.
+
+    The old numbers meant something other than their labels implied: "0" was
+    labelled Full and stores the value that forces a full waveform on every
+    update. An explicit old value keeps its old meaning; only the default
+    changes.
     """
-    Set up the OpenEPaperLink services.
-    Args:
-        hass: Home Assistant instance
+    legacy = {
+        "0": LUT.NO_REPEAT,  # was labelled "Full"
+        "1": LUT.FAST,
+        "2": LUT.FAST_NO_REDS,
+        "3": LUT.DEFAULT,
+    }
+    names = {
+        "adaptive": LUT.DEFAULT,
+        "full": LUT.NO_REPEAT,
+        "fast": LUT.FAST,
+        "fast_no_red": LUT.FAST_NO_REDS,
+    }
+    text = str(value).strip().lower()
+    # Checked against None rather than truthiness: LUT.DEFAULT is 0.
+    if (result := legacy.get(text, names.get(text))) is not None:
+        return result
+    raise vol.Invalid(f"Invalid refresh_type: {value}")
+
+
+def _dither(value: Any) -> DitherMode:
+    """Accept any epaper-dithering mode name, and the pre-4.0 numbers.
+
+    Dithering is done here rather than on the Access Point, so the whole set
+    of algorithms is available instead of the three it offers. The old numbers
+    named those three.
+    """
+    legacy = {"0": DitherMode.NONE, "1": DitherMode.BURKES, "2": DitherMode.ORDERED}
+    text = str(value).strip().lower()
+    if text in legacy:
+        return legacy[text]
+    try:
+        return DitherMode[text.upper()]
+    except KeyError:
+        raise vol.Invalid(
+            f"Invalid dither: {value}. Expected one of "
+            + ", ".join(mode.name.lower() for mode in DitherMode)
+        ) from None
+
+
+def _accent_color(tag_type: TagType) -> str:
+    """Return the colour odl-renderer should draw accents in.
+
+    A two-colour panel has no accent, so black is the only honest answer.
+    """
+    return tag_type.accent_color or "black"
+
+
+_RGB = vol.All(cv.ensure_list, [vol.All(vol.Coerce(int), vol.Range(min=0, max=255))])
+_SECONDS = vol.All(vol.Coerce(float), vol.Range(min=0, max=25.5))
+_FLASH_SPEED = vol.All(vol.Coerce(float), vol.Range(min=0, max=1.5))
+_FLASH_COUNT = vol.All(vol.Coerce(int), vol.Range(min=0, max=15))
+
+
+def _led_segment_fields(index: int, color: list[int], delay: float) -> dict[Any, Any]:
+    """Return the schema fields for one of the three LED groups."""
+    return {
+        vol.Optional(f"color{index}", default=color): _RGB,
+        vol.Optional(f"flash_speed{index}", default=0.2): _FLASH_SPEED,
+        vol.Optional(f"flash_count{index}", default=2): _FLASH_COUNT,
+        vol.Optional(f"delay{index}", default=delay): _SECONDS,
+    }
+
+
+SCHEMA_DRAWCUSTOM = vol.Schema(
+    {
+        **_TARGET_FIELDS,
+        vol.Required("payload"): vol.All(cv.ensure_list, [dict]),
+        vol.Optional("background", default="white"): cv.string,
+        vol.Optional("rotate", default=0): vol.All(
+            vol.Coerce(int), vol.In([0, 90, 180, 270])
+        ),
+        vol.Optional("dither", default="ordered"): _dither,
+        vol.Optional("ttl", default=60): vol.All(vol.Coerce(int), vol.Range(min=0)),
+        vol.Optional("refresh_type", default="adaptive"): _refresh_type,
+        # Hyphenated, as the pre-4.0 action defined it.
+        vol.Optional("dry-run"): cv.boolean,
+        vol.Optional("dry_run"): cv.boolean,
+    },
+    # Drop keys that no longer apply, such as preload_type, rather than
+    # failing a call that used to work.
+    extra=vol.REMOVE_EXTRA,
+)
+
+SCHEMA_SETLED = vol.Schema(
+    {
+        **_TARGET_FIELDS,
+        vol.Optional("mode", default="flash"): vol.In(["off", "flash"]),
+        vol.Optional("brightness", default=1): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=16)
+        ),
+        vol.Optional("repeats", default=2): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=256)
+        ),
+        # Three groups, as the pre-4.0 action had. A group with no flashes is
+        # skipped, which is how it documented turning one off.
+        **_led_segment_fields(1, [255, 0, 0], 0.1),
+        **_led_segment_fields(2, [0, 255, 0], 0.1),
+        **_led_segment_fields(3, [0, 0, 255], 0.0),
+    },
+    extra=vol.REMOVE_EXTRA,
+)
+
+SCHEMA_TARGET_ONLY = vol.Schema(_TARGET_FIELDS, extra=vol.REMOVE_EXTRA)
+
+
+# ---------------------------------------------------------------------------
+# Rendering support
+# ---------------------------------------------------------------------------
+
+
+class HADataProvider:
+    """Supplies recorder history to odl-renderer's plot element.
+
+    odl-renderer defines this as a protocol precisely so it need not know
+    anything about Home Assistant.
     """
 
-    # Create upload queues
-    ble_upload_queue, hub_upload_queue = create_upload_queues()
+    def __init__(self, hass: HomeAssistant) -> None:
+        """Hold the Home Assistant instance."""
+        self._hass = hass
 
-    async def get_device_ids_from_label_id(label_id: str) -> list[str]:
-        """Get device_ids for OpenEPaperLink devices with a specific label."""
-        device_registry = dr.async_get(hass)
-        devices = dr.async_entries_for_label(device_registry, label_id)
+    async def get_history(
+        self, entity_ids: list[str], start: datetime, end: datetime
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Return state history for *entity_ids* between *start* and *end*."""
+        # Imported here because recorder is an after_dependency: it may not be
+        # loaded, and only the plot element needs it.
+        from homeassistant.components.recorder.history import get_significant_states
+        from homeassistant.helpers.recorder import get_instance
 
-        oepl_device_ids = []
-        for device in devices:
-            for identifier in device.identifiers:
-                if identifier[0] == DOMAIN:
-                    oepl_device_ids.append(device.id)
-                    break
-
-        return oepl_device_ids
-
-    async def get_device_ids_from_area_id(area_id: str) -> list[str]:
-        """Get device_ids for all OpenEPaperLink devices in an area."""
-        device_registry = dr.async_get(hass)
-        devices = dr.async_entries_for_area(device_registry, area_id)
-        oepl_device_ids = []
-        for device in devices:
-            for identifier in device.identifiers:
-                if identifier[0] == DOMAIN:
-                    oepl_device_ids.append(device.id)
-                    break
-        return oepl_device_ids
-
-    async def get_entity_id_from_device_id(device_id: str) -> str:
-        """Get the primary entity ID for an OpenEPaperLink device."""
-        device_registry = dr.async_get(hass)
-        device = device_registry.async_get(device_id)
-        if not device:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="device_not_found",
-                translation_placeholders={"device_id": device_id},
+        raw = await get_instance(self._hass).async_add_executor_job(
+            partial(
+                get_significant_states,
+                self._hass,
+                start,
+                end,
+                entity_ids,
+                significant_changes_only=False,
+                minimal_response=True,
+                no_attributes=False,
             )
-        if not device.identifiers:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="device_no_identifiers",
-                translation_placeholders={"device_id": device_id},
-            )
-
-        domain_mac = next(iter(device.identifiers))
-        if domain_mac[0] != DOMAIN:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="device_not_oepl",
-                translation_placeholders={"device_id": device_id},
-            )
-
-        identifier = domain_mac[1]
-        if identifier.startswith("ble_"):
-            mac_address = identifier[4:]
-        else:
-            mac_address = identifier
-
-        return f"{DOMAIN}.{mac_address.lower()}"
-
-
-    def _build_led_pattern(service_data: dict[str, Any]) -> str:
-        """Build LED pattern hex string from service data."""
-        mode = service_data.get("mode", "")
-        modebyte = "1" if mode == "flash" else "0"
-        brightness = service_data.get("brightness", 2)
-        modebyte = hex(((brightness - 1) << 4) + int(modebyte))[2:]
-
-        def _color_segment(color_num: int) -> str:
-            default_delay = 0.0 if color_num == 3 else 0.1
-            color = service_data.get(f"color{color_num}")
-            flash_speed = service_data.get(f"flashSpeed{color_num}", 0.2)
-            flash_count = service_data.get(f"flashCount{color_num}", 2)
-            delay = service_data.get(f"delay{color_num}", default_delay)
-
-            if not isinstance(color, (list, tuple)) or len(color) != 3:
-                color = (0, 0, 0)
-                flash_speed = 0
-                flash_count = 0
-
-            return (
-                    rgb_to_rgb332(color)
-                    + hex(int(flash_speed * 10))[2:]
-                    + hex(flash_count)[2:]
-                    + int_to_hex_string(int(delay * 10))
-            )
-
-        return (
-                modebyte +
-                _color_segment(1) +
-                _color_segment(2) +
-                _color_segment(3) +
-                int_to_hex_string(service_data.get("repeats", 2) - 1) +
-                "00"
         )
 
+        return {
+            entity_id: [_as_history_row(row) for row in rows]
+            for entity_id, rows in raw.items()
+        }
 
-    def require_hub_online(func: Callable) -> Callable:
-        """Decorator to require the AP to be online before executing a service."""
-        @wraps(func)
-        async def wrapper(service: ServiceCall, *args, **kwargs) -> None:
-            hub = get_hub_from_hass(hass)
-            if not hub.online:
-                raise HomeAssistantError(
-                    translation_domain=DOMAIN,
-                    translation_key="ap_offline",
-                )
-            return await func(service, *args, hub=hub, **kwargs)
-        return wrapper
 
-    def handle_targets(func: Callable) -> Callable:
-        """Decorator to handle device_id, label_id, and area_id targeting."""
-        @wraps(func)
-        async def wrapper(service: ServiceCall, *args, **kwargs):
-            device_ids = service.data.get("device_id", [])
-            label_ids = service.data.get("label_id", [])
-            area_ids = service.data.get("area_id", [])
+def _as_history_row(row: State | dict[str, Any]) -> dict[str, Any]:
+    """Normalise one recorder row into a plain mapping.
 
-            # Normalize to lists
-            if isinstance(device_ids, str):
-                device_ids = [device_ids]
-            if isinstance(label_ids, str):
-                label_ids = [label_ids]
-            if isinstance(area_ids, str):
-                area_ids = [area_ids]
+    ``minimal_response`` returns the first row of each entity as a full State
+    and the rest as dicts. That is an optimisation rather than a guarantee, so
+    each row is converted on its own merits instead of by position.
+    """
+    if isinstance(row, State):
+        return {"state": row.state, "last_changed": str(row.last_changed)}
+    return row
 
-            # Expand labels
-            for label_id in label_ids:
-                expanded = await get_device_ids_from_label_id(label_id)
-                device_ids.extend(expanded)
 
-            # Expand areas
-            for area_id in area_ids:
-                expanded = await get_device_ids_from_area_id(area_id)
-                device_ids.extend(expanded)
+def _font_search_dirs(hass: HomeAssistant, extra: str | None) -> list[str]:
+    """Return font directories in priority order, skipping absent ones."""
+    candidates = [
+        hass.config.path("www/fonts"),
+        hass.config.path("media/fonts"),
+        "/media/fonts",
+    ]
+    if extra:
+        # Semicolon-separated, as the pre-4.0 option was.
+        candidates = [p.strip() for p in extra.split(";") if p.strip()] + candidates
+    return [path for path in candidates if Path(path).is_dir()]
 
-            # Remove duplicates while preserving order
-            seen = set()
-            unique_device_ids = []
-            for device_id in device_ids:
-                if device_id not in seen:
-                    seen.add(device_id)
-                    unique_device_ids.append(device_id)
 
-            if not unique_device_ids:
-                raise ServiceValidationError(
-                    translation_domain=DOMAIN,
-                    translation_key="no_targets_specified",
-                )
+def _allow_source(hass: HomeAssistant, kind: SourceKind, source: str) -> bool:
+    """Let elements open only files in folders Home Assistant allows.
 
-            # Process each device
-            errors: list[tuple[str, str]] = []
-            for device_id in unique_device_ids:
-                try:
-                    entity_id = await get_entity_id_from_device_id(device_id)
-                    await func(service, entity_id, *args, **kwargs)
-                except ServiceValidationError as err:
-                    errors.append((device_id, str(err)))
+    odl-renderer asks this before it opens any image or font by path, so
+    nothing an element names escapes ``allowlist_external_dirs``. URLs are
+    anyone's to fetch, as Home Assistant's own image entities do.
+    """
+    return kind != "file" or hass.config.is_allowed_path(source)
 
-                # Wait for all queued uploads to complete
-                # This is async/await so it doesn't block the HA event loop
-                try:
-                    ble_errors = await ble_upload_queue.wait_for_current_batch()
-                    hub_errors = await hub_upload_queue.wait_for_current_batch()
-                    for ble_error in ble_errors:
-                        errors.append((device_id, str(ble_error)))
-                    for hub_error in hub_errors:
-                        errors.append((device_id, str(hub_error)))
-                except (ServiceValidationError, HomeAssistantError) as err:
-                    errors.append((device_id, str(err)))
 
-            # If ANY errors occurred across all targets, raise them
-            if errors:
-                errors_str = "\n".join(f"{entity}: {message}" for entity, message in errors)
-                raise ServiceValidationError(
-                    translation_domain=DOMAIN,
-                    translation_key="multiple_errors",
-                    translation_placeholders={"errors": errors_str},
-                )
-        return wrapper
+# ---------------------------------------------------------------------------
+# Targeting
+# ---------------------------------------------------------------------------
 
-    @handle_targets
-    async def drawcustom_service(service: ServiceCall, entity_id: str) -> None:
-        """Handle drawcustom service calls.
 
-        Processes requests to generate and upload custom images to tags.
-        The service supports:
+async def _async_targets(
+    hass: HomeAssistant, call: ServiceCall
+) -> list[tuple[ConfigEntry, str | None]]:
+    """Resolve what a call targets to (entry, MAC) pairs.
 
-        - Multiple target devices
-        - Custom content with text, shapes, and images
-        - Background color and rotation
-        - Dithering options
-        - "Dry run" mode for testing
+    A MAC of None means the Access Point itself. Entries come back whatever
+    their kind, because a tag reached over Bluetooth is as legitimate a target
+    as one behind an Access Point; callers narrow on runtime_data. Home
+    Assistant expands areas and labels for us, which the pre-4.0 code did by
+    hand.
+    """
+    entity_registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
 
-        Args:
-            service: Service call object with parameters and target devices
+    device_ids = set(call.data.get("device_id") or [])
+    for entity_id in await async_extract_entity_ids(call):
+        if (record := entity_registry.async_get(entity_id)) and record.device_id:
+            device_ids.add(record.device_id)
 
-        Raises:
-            HomeAssistantError: If AP is offline or image generation fails
-        """
-        device_errors = []
+    targets: list[tuple[ConfigEntry, str | None]] = []
+    seen: set[str] = set()
+
+    for device_id in device_ids:
+        device = device_registry.async_get(device_id)
+        if device is None:
+            continue
+        for domain, value in device.identifiers:
+            if domain != DOMAIN or value in seen:
+                continue
+            # Identifiers are "{entry_id}_ap" or "{entry_id}_{mac}", and entry
+            # ids are ULIDs, so the first underscore is the separator.
+            entry_id, _, suffix = value.partition("_")
+            entry = hass.config_entries.async_get_entry(entry_id)
+            if entry is None or getattr(entry, "runtime_data", None) is None:
+                continue  # not loaded, so nothing to act on
+            seen.add(value)
+            targets.append((entry, None if suffix == "ap" else suffix))
+
+    if not targets:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="no_tags_targeted"
+        )
+    return targets
+
+
+async def _async_target_tags(
+    hass: HomeAssistant, call: ServiceCall
+) -> list[tuple[APCoordinator, str]]:
+    """Resolve what a call targets, rejecting all but Access Point tags."""
+    tags = [
+        (entry.runtime_data, mac)
+        for entry, mac in await _async_targets(hass, call)
+        if mac is not None
+        and isinstance(entry.runtime_data, APCoordinator)
+        and mac in entry.runtime_data.data
+    ]
+    if not tags:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="no_tags_targeted"
+        )
+    return tags
+
+
+# ---------------------------------------------------------------------------
+# Handlers
+# ---------------------------------------------------------------------------
+
+
+async def _async_drawcustom(call: ServiceCall) -> None:
+    """Render a payload and send it to each targeted tag.
+
+    Nothing is returned. What was drawn is on the tag's image entity, dry runs
+    included, which is where it can actually be looked at -- Home Assistant
+    renders an action response as JSON, so returning the image only produced a
+    wall of base64 nobody could read or use.
+    """
+    hass = call.hass
+    elements = call.data["payload"]
+
+    rotate: int = call.data["rotate"]
+    dry_run = call.data.get("dry-run", call.data.get("dry_run", False))
+
+    for canvas in await _async_canvases(hass, call):
+        # rotate is applied here, not by the device. A quarter turn is laid
+        # out on a transposed canvas and turned back below, so what is sent is
+        # always the panel's own size -- which is not optional: neither the
+        # Access Point nor a tag scales what it is given.
+        if rotate in (90, 270):
+            width, height = canvas.height, canvas.width
+        else:
+            width, height = canvas.width, canvas.height
 
         try:
-            is_ble = is_ble_device(hass, entity_id)
-
-            # For hub devices, ensure hub is online
-            hub = None
-            if not is_ble:
-                hub = get_hub_from_hass(hass)
-                if not hub.online:
-                    raise HomeAssistantError(
-                        translation_domain=DOMAIN,
-                        translation_key="ap_offline",
-                    )
-
-            # Generate image
-            generator = ImageGen(hass)
-            width, height, accent_color = await generator.get_tag_dimensions(
-                entity_id, is_ble=is_ble
-            )
-            image_data = await generator.generate_custom_image(
-                entity_id=entity_id,
-                service_data=service.data,
-                error_collector=device_errors,
+            image = await generate_image(
                 width=width,
                 height=height,
-                accent_color=accent_color,
+                elements=elements,
+                background=call.data["background"],
+                accent_color=canvas.accent_color,
+                session=async_get_clientsession(hass),
+                data_provider=HADataProvider(hass),
+                font_dirs=await hass.async_add_executor_job(
+                    _font_search_dirs, hass, canvas.options.get(OPT_CUSTOM_FONT_DIRS)
+                ),
+                allow_source=partial(_allow_source, hass),
             )
-
-            if device_errors:
-                errors_str = "\n".join(device_errors)
-                raise ServiceValidationError(
-                    translation_domain=DOMAIN,
-                    translation_key="invalid_payload",
-                    translation_placeholders={"errors": errors_str},
-                )
-
-            if device_errors:
-                _LOGGER.warning(
-                    "Completed with warnings for device %s:\n%s",
-                    entity_id,
-                    "\n".join(device_errors)
-                )
-
-            # Handle dry-run mode
-            if service.data.get("dry-run", False):
-                _LOGGER.info("Dry run completed for %s", entity_id)
-                tag_mac = get_mac_from_entity_id(entity_id)
-                async_dispatcher_send(
-                    hass,
-                    f"{SIGNAL_TAG_IMAGE_UPDATE}_{tag_mac}",
-                    image_data
-                )
-                return
-
-            # Upload image
-            dither = int(service.data.get("dither", DITHER_DEFAULT))
-
-            refresh_type = int(service.data.get("refresh_type", 0))
-
-            if is_ble:
-                from .util import is_bluetooth_available
-                if not is_bluetooth_available(hass):
-                    raise ServiceValidationError(
-                        translation_domain=DOMAIN,
-                        translation_key="ble_upload_bt_disabled",
-                        translation_placeholders={"entity_id": entity_id},
-                    )
-
-                # Determine upload method
-                await ble_upload_queue.add_to_queue(upload_to_ble_block, hass, entity_id, image_data, dither)
-            else:
-                # Map refresh_type to AP's lut parameter
-                # 0→1 (full), 1→3 (fast), 2→2 (fast no-reds), 3→0 (no-repeats)
-                ap_lut_mapping = {0: 1, 1: 3, 2: 2, 3: 0}
-                ap_lut = ap_lut_mapping.get(refresh_type, 1)  # Default to 1 (full) if invalid
-                await hub_upload_queue.add_to_queue(
-                    upload_to_hub, hub, entity_id, image_data, dither,
-                    service.data.get("ttl", 60),
-                    service.data.get("preload_type", 0),
-                    service.data.get("preload_lut", 0),
-                    ap_lut
-                )
-
-        except ServiceValidationError:
-            raise  # User input errors - propagate unchanged
-        except (HomeAssistantError, BLEConnectionError, BLETimeoutError, BLEProtocolError):
-            raise  # Operational errors - propagate unchanged
-        except Exception as err:
-            # Unexpected errors - wrap as operational error
-            raise HomeAssistantError(
+        except SourceNotAllowedError as err:
+            raise ServiceValidationError(
                 translation_domain=DOMAIN,
-                translation_key="error_processing_device",
-                translation_placeholders={"entity_id": entity_id, "error": str(err)}
+                translation_key="path_not_allowed",
+                translation_placeholders={"path": err.source},
             ) from err
 
+        if rotate:
+            # Positive is anticlockwise in PIL, matching the pre-4.0 action.
+            image = image.rotate(rotate, expand=True)
+
+        image, shown = await hass.async_add_executor_job(canvas.finish, image)
+
+        # Shown on the tag's image entity either way, so a dry run is a
+        # preview rather than a silent no-op.
+        canvas.preview(_to_png(shown))
+        if not dry_run:
+            await canvas.send(image)
 
 
-    @require_hub_online
-    @handle_targets
-    async def setled_service(service: ServiceCall, entity_id: str, hub: Hub) -> None:
-        pattern = _build_led_pattern(service.data)
+@dataclass(frozen=True)
+class _Canvas:
+    """Somewhere a drawcustom call can render to.
 
-        await hub.set_led_pattern(entity_id, pattern)
+    An Access Point tag and a Bluetooth tag differ in where their geometry
+    comes from, what colour they can accent in, where a preview goes and how a
+    finished image reaches them -- and in nothing else. Building that
+    difference here keeps the drawing itself a single path.
+    """
 
-    @require_hub_online
-    @handle_targets
-    async def clear_pending_service(service: ServiceCall, entity_id: str, hub: Hub) -> None:
-        """Clear pending updates for target devices."""
-        await hub.send_tag_cmd(entity_id, "clear")
+    width: int
+    height: int
+    accent_color: str
+    options: Mapping[str, Any]
+    preview: Callable[[bytes], None]
+    send: Callable[[Image], Awaitable[None]]
+    # Turns a drawing into what is sent and how the panel will show it.
+    finish: Callable[[Image], tuple[Image, Image]] = lambda image: (image, image)
 
-    @require_hub_online
-    @handle_targets
-    async def force_refresh_service(service: ServiceCall, entity_id: str, hub: Hub) -> None:
-        """Force refresh target devices."""
-        await hub.send_tag_cmd(entity_id, "refresh")
 
-    @require_hub_online
-    @handle_targets
-    async def reboot_tag_service(service: ServiceCall,entity_id: str, hub: Hub) -> None:
-        """Reboot target devices."""
-        await hub.send_tag_cmd(entity_id, "reboot")
+async def _async_canvases(hass: HomeAssistant, call: ServiceCall) -> list[_Canvas]:
+    """Resolve what a call targets into things that can be drawn on."""
+    canvases: list[_Canvas] = []
+    for entry, mac in await _async_targets(hass, call):
+        runtime = entry.runtime_data
+        if isinstance(runtime, ATCRuntimeData):
+            canvases.append(_atc_canvas(hass, entry, call))
+        elif mac is not None and mac in runtime.data:
+            canvases.append(_tag_canvas(runtime, mac, call))
 
-    @require_hub_online
-    @handle_targets
-    async def scan_channels_service(service: ServiceCall, entity_id: str, hub: Hub) -> None:
-        """Trigger channel scan on target devices."""
-        await hub.send_tag_cmd(entity_id, "scan")
+    if not canvases:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="no_tags_targeted"
+        )
+    return canvases
 
-    @require_hub_online
-    async def reboot_ap_service(service: ServiceCall, hub: Hub) -> None:
-        """Reboot the Access Point."""
-        await hub.reboot_ap()
 
-    async def refresh_tag_types_service(service: ServiceCall) -> None:
-        """Force refresh tag types from GitHub."""
-        manager = await get_tag_types_manager(hass)
-        manager._last_update = None  # Force refresh by invalidating cache
+def _tag_canvas(coordinator: APCoordinator, mac: str, call: ServiceCall) -> _Canvas:
+    """A tag behind an Access Point, which queues the image and delivers it."""
+    tag_type = coordinator.tag_type(mac)
+    if tag_type is None:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="unknown_tag_type",
+            translation_placeholders={"mac": mac},
+        )
+    return _Canvas(
+        width=tag_type.width,
+        height=tag_type.height,
+        accent_color=_accent_color(tag_type),
+        options=coordinator.config_entry.options,
+        preview=partial(coordinator.async_set_preview, mac),
+        send=partial(
+            coordinator.async_upload_image,
+            mac,
+            ttl=call.data["ttl"],
+            lut=call.data["refresh_type"],
+        ),
+        finish=partial(_dither_for_tag, tag_type, call.data["dither"]),
+    )
 
-        # Let exceptions propagate - ensure_types_loaded will raise HomeAssistantError if it fails
-        await manager.ensure_types_loaded()
 
-        tag_types_len = len(manager.get_all_types())
-        message = f"Successfully refreshed {tag_types_len} tag type definitions from GitHub"
+def _dither_for_tag(
+    tag_type: TagType, mode: DitherMode, image: Image
+) -> tuple[Image, Image]:
+    """Dither against the colours the tag's panel really shows.
 
-        await hass.services.async_call(
-            "persistent_notification",
-            "create",
-            {
-                "title": "Tag Types Refresh",
-                "message": message,
-                "notification_id": "oepl_tag_types_refresh",
-            },
+    The preview shows those colours too, so it looks like the tag will. With
+    no dithering each pixel takes the nearest colour on the Access Point, and
+    the drawing is shown as drawn.
+    """
+    if mode is DitherMode.NONE:
+        return image, image
+    dithered = dither_for_tag(image, tag_type, mode)
+    return dithered, as_displayed(dithered, tag_type)
+
+
+def _atc_canvas(
+    hass: HomeAssistant, entry: ATCConfigEntry, call: ServiceCall
+) -> _Canvas:
+    """A tag reached directly over Bluetooth.
+
+    Its geometry was read when the entry was set up, so nothing here has to
+    talk to the tag before drawing.
+    """
+    runtime = entry.runtime_data
+    panel = runtime.capabilities
+    return _Canvas(
+        width=panel.width,
+        height=panel.height,
+        accent_color=_atc_accent_color(panel.color_scheme),
+        options=entry.options,
+        preview=runtime.coordinator.async_set_rendered,
+        send=partial(_async_send_to_atc, hass, entry, call.data["dither"]),
+    )
+
+
+def _atc_accent_color(color_scheme: int) -> str:
+    """Return the colour a Bluetooth tag can accent in.
+
+    A Bluetooth tag carries no tag type, so this comes from the colour scheme
+    it reported for its own panel.
+    """
+    try:
+        return ATCColorScheme.from_value(color_scheme).accent_color
+    except ValueError:
+        return "black"
+
+
+async def _async_send_to_atc(
+    hass: HomeAssistant, entry: ATCConfigEntry, dither_mode: DitherMode, image: Image
+) -> None:
+    """Hand an image to a Bluetooth tag, without waiting for it to arrive.
+
+    Sending takes tens of seconds, which no automation should block on. A
+    newer draw replaces an older still in flight rather than queueing behind
+    it: the older one's picture is already stale.
+    """
+    runtime = entry.runtime_data
+    if runtime.upload_task is not None and not runtime.upload_task.done():
+        runtime.upload_task.cancel()
+    runtime.upload_task = entry.async_create_background_task(
+        hass, _async_upload_to_atc(entry, image, dither_mode), name=f"{DOMAIN} upload"
+    )
+
+
+async def _async_upload_to_atc(
+    entry: ATCConfigEntry, image: Image, dither_mode: DitherMode
+) -> None:
+    """Send a rendered image over Bluetooth.
+
+    Detached from the action that asked for it, so a failure is logged rather
+    than raised at a caller already told the draw was accepted.
+    """
+    runtime = entry.runtime_data
+    try:
+        async with runtime.device:
+            await runtime.device.upload_image(
+                image, dither_mode=dither_mode, fit=FitMode.CONTAIN
+            )
+    except ATCError as err:
+        _LOGGER.error("Could not draw on %s: %s", runtime.coordinator.address, err)
+
+
+def _to_png(image: Image) -> bytes:
+    """Encode a rendered image for the image entity.
+
+    PNG rather than JPEG: these are flat-colour e-paper images, where JPEG
+    ringing is both visible and larger.
+    """
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _led_pattern(data: dict[str, Any]) -> LEDPattern:
+    """Build an LED pattern from a setled call."""
+    if data["mode"] == "off":
+        return LEDPattern.off()
+
+    segments = [
+        LEDSegment(
+            color=Color(*[*data[f"color{i}"], 0, 0, 0][:3]),
+            flash_speed=data[f"flash_speed{i}"],
+            flash_count=data[f"flash_count{i}"],
+            delay=data[f"delay{i}"],
+        )
+        for i in (1, 2, 3)
+        # A group with no flashes is skipped, as the pre-4.0 action documented.
+        if data[f"flash_count{i}"] > 0
+    ]
+    if not segments:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="no_led_segments"
+        )
+    return LEDPattern(
+        segments=segments, repeats=data["repeats"], brightness=data["brightness"]
+    )
+
+
+async def _async_setled(call: ServiceCall) -> None:
+    """Set a tag's LED pattern."""
+    pattern = _led_pattern(call.data)
+    for coordinator, mac in await _async_target_tags(call.hass, call):
+        await coordinator.async_set_led(mac, pattern)
+
+
+def _make_tag_command_handler(
+    command: TagCommand,
+) -> Callable[[ServiceCall], Coroutine[Any, Any, None]]:
+    """Return a handler that sends *command* to every targeted tag."""
+
+    async def handler(call: ServiceCall) -> None:
+        for coordinator, mac in await _async_target_tags(call.hass, call):
+            await coordinator.async_send_tag_command(mac, command)
+
+    return handler
+
+
+async def _async_target_access_points(
+    hass: HomeAssistant, call: ServiceCall
+) -> list[APCoordinator]:
+    """Resolve what a call targets to Access Points, ignoring anything else.
+
+    Each appears once, though targeting an Access Point also targets its
+    display and several of its tags may be targeted.
+    """
+    return list(
+        dict.fromkeys(
+            entry.runtime_data
+            for entry, _ in await _async_targets(hass, call)
+            if isinstance(entry.runtime_data, APCoordinator)
+        )
+    )
+
+
+async def _async_reboot_ap(call: ServiceCall) -> None:
+    """Reboot every targeted Access Point."""
+    for coordinator in await _async_target_access_points(call.hass, call):
+        await coordinator.async_reboot_ap()
+
+
+async def _async_refresh_tag_types(call: ServiceCall) -> None:
+    """Reload tag type definitions from the Access Point.
+
+    Useful after it downloads a definition it did not previously hold.
+    """
+    for coordinator in await _async_target_access_points(call.hass, call):
+        await coordinator.async_refresh_tag_types()
+
+
+@callback
+def async_register_services(hass: HomeAssistant) -> None:
+    """Register the integration's actions."""
+    hass.services.async_register(
+        DOMAIN,
+        "drawcustom",
+        _async_drawcustom,
+        schema=SCHEMA_DRAWCUSTOM,
+        # Optional rather than only: existing automations call this without
+        # asking for a response, and must keep working.
+    )
+    hass.services.async_register(DOMAIN, "setled", _async_setled, schema=SCHEMA_SETLED)
+
+    for name, command in TAG_COMMAND_SERVICES.items():
+        hass.services.async_register(
+            DOMAIN, name, _make_tag_command_handler(command), schema=SCHEMA_TARGET_ONLY
         )
 
-    # Register all services
-    hass.services.async_register(DOMAIN, "drawcustom", drawcustom_service)
-    hass.services.async_register(DOMAIN, "setled", setled_service)
-    hass.services.async_register(DOMAIN, "clear_pending", clear_pending_service)
-    hass.services.async_register(DOMAIN, "force_refresh", force_refresh_service)
-    hass.services.async_register(DOMAIN, "reboot_tag", reboot_tag_service)
-    hass.services.async_register(DOMAIN, "scan_channels", scan_channels_service)
-    hass.services.async_register(DOMAIN, "reboot_ap", reboot_ap_service)
-    hass.services.async_register(DOMAIN, "refresh_tag_types", refresh_tag_types_service)
+    hass.services.async_register(
+        DOMAIN, "reboot_ap", _async_reboot_ap, schema=SCHEMA_TARGET_ONLY
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "refresh_tag_types",
+        _async_refresh_tag_types,
+        schema=SCHEMA_TARGET_ONLY,
+    )

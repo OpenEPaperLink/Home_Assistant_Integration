@@ -1,599 +1,402 @@
-"""Config flow for OpenEPaperLink integration."""
+"""Config flow for OpenEPaperLink.
+
+Discovery is the intended way in. The AP announces itself over DHCP as
+``openepaperlink-*``, so in the normal case the user gets a discovered-device
+card and clicks Add without typing an address. Manual entry remains for setups
+where discovery cannot reach the AP, such as a separate VLAN.
+"""
+
 from __future__ import annotations
 
-from typing import Any, Final, Mapping
-import asyncio
-
-import aiohttp
-import voluptuous as vol
-from habluetooth.models import BluetoothServiceInfoBleak
-from homeassistant import config_entries
-from homeassistant.config_entries import ConfigEntry, OptionsFlow, ConfigFlowResult
-from homeassistant.const import CONF_HOST
-from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
-from homeassistant.helpers import selector
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.selector import TextSelectorType
-
-from .const import DOMAIN
-from .ble import (
-    get_protocol_by_manufacturer_id,
-    BLEConnection,
-    UnsupportedProtocolError,
-    ConfigValidationError,
-    BLEConnectionError,
-    BLEProtocolError,
-)
-from .tag_types import get_tag_types_manager, get_hw_string
-from .util import is_ble_entry
 import logging
+from typing import Any
 
-_LOGGER: Final = logging.getLogger(__name__)
-
-STEP_USER_DATA_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_HOST): str,
-    }
+import probatio as vol
+from homeassistant.components import bluetooth
+from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
+from homeassistant.config_entries import (
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.core import callback
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
+from oepl import OEPLClient, OEPLError, build_hostname
+from py_atc_ble_oepl import (
+    MANUFACTURER_ID,
+    ATCDevice,
+    ATCError,
+    ATCProtocol,
 )
 
+from .const import (
+    CONF_AP_MAC,
+    CONF_HOST,
+    CONF_MAC_ADDRESS,
+    DEFAULT_BUTTON_DEBOUNCE,
+    DEFAULT_NFC_DEBOUNCE,
+    DOMAIN,
+    OPT_BLACKLISTED_TAGS,
+    OPT_BUTTON_DEBOUNCE,
+    OPT_NFC_DEBOUNCE,
+)
+from .coordinator import APConfigEntry
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for OpenEPaperLink.
+_LOGGER = logging.getLogger(__name__)
 
-    Implements the flow for initial integration setup.
-    The flow validates that the provided AP host is reachable and responds
-    correctly before creating a configuration entry.
 
-    The class stores connection state throughout the flow steps to maintain
-    context between user interactions.
-    """
+class OpenEPaperLinkConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for OpenEPaperLink."""
 
-    VERSION = 4
+    VERSION = 5
 
     def __init__(self) -> None:
-        """Initialize flow."""
+        """Initialise the flow."""
         self._host: str | None = None
-        self._discovery_info: BluetoothServiceInfoBleak | None = None
-        self._discovered_device: dict[str, Any] | None = {}
-        self._dhcp_discovery_info: DhcpServiceInfo | None = None
+        self._alias: str | None = None
+        self._ap_mac: str | None = None
+        self._atc_address: str | None = None
+        self._atc_name: str | None = None
 
-    async def _validate_input(self, host: str) -> tuple[dict[str, str], str | None]:
-        """Validate the user input allows us to connect.
+    # ------------------------------------------------------------------
+    # Probing
+    # ------------------------------------------------------------------
 
-        Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
+    async def _async_probe(self, host: str) -> tuple[str, str] | None:
+        """Return (ap_mac, alias) for the AP at *host*, or None if unreachable.
+
+        The MAC is the AP's identity: the host is mutable because DHCP moves
+        it, whereas ``/sysinfo`` reports an empty alias and a ``sha`` that
+        changes on every firmware update.
         """
-        errors = {}
-
-        # Remove any http:// or https:// prefix
-        host = host.replace("http://", "").replace("https://", "")
-        # Remove any trailing slashes
-        host = host.rstrip("/")
-
+        client = OEPLClient(host, session=async_get_clientsession(self.hass))
         try:
-            session = async_get_clientsession(self.hass)
-            async with asyncio.timeout(10):
-                async with session.get(f"http://{host}") as response:
-                    if response.status != 200:
-                        errors["base"] = "cannot_connect"
-                    else:
-                        # Store version info for later display
-                        self._host = host
-                        return {"title": f"OpenEPaperLink AP ({host})"}, None
+            info = await client.get_sysinfo()
+            mac = await client.get_ap_mac()
+        except OEPLError as err:
+            _LOGGER.debug("Could not identify the AP at %s: %s", host, err)
+            return None
+        return dr.format_mac(mac), info.alias
 
-        except asyncio.TimeoutError:
-            errors["base"] = "timeout"
-        except aiohttp.ClientError:
-            errors["base"] = "cannot_connect"
-        except Exception:  # pylint: disable=broad-except
-            _LOGGER.exception("Unexpected exception")
-            errors["base"] = "unknown"
+    def _title(self) -> str:
+        """Human-readable entry title.
 
-        return {}, errors.get("base", "unknown")
-
-    async def async_step_user(
-            self, user_input: dict[str, Any] | None = None
-    ):
-        """Handle the initial step of the config flow.
-
-        Presents a form for the user to enter the AP host address,
-        validates the connection, and creates a config entry if successful.
-
-        Args:
-            user_input: User-provided configuration data, or None if the
-                       form is being shown for the first time
-
-        Returns:
-            FlowResult: Result of the flow step, either showing the form
-                       again (with errors if applicable) or creating an entry
+        The Access Point's alias, or failing that the name it gives itself on
+        the network -- py-oepl derives that from the MAC the way the firmware
+        does. Deliberately not the address: DHCP moves it, and the title is
+        set once at creation, so an address here is wrong from the first time
+        the Access Point is handed a different one.
         """
-        # Check for existing AP hub entries immediately (before showing form)
-        for entry_id, entry_data in self.hass.data.get(DOMAIN, {}).items():
-            if not is_ble_entry(entry_data):  # This is an AP (Hub object)
-                return self.async_abort(reason="single_instance_allowed")
-        
+        if self._alias:
+            return self._alias
+        if self._ap_mac:
+            return build_hostname(self._ap_mac)
+        return "OpenEPaperLink"
+
+    # ------------------------------------------------------------------
+    # DHCP discovery -- the primary path
+    # ------------------------------------------------------------------
+
+    @callback
+    def _async_adopt_unmigrated_entry(self, mac: str, host: str) -> None:
+        """Re-key a pre-4.0 entry for this Access Point onto its MAC.
+
+        Entries added before 4.0 were keyed on the host, whichever way they
+        were set up: both the manual step and DHCP discovery called
+        ``async_set_unique_id(host)``. Migration replaces that with the MAC,
+        but it needs the MAC from the Access Point, so it only runs once setup
+        has succeeded -- and an unreachable Access Point retries indefinitely,
+        leaving the old key in place for as long as it is down.
+
+        A discovery arriving in that window would match nothing and add a
+        second entry for hardware already configured. Discovery carries the
+        MAC, so the re-key can happen here without a round trip.
+        """
+        for entry in self._async_current_entries():
+            if entry.data.get(CONF_HOST) != host or entry.unique_id == mac:
+                continue
+            self.hass.config_entries.async_update_entry(
+                entry, unique_id=mac, data={**entry.data, CONF_AP_MAC: mac}
+            )
+            _LOGGER.debug(
+                "Re-keyed pre-4.0 entry %s onto %s before discovery",
+                entry.entry_id,
+                mac,
+            )
+
+    async def async_step_dhcp(
+        self, discovery_info: DhcpServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle an AP discovered over DHCP."""
+        mac = dr.format_mac(discovery_info.macaddress)
+        self._async_adopt_unmigrated_entry(mac, discovery_info.ip)
+        await self.async_set_unique_id(mac)
+        # An AP that moved to a new address updates its entry rather than being
+        # ignored, which is what keying on the host string used to prevent.
+        #
+        # reload_on_update=False because this entry already carries an update
+        # listener that reloads. Doing both reloads twice and can race, which
+        # Home Assistant deprecated in 2026.6 and rejects from 2026.12.
+        self._abort_if_unique_id_configured(
+            updates={CONF_HOST: discovery_info.ip}, reload_on_update=False
+        )
+
+        # Deliberately no probe here: the announcement already carries the MAC
+        # this entry is keyed on, and an Access Point that is briefly busy
+        # should still be offered rather than silently dropped. Reachability is
+        # verified when the user confirms.
+        self._host = discovery_info.ip
+        self._ap_mac = mac
+        self.context["title_placeholders"] = {"name": self._title()}
+        return await self.async_step_discovery_confirm()
+
+    async def async_step_integration_discovery(
+        self, discovery_info: dict[str, Any]
+    ) -> ConfigFlowResult:
+        """Handle a peer AP announced by an already-configured AP.
+
+        Mesh members advertise each other, so adding the rest of a mesh is a
+        click rather than a second manual entry.
+        """
+        host = discovery_info[CONF_HOST]
+        probed = await self._async_probe(host)
+        if probed is None:
+            return self.async_abort(reason="cannot_connect")
+
+        ap_mac, alias = probed
+        await self.async_set_unique_id(ap_mac)
+        # See async_step_dhcp: the update listener owns the reload.
+        self._abort_if_unique_id_configured(
+            updates={CONF_HOST: host}, reload_on_update=False
+        )
+
+        self._host = host
+        self._ap_mac = ap_mac
+        self._alias = alias or discovery_info.get("alias")
+        self.context["title_placeholders"] = {"name": self._title()}
+        return await self.async_step_discovery_confirm()
+
+    async def async_step_discovery_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Confirm adding a discovered AP, verifying it answers first."""
+        assert self._host is not None
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            info, error = await self._validate_input(user_input[CONF_HOST])
-            if not error:
-                await self.async_set_unique_id(self._host)
-                self._abort_if_unique_id_configured()
-
+            probed = await self._async_probe(self._host)
+            if probed is None:
+                errors["base"] = "cannot_connect"
+            else:
+                _, self._alias = probed
                 return self.async_create_entry(
-                    title=info["title"],
-                    data={CONF_HOST: self._host}
+                    title=self._title(),
+                    data={CONF_HOST: self._host, CONF_AP_MAC: self.unique_id},
                 )
 
-            errors["base"] = error
+        return self.async_show_form(
+            step_id="discovery_confirm",
+            description_placeholders={"name": self._title(), "host": self._host},
+            errors=errors,
+        )
+
+    # ------------------------------------------------------------------
+    # Manual entry -- the fallback
+    # ------------------------------------------------------------------
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Add an AP by address, for setups discovery cannot reach."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            host = _normalise_host(user_input[CONF_HOST])
+            probed = await self._async_probe(host)
+            if probed is None:
+                errors["base"] = "cannot_connect"
+            else:
+                ap_mac, alias = probed
+                await self.async_set_unique_id(ap_mac)
+                # See async_step_dhcp: the update listener owns the reload.
+                self._abort_if_unique_id_configured(
+                    updates={CONF_HOST: host}, reload_on_update=False
+                )
+                self._host, self._alias, self._ap_mac = host, alias, ap_mac
+                return self.async_create_entry(
+                    title=self._title(),
+                    data={CONF_HOST: host, CONF_AP_MAC: ap_mac},
+                )
 
         return self.async_show_form(
             step_id="user",
-            data_schema=STEP_USER_DATA_SCHEMA,
+            data_schema=vol.Schema({vol.Required(CONF_HOST): cv.string}),
             errors=errors,
         )
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
-    ):
-        """Handle reconfiguration of the AP host."""
+    ) -> ConfigFlowResult:
+        """Point an existing entry at a new address."""
         entry = self._get_reconfigure_entry()
-
-        # BLE entries do not expose reconfiguration
-        if entry.data.get("device_type") == "ble":
-            return self.async_abort(reason="no_reconfigure_ble")
-
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            info, error = await self._validate_input(user_input[CONF_HOST])
-            if not error:
-                return self.async_update_reload_and_abort(
-                    entry,
-                    unique_id=self._host,
-                    title=info.get("title"),
-                    data_updates={CONF_HOST: self._host},
+            host = _normalise_host(user_input[CONF_HOST])
+            probed = await self._async_probe(host)
+            if probed is None:
+                errors["base"] = "cannot_connect"
+            else:
+                ap_mac, _ = probed
+                await self.async_set_unique_id(ap_mac)
+                # Refuse to repoint an entry at a different physical AP.
+                self._abort_if_unique_id_mismatch(reason="wrong_ap")
+                # Updating the entry wakes the update listener, which reloads.
+                # Reloading here as well is the deprecated double reload.
+                return self.async_update_and_abort(
+                    entry, data_updates={CONF_HOST: host}
                 )
-            errors["base"] = error
 
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_HOST,
-                        default=entry.data.get(CONF_HOST, ""),
-                    ): str
-                }
+                {vol.Required(CONF_HOST, default=entry.data.get(CONF_HOST)): cv.string}
             ),
             errors=errors,
         )
 
-    async def async_step_bluetooth(
-            self, discovery_info: BluetoothServiceInfoBleak
-    ):
-        """Handle bluetooth discovery."""
-        _LOGGER.debug("BLE Discovery - Name: '%s', Address: %s",
-                     discovery_info.name, discovery_info.address)
+    # ------------------------------------------------------------------
+    # Bluetooth discovery (ATC tags)
+    # ------------------------------------------------------------------
 
-        await self.async_set_unique_id(f"oepl_ble_{discovery_info.address}")
+    async def async_step_bluetooth(
+        self, discovery_info: BluetoothServiceInfoBleak
+    ) -> ConfigFlowResult:
+        """Handle a tag running ATC firmware seen over Bluetooth."""
+        await self.async_set_unique_id(dr.format_mac(discovery_info.address))
         self._abort_if_unique_id_configured()
 
-        self._discovery_info = discovery_info
-
-        # Detect protocol from manufacturer data
-        manufacturer_id = None
-        manufacturer_data = b''
-
-        # Check for ATC manufacturer ID (4919)
-        for mfg_id, mfg_data in discovery_info.manufacturer_data.items():
-            if mfg_id == 4919:
-                manufacturer_id = mfg_id
-                manufacturer_data = mfg_data
-                break
-
-        if manufacturer_id is None:
-            _LOGGER.error("No supported manufacturer ID found in advertising data")
-            return self.async_abort(reason="unsupported_protocol")
-
-        # Get protocol handler
+        raw = discovery_info.manufacturer_data.get(MANUFACTURER_ID)
+        if not raw:
+            return self.async_abort(reason="not_supported")
         try:
-            protocol = get_protocol_by_manufacturer_id(manufacturer_id)
-            _LOGGER.debug("Detected protocol: %s (manufacturer ID: 0x%04X)",
-                         protocol.protocol_name, manufacturer_id)
-        except UnsupportedProtocolError:
-            _LOGGER.error("Unsupported manufacturer ID: 0x%04X", manufacturer_id)
-            return self.async_abort(reason="unsupported_protocol")
+            ATCProtocol.parse_advertising_data(raw)
+        except ValueError:
+            _LOGGER.debug("Unparseable advertisement from %s", discovery_info.address)
+            return self.async_abort(reason="not_supported")
+        # A receiver can attach a tag's advertisement to a neighbouring
+        # device; one naming itself as something else is not the tag.
+        if not ATCProtocol.is_device_name(discovery_info.name, discovery_info.address):
+            _LOGGER.debug(
+                "%s carries ATC data but is named %r",
+                discovery_info.address,
+                discovery_info.name,
+            )
+            return self.async_abort(reason="not_supported")
 
-        # Parse advertising data using protocol-specific parser
-        try:
-            advertising_data = protocol.parse_advertising_data(manufacturer_data)
-            if not advertising_data:
-                raise ValueError("Failed to parse advertising data")
-        except Exception as e:
-            _LOGGER.error("Failed to parse advertising data: %s", e)
-            return self.async_abort(reason="invalid_advertising_data")
-
-        device_name = discovery_info.name or f"ATC_BLE_{discovery_info.address[-8:].replace(':', '')}"
-
-        self._discovered_device = {
-            "address": discovery_info.address,
-            "name": device_name,
-            "rssi": discovery_info.rssi,
-            "hw_type": advertising_data.hw_type,
-            "battery_mv": advertising_data.battery_mv,
-            "fw_version": advertising_data.fw_version,
-            "version": advertising_data.version,
-            "protocol_type": protocol.protocol_name,  # Store protocol type
-        }
-        _LOGGER.debug("Discovered device info: %s", self._discovered_device)
-
-        # Set discovery context for proper display in UI
-        self.context["title_placeholders"] = {
-            "name": self._discovered_device["name"],
-        }
-
+        self._atc_address = discovery_info.address
+        # The name only arrives in the scan response, so it is often missing.
+        self._atc_name = ATCProtocol.device_name(discovery_info.address)
+        self.context["title_placeholders"] = {"name": self._atc_name}
         return await self.async_step_bluetooth_confirm()
 
     async def async_step_bluetooth_confirm(
-            self, user_input: dict[str, Any] | None = None
-    ):
-        """Confirm discovery of Bluetooth device."""
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Confirm adding a discovered tag, verifying it answers first.
+
+        Discovery itself never connects -- it happens unprompted and would
+        cost a sleeping tag a wake-up. Confirming is a deliberate act, so one
+        connection here is worth it to fail now rather than at first upload.
+        """
+        assert self._atc_address is not None
+        errors: dict[str, str] = {}
+
         if user_input is not None:
-
-            # Perform device interrogation to get real metadata
-            _LOGGER.debug("Interrogating device %s for metadata", self._discovered_device["address"])
-
-            try:
-                # Get protocol handler for this device
-                protocol = get_protocol_by_manufacturer_id(4919)
-
-                async with BLEConnection(
-                    self.hass,
-                    self._discovered_device["address"],
-                    protocol.service_uuid,
-                    protocol
-                ) as conn:
-                    capabilities = await protocol.interrogate_device(conn)
-
-                _LOGGER.debug("Device capabilities: %s", capabilities)
-
-                # Interrogation must succeed - no fallback
-                if not capabilities:
-                    raise ConfigValidationError(
-                        translation_domain=DOMAIN,
-                        translation_key="config_flow_invalid_config"
-                    )
-
-                hw_type = self._discovered_device["hw_type"]
-
-                # Use tagtypes.json lookup to build device metadata
-                tag_types_manager = await get_tag_types_manager(self.hass)
-                model_name = get_hw_string(hw_type) if hw_type else "Unknown"
-                _LOGGER.debug("Resolved hw_type %s to model: %s", hw_type, model_name)
-
-                # Refine color_scheme using TagTypes db
-                if tag_types_manager.is_in_hw_map(hw_type):
-                    tag_type = await tag_types_manager.get_tag_info(hw_type)
-                    color_table = tag_type.color_table
-
-                    if 'yellow' in color_table and 'red' in color_table:
-                        color_scheme = 3 # BWRY
-                    elif 'yellow' in color_table:
-                        color_scheme = 2 # BWY
-                    elif 'red' in color_table:
-                        color_scheme = 1 # BWR
-                    else:
-                        color_scheme = 0 # BW
-                else:
-                    # Fallback to protocol detection
-                    color_scheme = capabilities.color_scheme
-                    _LOGGER.warning(
-                        "hw_type %s not in TagTypes, using protocol color_scheme: %d",
-                        hw_type, color_scheme
-                    )
-
-                # Build device metadata from capabilities
-                device_metadata = {
-                    "hw_type": hw_type,
-                    "fw_version": self._discovered_device["fw_version"],
-                    "width": capabilities.width,
-                    "height": capabilities.height,
-                    "rotatebuffer": capabilities.rotatebuffer,
-                    "color_scheme": color_scheme,
-                    "model_name": model_name,
-                }
-
+            if await self._async_probe_atc(self._atc_address):
                 return self.async_create_entry(
-                    title=self._discovered_device['name'],
-                    data={
-                        "mac_address": self._discovered_device["address"],
-                        "name": self._discovered_device["name"],
-                        "device_metadata": device_metadata,
-                        "device_type": "ble",
-                        "protocol_type": self._discovered_device["protocol_type"],  # Store protocol
-                        "send_welcome_image": True,
-                    }
+                    title=self._atc_name or self._atc_address,
+                    data={CONF_MAC_ADDRESS: self._atc_address},
                 )
-
-            except ConfigValidationError as e:
-                _LOGGER.error("Invalid device configuration: %s", e)
-                return self.async_show_form(
-                    step_id="bluetooth_confirm",
-                    errors={"base": "invalid_device_config"},
-                    description_placeholders={
-                        "name": self._discovered_device["name"],
-                        "address": self._discovered_device["address"],
-                        "rssi": str(self._discovered_device["rssi"]),
-                        "battery": f"{self._discovered_device['battery_mv']/1000:.2f}V" if self._discovered_device["battery_mv"] > 0 else "Unknown",
-                        "fw_version": str(self._discovered_device["fw_version"]) if self._discovered_device["fw_version"] > 0 else "Unknown",
-                        "config_version": str(self._discovered_device["version"]) if self._discovered_device["version"] > 0 else "Unknown",
-                    },
-                )
-
-            except (BLEConnectionError, BLEProtocolError) as e:
-                _LOGGER.error("Error during device interrogation: %s", e)
-                return self.async_show_form(
-                    step_id="bluetooth_confirm",
-                    errors={"base": "interrogation_failed"},
-                    description_placeholders={
-                        "name": self._discovered_device["name"],
-                        "address": self._discovered_device["address"],
-                        "rssi": str(self._discovered_device["rssi"]),
-                        "battery": f"{self._discovered_device['battery_mv']/1000:.2f}V" if self._discovered_device["battery_mv"] > 0 else "Unknown",
-                        "fw_version": str(self._discovered_device["fw_version"]) if self._discovered_device["fw_version"] > 0 else "Unknown",
-                        "config_version": str(self._discovered_device["version"]) if self._discovered_device["version"] > 0 else "Unknown",
-                        "error": str(e),
-                    },
-                )
-
-            except Exception as e:
-                _LOGGER.error("Unexpected error during device interrogation: %s", e)
-                return self.async_show_form(
-                    step_id="bluetooth_confirm",
-                    errors={"base": "interrogation_failed"},
-                    description_placeholders={
-                        "name": self._discovered_device["name"],
-                        "address": self._discovered_device["address"],
-                        "rssi": str(self._discovered_device["rssi"]),
-                        "battery": f"{self._discovered_device['battery_mv']/1000:.2f}V" if self._discovered_device["battery_mv"] > 0 else "Unknown",
-                        "fw_version": str(self._discovered_device["fw_version"]) if self._discovered_device["fw_version"] > 0 else "Unknown",
-                        "config_version": str(self._discovered_device["version"]) if self._discovered_device["version"] > 0 else "Unknown",
-                        "error": str(e),
-                    },
-                )
-
-        # Build description placeholders from advertising data
-        description_placeholders = {
-            "name": self._discovered_device["name"],
-            "address": self._discovered_device["address"],
-            "rssi": str(self._discovered_device["rssi"]),
-            "battery": f"{self._discovered_device['battery_mv']/1000:.2f}V" if self._discovered_device["battery_mv"] > 0 else "Unknown",
-            "fw_version": str(self._discovered_device["fw_version"]) if self._discovered_device["fw_version"] > 0 else "Unknown",
-            "config_version": str(self._discovered_device["version"]) if self._discovered_device["version"] > 0 else "Unknown",
-        }
+            errors["base"] = "cannot_connect"
 
         return self.async_show_form(
             step_id="bluetooth_confirm",
-            description_placeholders=description_placeholders,
+            description_placeholders={
+                "name": self._atc_name or self._atc_address,
+                "address": self._atc_address,
+            },
+            errors=errors,
         )
 
-    async def async_step_dhcp(
-            self, discovery_info: DhcpServiceInfo
-    ):
-        """Handle DHCP discovery of OpenEPaperLink AP."""
-        _LOGGER.debug(
-            "DHCP Discovery - Hostname: '%s', IP: %s, MAC: %s",
-            discovery_info.hostname,
-            discovery_info.ip,
-            discovery_info.macaddress,
+    async def _async_probe_atc(self, address: str) -> bool:
+        """Return whether the tag at *address* can be reached right now."""
+        ble_device = bluetooth.async_ble_device_from_address(
+            self.hass, address, connectable=True
         )
-
-        # Extract host IP from discovery info
-        host = discovery_info.ip
-
-        # Check for existing AP entries in config entries
-        # AP entries have CONF_HOST in data, BLE entries have device_type
-        for entry in self._async_current_entries():
-            if CONF_HOST in entry.data:
-                return self.async_abort(reason="single_instance_allowed")
-
-        # Set unique_id to IP address (same as manual setup)
-        # This ensures DHCP and manual discoveries are treated as the same entry
-        await self.async_set_unique_id(host)
-
-        # Check if this IP was already configured
-        self._abort_if_unique_id_configured()
-
-        # Store discovery info for confirmation step
-        self._dhcp_discovery_info = discovery_info
-        self._host = host
-
-        # Validate connectivity before showing confirmation
-        info, error = await self._validate_input(host)
-
-        if error:
-            _LOGGER.warning(
-                "DHCP discovered AP at %s failed validation: %s",
-                host,
-                error,
-            )
-            return self.async_abort(reason="cannot_connect")
-
-        # Set discovery context for proper display in UI
-        self.context["title_placeholders"] = {
-            "name": f"OEPL AP ({host})",
-        }
-
-        return await self.async_step_dhcp_confirm()
-
-    async def async_step_dhcp_confirm(
-            self, user_input: dict[str, Any] | None = None
-    ):
-        """Confirm DHCP discovery of OpenEPaperLink AP."""
-        if user_input is not None:
-            # User confirmed - create the config entry
-            return self.async_create_entry(
-                title=f"OpenEPaperLink AP ({self._host})",
-                data={CONF_HOST: self._host},
-            )
-
-        # Build description placeholders for the confirmation form
-        description_placeholders = {
-            "hostname": self._dhcp_discovery_info.hostname,
-            "ip": self._host,
-            "mac": self._dhcp_discovery_info.macaddress,
-        }
-
-        return self.async_show_form(
-            step_id="dhcp_confirm",
-            description_placeholders=description_placeholders,
-        )
-
+        if ble_device is None:
+            _LOGGER.debug("No connectable device for %s", address)
+            return False
+        try:
+            async with ATCDevice(address, ble_device=ble_device):
+                return True
+        except ATCError as err:
+            _LOGGER.debug("Could not reach tag %s: %s", address, err)
+            return False
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        """Create the options flow handler.
+    def async_get_options_flow(
+        config_entry: APConfigEntry,  # noqa: ARG004
+    ) -> OpenEPaperLinkOptionsFlow:
+        """Return the options flow."""
+        return OpenEPaperLinkOptionsFlow()
 
-        Returns an instance of the OptionsFlowHandler to manage the
-        integration's configuration options.
 
-        Args:
-            config_entry: The current configuration entry
+class OpenEPaperLinkOptionsFlow(OptionsFlow):
+    """Handle OpenEPaperLink options."""
 
-        Returns:
-            OptionsFlow: The options flow handler
-        """
-        return OptionsFlowHandler()
-
-class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle OpenEPaperLink integration options.
-
-    Provides a UI for configuring integration options including:
-
-    - Tag blacklisting to hide unwanted devices
-    - Button and NFC debounce intervals to prevent duplicate triggers
-    - Custom font directories for the image generation system
-
-    The options flow fetches current tag data from the hub to
-    populate the selection fields with accurate information.
-    """
-
-    def __init__(self) -> None:
-        """Initialize options flow.
-
-        The config_entry is now provided automatically by the base OptionsFlow class.
-        Option values will be extracted in async_step_init when needed.
-        """
-        # Option values will be initialized when needed in async_step_init
-        self._blacklisted_tags = []
-        self._button_debounce = 0.5
-        self._nfc_debounce = 1.0
-        self._custom_font_dirs = ""
-
-    async def async_step_init(self, user_input=None):
-        """Manage OpenEPaperLink options.
-
-        Presents a form with configuration options for the integration.
-        When submitted, updates the config entry with the new options.
-
-        This step retrieves a list of available tags from the hub to
-        allow selection of tags to blacklist.
-
-        Args:
-            user_input: User-provided input data, or None on first display
-
-        Returns:
-            FlowResult: Flow result showing the form or saving options
-        """
-        self._blacklisted_tags = self.config_entry.options.get("blacklisted_tags", [])
-        self._button_debounce = self.config_entry.options.get("button_debounce", 0.5)
-        self._nfc_debounce = self.config_entry.options.get("nfc_debounce", 1.0)
-        self._custom_font_dirs = self.config_entry.options.get("custom_font_dirs", "")
-
-        # Check if this is a BLE device
-        entry_data = self.config_entry.runtime_data
-        is_ble_device = is_ble_entry(entry_data)
-        
-        if is_ble_device:
-            # BLE devices don't have configurable options
-            return self.async_abort(reason="no_options_ble")
-
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manage the options."""
         if user_input is not None:
-            # Update blacklisted tags
-            return self.async_create_entry(
-                title="",
-                data={
-                    "blacklisted_tags": user_input.get("blacklisted_tags", []),
-                    "button_debounce": user_input.get("button_debounce", 0.5),
-                    "nfc_debounce": user_input.get("nfc_debounce", 1.0),
-                    "custom_font_dirs": user_input.get("custom_font_dirs", ""),
-                }
-            )
+            return self.async_create_entry(data=user_input)
 
-        # Get list of all known tags from the hub (AP devices only)
-        hub = entry_data
-        tags = []
-        for tag_mac in hub.tags:
-            tag_data = hub.get_tag_data(tag_mac)
-            tag_name = tag_data.get("tag_name", tag_mac)
-            tags.append(
-                selector.SelectOptionDict(
-                    value=tag_mac,
-                    label=f"{tag_name} ({tag_mac})"
-                )
-            )
+        options = self.config_entry.options
+        coordinator = getattr(self.config_entry, "runtime_data", None)
+        known_tags = sorted(coordinator.data) if coordinator is not None else []
 
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema({
-                vol.Optional(
-                    "blacklisted_tags",
-                    default=self._blacklisted_tags,
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=tags,
-                        multiple=True,
-                        mode=selector.SelectSelectorMode.DROPDOWN
-                    )
-                ),
-                vol.Optional(
-                    "button_debounce",
-                    default=self._button_debounce,
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=0.0,
-                        max=5.0,
-                        step=0.1,
-                        unit_of_measurement="s",
-                        mode=selector.NumberSelectorMode.SLIDER
-                    )
-                ),
-                vol.Optional(
-                    "nfc_debounce",
-                    default=self._nfc_debounce,
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=0.0,
-                        max=5.0,
-                        step=0.1,
-                        unit_of_measurement="s",
-                        mode=selector.NumberSelectorMode.SLIDER
-                    )
-                ),
-                vol.Optional(
-                    "custom_font_dirs",
-                    default=self._custom_font_dirs,
-                    description={
-                        "suggested_value": None
-                    }
-                ): selector.TextSelector(
-                    selector.TextSelectorConfig(
-                        type=TextSelectorType.TEXT,
-                        autocomplete="path"
-                    )
-                ),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        OPT_BLACKLISTED_TAGS,
+                        default=list(options.get(OPT_BLACKLISTED_TAGS, [])),
+                    ): cv.multi_select(known_tags),
+                    vol.Optional(
+                        OPT_BUTTON_DEBOUNCE,
+                        default=options.get(
+                            OPT_BUTTON_DEBOUNCE, DEFAULT_BUTTON_DEBOUNCE
+                        ),
+                    ): vol.All(vol.Coerce(float), vol.Range(min=0, max=10)),
+                    vol.Optional(
+                        OPT_NFC_DEBOUNCE,
+                        default=options.get(OPT_NFC_DEBOUNCE, DEFAULT_NFC_DEBOUNCE),
+                    ): vol.All(vol.Coerce(float), vol.Range(min=0, max=10)),
+                }
+            ),
         )
+
+
+def _normalise_host(host: str) -> str:
+    """Strip a scheme and trailing slashes from user-entered input."""
+    host = host.strip()
+    for scheme in ("http://", "https://"):
+        if host.startswith(scheme):
+            host = host[len(scheme) :]
+    return host.rstrip("/")
