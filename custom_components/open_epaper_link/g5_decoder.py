@@ -13,6 +13,10 @@ from PIL import Image
 from typing import Union, Tuple, Dict, Any
 import json
 
+# Tag types with "bpp": 5 store 2 bits per pixel, packed, as colour table
+# indices (e.g. BWRY panels). Same value as BPP_PACKED_2BIT in the AP firmware.
+BPP_PACKED_2BIT = 5
+
 
 # ============================================================================
 # Exception Classes
@@ -552,8 +556,9 @@ def assemble_image_from_bitmap(bitmap_data: bytes, tagtype: Dict[str, Any]) -> I
     
     if bpp == 16:
         image = render_16bit_rgb565(bitmap_data, canvas_width, canvas_height)
-    elif bpp in [3, 4]:
-        image = render_indexed_color(bitmap_data, canvas_width, canvas_height, bpp, colortable)
+    elif bpp in [3, 4, BPP_PACKED_2BIT]:
+        packed_bpp = 2 if bpp == BPP_PACKED_2BIT else bpp
+        image = render_indexed_color(bitmap_data, canvas_width, canvas_height, packed_bpp, colortable)
     else:  # bpp in [1, 2]
         image = render_monochrome_or_tricolor(bitmap_data, canvas_width, canvas_height, bpp, colortable)
     
