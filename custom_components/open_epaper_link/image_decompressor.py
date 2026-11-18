@@ -8,8 +8,13 @@ import zlib
 from PIL import Image
 
 from .tag_types import TagType
-from .g5_decoder import parse_g5_header, process_g5
+from .g5_decoder import BPP_PACKED_2BIT, parse_g5_header, process_g5
 _LOGGER = logging.getLogger(__name__)
+
+
+def _packed_bits_per_pixel(bpp: int) -> int:
+    """Bits per pixel in a packed buffer (bpp 5 means packed 2-bit)."""
+    return 2 if bpp == BPP_PACKED_2BIT else bpp
 
 
 def decode_esl_raw(data: bytes, tag_type: TagType) -> bytes:
@@ -71,8 +76,8 @@ def decode_esl_raw(data: bytes, tag_type: TagType) -> bytes:
         bytes_per_row = (width + 7) // 8
         bytes_per_plane = bytes_per_row * height
         total_size = bytes_per_plane * (2 if tag_type.bpp == 2 else 1)
-    else:  # 3-4 bit packed format
-        bits_per_pixel = tag_type.bpp
+    else:  # packed format: 3-4 bit, or 2 bit for BPP_PACKED_2BIT
+        bits_per_pixel = _packed_bits_per_pixel(tag_type.bpp)
         bytes_per_row = (width * bits_per_pixel + 7) // 8
         total_size = bytes_per_row * height
 
@@ -208,8 +213,8 @@ def to_image(raw_data: bytes, tag_type: TagType) -> bytes:
                 else:
                     pixels[x, y] = color_table['white']
 
-    else:  # 3-4 bit packed format
-        bits_per_pixel = tag_type.bpp
+    else:  # packed format: 3-4 bit, or 2 bit for BPP_PACKED_2BIT
+        bits_per_pixel = _packed_bits_per_pixel(tag_type.bpp)
         # pixels_per_byte = 8 // bits_per_pixel
         bit_mask = (1 << bits_per_pixel) - 1
         bytes_per_row = (native_width * bits_per_pixel + 7) // 8
