@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Final
 import requests
 
+import asyncio
+
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from .util import is_ble_entry
 from .entity import OpenEPaperLinkTagEntity, OpenEPaperLinkBLEEntity
@@ -19,6 +21,12 @@ from .image_decompressor import to_image
 from .tag_types import TagType, get_tag_types_manager
 
 _LOGGER: Final = logging.getLogger(__name__)
+
+# The AP logs "reports xfer complete" before the new image is in
+# /current/<mac>.raw, so a fetch straight after the event can return the
+# previous image. After a transfer, re-fetch until the file differs from the
+# one fetched before (bounded: the same picture may have been sent again).
+XFER_REFETCH_DELAYS: Final = (1, 2, 4, 8, 15)
 
 async def async_setup_entry(
         hass: HomeAssistant,
@@ -132,6 +140,8 @@ class ESLImage(OpenEPaperLinkTagEntity, ImageEntity):
         self._name = f"{tag_data.get('tag_name', tag_mac)}"
         self._attr_content_type = "image/jpeg"
         self._cached_image: bytes | None = None
+        self._last_raw: bytes | None = None
+        self._refetch_task: asyncio.Task | None = None
         self._last_updated: datetime | None = None
         self._tag_type = None
         self._last_error = None
@@ -189,11 +199,13 @@ class ESLImage(OpenEPaperLinkTagEntity, ImageEntity):
             await self._refresh_image()
         return self._cached_image
 
-    async def _refresh_image(self) -> None:
-        """Refresh the cached image data."""
+    async def _refresh_image(self, raw_data: bytes | None = None) -> None:
+        """Refresh the cached image data (fetching it unless given)."""
         try:
-            raw_data = await self._fetch_raw_image()
+            if raw_data is None:
+                raw_data = await self._fetch_raw_image()
             if raw_data:
+                self._last_raw = raw_data
                 tag_def = await self._get_tag_def()
                 if tag_def:
                     try:
@@ -212,6 +224,20 @@ class ESLImage(OpenEPaperLinkTagEntity, ImageEntity):
             _LOGGER.error("Error refreshing image for %s: %s", self._tag_mac, str(err))
             self._cached_image = None
 
+    async def _refresh_after_xfer(self) -> None:
+        """Fetch the image after a transfer, once the AP has stored the new one."""
+        before = self._last_raw
+        raw_data = None
+        for delay in XFER_REFETCH_DELAYS:
+            await asyncio.sleep(delay)
+            raw_data = await self._fetch_raw_image()
+            if raw_data and raw_data != before:
+                break
+        else:
+            _LOGGER.debug("Image for %s unchanged after transfer", self._tag_mac)
+        if raw_data:
+            await self._refresh_image(raw_data)
+
     async def async_added_to_hass(self) -> None:
         """Register callback when entity is added."""
         # Don't call super() - different signals are used for image updates
@@ -222,6 +248,7 @@ class ESLImage(OpenEPaperLinkTagEntity, ImageEntity):
                 self._handle_tag_image_update
             )
         )
+        self.async_on_remove(self._cancel_refetch)
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
@@ -231,6 +258,11 @@ class ESLImage(OpenEPaperLinkTagEntity, ImageEntity):
         )
 
     @callback
+    def _cancel_refetch(self) -> None:
+        if self._refetch_task and not self._refetch_task.done():
+            self._refetch_task.cancel()
+
+    @callback
     def _handle_tag_image_update(self, data) -> None:
         """Handle tag image updates."""
         if isinstance(data, bytes):
@@ -238,7 +270,9 @@ class ESLImage(OpenEPaperLinkTagEntity, ImageEntity):
             self._last_updated = datetime.now()
             self.async_write_ha_state()
         elif data:
-            self.hass.async_create_task(self._refresh_image())
+            if self._refetch_task and not self._refetch_task.done():
+                self._refetch_task.cancel()
+            self._refetch_task = self.hass.async_create_task(self._refresh_after_xfer())
             self.async_write_ha_state()
         self.async_write_ha_state()
 
