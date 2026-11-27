@@ -1,204 +1,194 @@
+"""Entity base classes."""
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Iterable
 
-from homeassistant.components import bluetooth
-from homeassistant.core import callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import DeviceInfo, Entity
-from .ble import BLEDeviceMetadata
+from homeassistant.components.bluetooth.passive_update_coordinator import (
+    PassiveBluetoothCoordinatorEntity,
+)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.device_registry import (
+    CONNECTION_BLUETOOTH,
+    ChildDeviceInfo,
+    DeviceInfo,
+    async_get_device_id_by_identifier,
+)
+from homeassistant.helpers.entity import EntityDescription
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from oepl import Tag, format_hw_type, format_tag_firmware_version
+from py_atc_ble_oepl import DEVICE_TYPES, AdvertisingData
+from py_atc_ble_oepl import guess_manufacturer as guess_atc_manufacturer
 
-from .const import DOMAIN, ATC_CONFIG_URL
-from .tag_types import get_hw_string, get_hw_dimensions
+from .atc_coordinator import ATCCoordinator
+from .const import DOMAIN
+from .coordinator import APCoordinator
 
-if TYPE_CHECKING:
-    from .coordinator import Hub
-    from .runtime_data import OpenEPaperLinkConfigEntry
+# The screen type of a tag configured by hand rather than from the type list.
+_ATC_DYNAMIC_TYPE = 65535
 
 
-class OpenEPaperLinkAPEntity(Entity):
-    """
-    Base entity for AP-level entities (switch, select, text, AP sensors).
+class OpenEPaperLinkEntity(CoordinatorEntity[APCoordinator]):
+    """Shared behaviour for every entity backed by an Access Point."""
 
-    Provides:
-    - device_info for AP device
-    - available property (hub.online)
-    - Signal registration for connection status updates
-    - Common callbacks for state updates
-
-    Subclasses must set:
-    - _attr_unique_id
-    - _attr_translation_key
-    """
     _attr_has_entity_name = True
-    _attr_entity_registry_enabled_default = False
+    _attr_should_poll = False
 
-    def __init__(self, hub: Hub) -> None:
-        self._hub = hub
+    def __init__(self, coordinator: APCoordinator, key: str) -> None:
+        """Set up the entity."""
+        super().__init__(coordinator)
+        self._attr_translation_key = key
 
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info for the AP."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, "ap")},
-            name="OpenEPaperLink AP",
-            model=self._hub.ap_model,
+
+class OpenEPaperLinkAPEntity(OpenEPaperLinkEntity):
+    """An entity describing the Access Point itself."""
+
+    def __init__(self, coordinator: APCoordinator, key: str) -> None:
+        """Set up the entity."""
+        super().__init__(coordinator, key)
+        entry_id = coordinator.config_entry.entry_id
+        self._attr_unique_id = f"{entry_id}_{key}"
+        # Scoped to the entry rather than a shared (DOMAIN, "ap") identifier,
+        # which used to make a second Access Point collide with the first.
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_ap")},
+            name=coordinator.ap_name,
             manufacturer="OpenEPaperLink",
-            configuration_url=f"http://{self._hub.host}"
+            model=coordinator.ap_info.env if coordinator.ap_info else None,
+            sw_version=coordinator.ap_info.build_version
+            if coordinator.ap_info
+            else None,
+            configuration_url=f"http://{coordinator.host}",
+            connections={("mac", coordinator.ap_mac)},
         )
 
     @property
     def available(self) -> bool:
-        """Return if the entity is available."""
-        return self._hub.online
+        """Whether the Access Point is currently connected."""
+        return self.coordinator.online
 
-    async def async_added_to_hass(self) -> None:
-        """Register the connection status signal handler."""
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                f"{DOMAIN}_connection_status",
-                self._handle_connection_status,
+
+class OpenEPaperLinkTagEntity(OpenEPaperLinkEntity):
+    """An entity describing a single tag."""
+
+    def __init__(self, coordinator: APCoordinator, mac: str, key: str) -> None:
+        """Set up the entity."""
+        super().__init__(coordinator, key)
+        self._mac = mac
+        entry_id = coordinator.config_entry.entry_id
+        self._attr_unique_id = f"{entry_id}_{mac}_{key}"
+        # The coordinator registers the Access Point during setup, so this
+        # resolves by the time entities are built.
+        ap_device_id = async_get_device_id_by_identifier(
+            coordinator.hass,
+            (DOMAIN, f"{entry_id}_ap"),
+            config_entry_id=entry_id,
+        )
+        if coordinator.is_ap_display(mac):
+            # The display is part of the Access Point, not a tag it reaches,
+            # so it is a child device: it goes wherever the Access Point does.
+            self._attr_device_info = ChildDeviceInfo(
+                identifiers={(DOMAIN, f"{entry_id}_{mac}")},
+                parent_device_id=ap_device_id,
+                translation_key="ap_display",
             )
+            return
+        tag = self.tag
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_{mac}")},
+            name=self._tag_name(),
+            manufacturer=coordinator.tag_manufacturer(mac),
+            model=coordinator.tag_type_name(mac),
+            sw_version=(
+                format_tag_firmware_version(tag.firmware_version) if tag else None
+            ),
+            hw_version=format_hw_type(tag.hw_type) if tag else None,
+            via_device_id=ap_device_id,
         )
 
-    @callback
-    def _handle_connection_status(self, is_online: bool) -> None:
-        """Handle connection status updates."""
-        self.async_write_ha_state()
-
-    @callback
-    def _handle_update(self) -> None:
-        """Handle data updates."""
-        self.async_write_ha_state()
-
-
-class OpenEPaperLinkTagEntity(Entity):
-    """
-    Base entity for tag-level entities (sensors, buttons, text, image).
-
-    Provides:
-    - device_info for tag device
-    - available property (hub.online + tag online + not blacklisted)
-    - Signal registration for tag updates and connection status
-    - Common callbacks for state updates
-
-    Subclasses must set:
-    - _attr_unique_id
-    - _attr_translation_key
-    """
-    _attr_has_entity_name = True
-    _attr_entity_registry_enabled_default = False
-
-    def __init__(self, hub: Hub, tag_mac: str) -> None:
-        """Initialize the tag entity."""
-        self._hub = hub
-        self._tag_mac = tag_mac
+    def _tag_name(self) -> str:
+        """The tag's alias, falling back to its MAC."""
+        tag = self.tag
+        return tag.alias if tag and tag.alias else self._mac
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info for the tag."""
-        tag_data = self._hub.get_tag_data(self._tag_mac)
-        tag_name = tag_data.get("tag_name", self._tag_mac)
-        hw_type = tag_data.get("hw_type", 0)
-        hw_string = get_hw_string(hw_type)
-        width, height = get_hw_dimensions(hw_type)
-        firmware_version = str(tag_data.get("version", ""))
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._tag_mac)},
-            name=tag_name,
-            manufacturer="OpenEPaperLink",
-            model=hw_string,
-            via_device=(DOMAIN, "ap"),
-            sw_version=f"0x{int(firmware_version, 16):X}" if firmware_version else "Unknown",
-            serial_number=self._tag_mac,
-            hw_version=f"{width}x{height}",
-        )
+    def tag(self) -> Tag | None:
+        """The current tag state, or None if it is no longer reported."""
+        return self.coordinator.data.get(self._mac)
 
     @property
     def available(self) -> bool:
-        """Return if the entity is available."""
-        return (
-                self._hub.online
-                and self._hub.is_tag_online(self._tag_mac)
-                and self._tag_mac not in self._hub.get_blacklisted_tags()
-        )
+        """Whether the Access Point is connected and still knows this tag."""
+        return self.coordinator.online and self.tag is not None
 
-    async def async_added_to_hass(self) -> None:
-        """Register update signal handlers."""
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                f"{DOMAIN}_tag_update_{self._tag_mac}",
-                self._handle_update,
-            )
-        )
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                f"{DOMAIN}_connection_status",
-                self._handle_connection_status,
-            )
-        )
 
-    @callback
-    def _handle_update(self) -> None:
-        """Handle tag data updates."""
-        self.async_write_ha_state()
+@callback
+def async_remove_ap_display_entities(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    mac: str,
+    platform: Platform,
+    keys: Iterable[str],
+) -> None:
+    """Remove entities registered for the display before it was recognised.
 
-    @callback
-    def _handle_connection_status(self, is_online: bool) -> None:
-        """Handle connection status updates."""
-        self.async_write_ha_state()
-
-class OpenEPaperLinkBLEEntity(Entity):
+    Earlier versions gave the Access Point's display everything a tag gets,
+    and the registry keeps an entity whether or not anything still provides
+    it, so they would linger as unavailable.
     """
-    Base entity for BLE device entities (sensors, light, button, image).
+    registry = er.async_get(hass)
+    for key in keys:
+        unique_id = f"{entry.entry_id}_{mac}_{key}"
+        if entity_id := registry.async_get_entity_id(platform, DOMAIN, unique_id):
+            registry.async_remove(entity_id)
 
-    Provides:
-    - device_info for BLE device (using BLEDeviceMetadata)
-    - available property (bluetooth.async_address_present)
 
-    Subclasses must set:
-    - _attr_unique_id
-    - _attr_translation_key
+class ATCEntity(PassiveBluetoothCoordinatorEntity[ATCCoordinator]):
+    """Base class for entities of a tag running ATC firmware.
+
+    Unlike the Access Point entities these are not backed by a polling or
+    push coordinator over the network; state arrives in Bluetooth
+    advertisements, which is what PassiveBluetoothCoordinatorEntity models.
     """
+
     _attr_has_entity_name = True
-    _attr_entity_registry_enabled_default = False
 
     def __init__(
-            self,
-            mac_address: str,
-            name: str,
-            entry: OpenEPaperLinkConfigEntry,
+        self,
+        coordinator: ATCCoordinator,
+        entry_id: str,
+        description: EntityDescription,
     ) -> None:
-        """Initialize the BLE entity."""
-        self._mac_address = mac_address
-        self._name = name
-        self._entry = entry
+        """Set up the entity."""
+        super().__init__(coordinator)
+        self.entity_description = description
+        # Entry-scoped, matching the Access Point entities and what the
+        # registry migration rewrites the old oepl_ble_ ids to.
+        self._attr_unique_id = f"{entry_id}_{description.key}"
+        config = coordinator.device_config
+        screen_type = config.screen_type if config else None
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_{coordinator.address}")},
+            connections={(CONNECTION_BLUETOOTH, coordinator.address)},
+            # The maker, guessed from the screen type's name where it says.
+            manufacturer=(
+                guess_atc_manufacturer(screen_type) if screen_type is not None else None
+            )
+            or "OpenEPaperLink",
+            model=(
+                DEVICE_TYPES[screen_type]
+                if screen_type in DEVICE_TYPES and screen_type != _ATC_DYNAMIC_TYPE
+                else None
+            ),
+            # As tags behind an Access Point show theirs; the firmware version
+            # is only known from advertisements and follows them.
+            hw_version=format_hw_type(config.hw_type) if config else None,
+        )
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info for the BLE device."""
-
-        current_metadata = self._entry.runtime_data.device_metadata
-        metadata = BLEDeviceMetadata(current_metadata)
-
-        device_info = {
-            "identifiers": {(DOMAIN, f"ble_{self._mac_address}")},
-            "name": self._name,
-            "manufacturer": "OpenEPaperLink",
-            "model": metadata.model_name,
-            "sw_version": metadata.formatted_fw_version(),
-            "hw_version": f"{metadata.width}x{metadata.height}" if metadata.width and metadata.height else None,
-        }
-
-        device_info["configuration_url"] = ATC_CONFIG_URL
-
-        return DeviceInfo(**device_info)
-
-    @property
-    def available(self) -> bool:
-        """Return if the entity is available."""
-        return bluetooth.async_address_present(self.hass, self._mac_address)
+    def advertisement(self) -> AdvertisingData | None:
+        """The most recent advertisement, if one has been seen."""
+        return self.coordinator.data.advertisement if self.coordinator.data else None

@@ -1,111 +1,118 @@
-"""Diagnostics support for OpenEPaperLink."""
+"""Diagnostics for OpenEPaperLink Access Points and ATC tags."""
+
 from __future__ import annotations
 
+from dataclasses import asdict, is_dataclass
 from typing import Any
 
-from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.const import CONF_HOST
+from homeassistant.components.diagnostics import REDACTED, async_redact_data
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
-from .coordinator import Hub
-from .runtime_data import OpenEPaperLinkConfigEntry, OpenEPaperLinkBLERuntimeData
+from . import OpenEPaperLinkConfigEntry, _is_ap_entry
+from .atc_coordinator import ATCConfigEntry
+from .const import CONF_AP_MAC, CONF_HOST, CONF_MAC_ADDRESS, OPT_BLACKLISTED_TAGS
+from .coordinator import APConfigEntry
 
-# Sensitive fields to redact
+# Fields that locate the network or the Access Point on it. MACs are handled
+# separately, so tags stay distinguishable from one another.
 TO_REDACT = {
-    CONF_HOST,  # AP IP address
-    "wifi_ssid",  # WiFi network name
-    "ip",  # AP IP in status
+    CONF_HOST,
+    "ap_ip",
+    "wifi_ssid",
+    # A tag's content configuration can carry URLs and tokens for the
+    # Access Point's own content modes.
+    "modecfgjson",
 }
 
 
-# Partial redaction for MAC addresses (show last 4 chars)
-def _clean_mac(mac: str) -> str:
-    return mac.replace(":", "").replace("-", "").upper()
-
-
 def _redact_mac(mac: str) -> str:
-    if not mac:
-        return "**REDACTED**"
-    clean = _clean_mac(mac)
-    suffix = clean[-4:] if len(clean) >= 4 else clean
-    return f"**REDACTED**{suffix}"
+    """Hide a MAC but keep its last four digits, which tell tags apart."""
+    clean = mac.replace(":", "").replace("-", "").upper()
+    return f"{REDACTED}{clean[-4:]}" if clean else REDACTED
 
 
-def _redact_name_if_mac(name: str | None, mac: str) -> str | None:
-    if not name:
-        return name
-    if _clean_mac(name) == _clean_mac(mac):
-        return _redact_mac(mac)
-    return name
+def _as_dict(obj: object) -> dict[str, Any] | None:
+    """Turn a library model into a dict, without the raw payload it came from.
+
+    ``raw`` holds every key the device sent, including ones not modelled, so
+    nothing in it could be redacted by name.
+    """
+    if obj is None or not is_dataclass(obj) or isinstance(obj, type):
+        return None
+    data = asdict(obj)
+    data.pop("raw", None)
+    return async_redact_data(data, TO_REDACT)
 
 
-def _redact_tag_data(tags: dict[str, dict]) -> dict[str, dict]:
-    result = {}
-    for mac, data in tags.items():
-        redacted_mac = _redact_mac(mac)
-        redacted_data = dict(data)
-        redacted_data["tag_mac"] = redacted_mac
-        if "tag_name" in redacted_data:
-            redacted_data["tag_name"] = _redact_name_if_mac(redacted_data["tag_name"], mac)
-        if "modecfgjson" in redacted_data:
-            redacted_data["modecfgjson"] = "**REDACTED**"
-        result[redacted_mac] = redacted_data
-    return result
+def _entry_info(entry: OpenEPaperLinkConfigEntry) -> dict[str, Any]:
+    """Describe the config entry itself."""
+    data = dict(entry.data)
+    for key in (CONF_AP_MAC, CONF_MAC_ADDRESS):
+        if key in data:
+            data[key] = _redact_mac(str(data[key]))
+    options = dict(entry.options)
+    if OPT_BLACKLISTED_TAGS in options:
+        options[OPT_BLACKLISTED_TAGS] = [
+            _redact_mac(str(mac)) for mac in options[OPT_BLACKLISTED_TAGS]
+        ]
+    return {
+        "title": entry.title,
+        "version": entry.version,
+        "minor_version": entry.minor_version,
+        "data": async_redact_data(data, TO_REDACT),
+        "options": async_redact_data(options, TO_REDACT),
+    }
+
+
+def _ap_diagnostics(entry: APConfigEntry) -> dict[str, Any]:
+    """Describe an Access Point and the tags it shows."""
+    coordinator = entry.runtime_data
+    tags: dict[str, Any] = {}
+    for mac, tag in coordinator.data.items():
+        info = _as_dict(tag) or {}
+        info["mac"] = _redact_mac(mac)
+        if info.get("alias", "").replace(":", "").upper() == mac.upper():
+            info["alias"] = info["mac"]
+        info["tag_type"] = coordinator.tag_type_name(mac)
+        info["is_ap_display"] = coordinator.is_ap_display(mac)
+        tags[info["mac"]] = info
+    return {
+        "type": "access_point",
+        "online": coordinator.online,
+        "last_update_success": coordinator.last_update_success,
+        "info": _as_dict(coordinator.ap_info),
+        "config": _as_dict(coordinator.ap_config),
+        "status": _as_dict(coordinator.ap_status),
+        # The Access Point lists every tag in the mesh; this entry shows only
+        # the ones it owns and the user has not hidden.
+        "tags_reported": len(coordinator.client.tags),
+        "tags_shown": len(tags),
+        "tags": tags,
+    }
+
+
+def _atc_diagnostics(entry: ATCConfigEntry) -> dict[str, Any]:
+    """Describe an ATC tag from what it reported at setup and advertises."""
+    runtime = entry.runtime_data
+    coordinator = runtime.coordinator
+    update = coordinator.data
+    return {
+        "type": "atc",
+        "available": coordinator.available,
+        "capabilities": _as_dict(runtime.capabilities),
+        "device_config": _as_dict(coordinator.device_config),
+        "advertisement": _as_dict(update.advertisement) if update else None,
+        "has_rendered_image": coordinator.rendered is not None,
+        "upload_in_progress": (
+            runtime.upload_task is not None and not runtime.upload_task.done()
+        ),
+    }
 
 
 async def async_get_config_entry_diagnostics(
-        hass: HomeAssistant, entry: OpenEPaperLinkConfigEntry
+    hass: HomeAssistant,  # noqa: ARG001
+    entry: OpenEPaperLinkConfigEntry,
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-
-    title = entry.title
-    host = entry.data.get(CONF_HOST)
-    if host and host in title:
-        title = title.replace(host, "**REDACTED**")
-
-    # Common entry info
-    diag: dict[str, Any] = {
-        "config_entry": {
-            "title": title,
-            "version": entry.version,
-            "minor_version": entry.minor_version,
-            "data": async_redact_data(dict(entry.data), TO_REDACT),
-            "options": async_redact_data(dict(entry.options), TO_REDACT),
-        },
-    }
-
-    runtime_data = entry.runtime_data
-
-    if isinstance(runtime_data, Hub):
-        # AP-based entry
-        hub = runtime_data
-        diag["device_type"] = "ap"
-        diag["ap"] = {
-            "online": hub.online,
-            "model": hub.ap_model,
-            "environment": hub.ap_env,
-            "status": async_redact_data(hub.ap_status, TO_REDACT),
-            "config": async_redact_data(hub.ap_config, TO_REDACT),
-        }
-        diag["tags"] = {
-            "count": len(hub.tags),
-            "blacklisted_count": len(hub.get_blacklisted_tags()),
-            "data": _redact_tag_data({
-                mac: hub.get_tag_data(mac) for mac in hub.tags
-            }),
-        }
-
-    elif isinstance(runtime_data, OpenEPaperLinkBLERuntimeData):
-        # BLE device entry
-        ble_data = runtime_data
-        diag["device_type"] = "ble"
-        diag["ble"] = {
-            "mac_address": _redact_mac(ble_data.mac_address),
-            "name": _redact_name_if_mac(ble_data.name, ble_data.mac_address),
-            "protocol_type": ble_data.protocol_type,
-            "device_metadata": ble_data.device_metadata,  # Hardware specs (not sensitive)
-            "sensor_count": len(ble_data.sensors),
-        }
-
-    return diag
+    device = _ap_diagnostics(entry) if _is_ap_entry(entry) else _atc_diagnostics(entry)
+    return {"entry": _entry_info(entry), "device": device}
