@@ -168,6 +168,6 @@ Set the Access Point's [**Shorten latency during config**](https://github.com/Op
 
 ## Contributing
 
-- Feature requests and bug reports are welcome. Please [open an issue](https://github.com/OpenEPaperLink/Home_Assistant_Integration/issues).
+- Feature requests and bug reports are welcome. Please [open an issue](https://github.com/OpenEPaperLink/Home_Assistant_Integration/issues). For a bug, attach the diagnostics from the Access Point or tag's **⋮** menu in **Settings → Devices & services → OpenEPaperLink**. Addresses, MACs and Wi-Fi names are redacted.
 - Pull requests are encouraged.
 - Join the [OpenEPaperLink Discord](https://discord.com/invite/eRUHt4u5CZ) (`#home_assistant` and `#atc_ble_oepl`) to discuss ideas and get help.
