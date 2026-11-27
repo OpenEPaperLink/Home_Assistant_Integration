@@ -19,6 +19,8 @@ CONF_MAC_ADDRESS: Final = "mac_address"
 CONF_DEVICE_TYPE: Final = "device_type"
 
 OPT_BLACKLISTED_TAGS: Final = "blacklisted_tags"
+# Leave out tags that show content the Access Point makes itself.
+OPT_HIDE_OEPL_CONTENT_TAGS: Final = "hide_oepl_content_tags"
 OPT_BUTTON_DEBOUNCE: Final = "button_debounce"
 OPT_NFC_DEBOUNCE: Final = "nfc_debounce"
 # Semicolon-separated extra font directories for drawcustom.

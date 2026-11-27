@@ -53,6 +53,7 @@ from .const import (
     DOMAIN,
     OPT_BLACKLISTED_TAGS,
     OPT_BUTTON_DEBOUNCE,
+    OPT_HIDE_OEPL_CONTENT_TAGS,
     OPT_NFC_DEBOUNCE,
     SIGNAL_ENTRIES_CHANGED,
     SIGNAL_TAG_INTERACTION,
@@ -69,6 +70,16 @@ RADIO_REPORT_ATTEMPTS = 6
 RADIO_REPORT_INTERVAL = 5
 
 type APConfigEntry = ConfigEntry[APCoordinator]
+
+# Content modes still shown with OPT_HIDE_OEPL_CONTENT_TAGS on: the ones where
+# the picture comes from Home Assistant, or from nothing yet.
+_HA_CONTENT_MODES: frozenset[int] = frozenset(
+    {ContentMode.NOT_CONFIGURED, ContentMode.STATIC_IMAGE, ContentMode.HOME_ASSISTANT}
+)
+# Displays built into an Access Point are always shown: they are part of it
+# rather than tags someone set up. This Access Point's own is found by its MAC
+# (see is_ap_display); a mesh peer's by the hardware types these displays use.
+_AP_DISPLAY_HW_TYPES = range(0xE0, 0xF0)
 
 # Wake-up reasons surfaced as event entity events. The firmware defines exactly
 # two button reasons, so this is the complete set; the pre-4.0 integration
@@ -131,6 +142,20 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         """MACs the user has chosen to hide, uppercased."""
         raw = self.config_entry.options.get(OPT_BLACKLISTED_TAGS, [])
         return {str(mac).upper() for mac in raw}
+
+    def _hidden_by_content(self, tag: Tag) -> bool:
+        """Whether the content filter leaves *tag* out.
+
+        Follows the tag's content mode as the Access Point reports it, so a
+        tag switched to Home Assistant on the Access Point appears, and one
+        switched to Access Point content disappears.
+        """
+        return (
+            bool(self.config_entry.options.get(OPT_HIDE_OEPL_CONTENT_TAGS, False))
+            and int(tag.content_mode) not in _HA_CONTENT_MODES
+            and tag.hw_type not in _AP_DISPLAY_HW_TYPES
+            and not self.is_ap_display(tag.mac)
+        )
 
     def _debounce_for(self, trigger_type: str) -> timedelta:
         """Return the debounce window for a trigger type."""
@@ -238,14 +263,17 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
             for entry in self.hass.config_entries.async_entries(DOMAIN)
         )
 
+    def _shows(self, tag: Tag) -> bool:
+        """Whether this entry exposes *tag*."""
+        return (
+            tag.mac not in self.blacklisted_tags
+            and self.owns_tag(tag)
+            and not self._hidden_by_content(tag)
+        )
+
     def _visible_tags(self, tags: list[Tag]) -> dict[str, Tag]:
         """Filter *tags* down to the ones this entry exposes."""
-        blacklist = self.blacklisted_tags
-        return {
-            tag.mac: tag
-            for tag in tags
-            if tag.mac not in blacklist and self.owns_tag(tag)
-        }
+        return {tag.mac: tag for tag in tags if self._shows(tag)}
 
     @callback
     def async_reevaluate_ownership(self) -> None:
@@ -293,7 +321,7 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
     @callback
     def _handle_tag_update(self, tag: Tag) -> None:
         """Handle a pushed tag update."""
-        if tag.mac in self.blacklisted_tags or not self.owns_tag(tag):
+        if not self._shows(tag):
             self.data.pop(tag.mac, None)
             self.async_update_listeners()
             return

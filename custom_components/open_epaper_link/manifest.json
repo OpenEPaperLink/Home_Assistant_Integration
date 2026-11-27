@@ -35,7 +35,7 @@
   "requirements": [
     "odl-renderer>=0.5.15,<0.6",
     "py-atc-ble-oepl==1.0.0",
-    "py-oepl[dither]==1.0.1"
+    "py-oepl[dither]==1.0.2"
   ],
   "version": "3.0.0"
 }

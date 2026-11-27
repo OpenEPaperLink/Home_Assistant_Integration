@@ -44,11 +44,13 @@
         "title": "Options",
         "data": {
           "blacklisted_tags": "Hidden tags",
+          "hide_oepl_content_tags": "Hide tags with Access Point content",
           "button_debounce": "Button debounce (seconds)",
           "nfc_debounce": "NFC debounce (seconds)"
         },
         "data_description": {
           "blacklisted_tags": "Tags to hide; no entities are created for them.",
+          "hide_oepl_content_tags": "Only show tags whose content is Home Assistant, Static image or Not configured. Tags showing content the Access Point makes itself, such as weather or a calendar, are left out, and follow their content mode as it changes. The Access Point's own display is always shown.",
           "button_debounce": "Ignore repeated button events within this window. The Access Point repeats a wake-up reason on every check-in.",
           "nfc_debounce": "Ignore repeated NFC scans within this window."
         }

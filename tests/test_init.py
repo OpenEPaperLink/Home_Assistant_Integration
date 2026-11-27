@@ -381,3 +381,100 @@ async def test_unnamed_access_point_uses_the_name_it_gives_itself(
     # py-oepl derives this from the MAC the way the firmware does.
     assert device.name == "OpenEpaperLink-EEFF"
     assert AP_HOST not in device.name
+
+
+# ---------------------------------------------------------------------------
+# Hiding tags with Access Point content
+# ---------------------------------------------------------------------------
+
+WEATHER_TAG = "00000335042F3E12"
+STATIC_TAG = "00000335042F3E13"
+NEW_TAG = "00000335042F3E14"
+AP_DISPLAY = "0000FFEEDDCCBBAA"  # ap_display_mac(AP_MAC)
+PEER_DISPLAY = "0000665544332211"
+
+
+def _content_tags() -> list:
+    return [
+        make_tag(TAG_MAC, contentMode=25),  # Home Assistant
+        make_tag(WEATHER_TAG, contentMode=4),
+        make_tag(STATIC_TAG, contentMode=22),
+        make_tag(NEW_TAG, contentMode=0),  # not configured
+        # The display reports Access Point info, and a board may give it a
+        # hardware type outside the usual range: it is found by its MAC.
+        make_tag(AP_DISPLAY, hw_type=0x60, contentMode=21),
+        make_tag(PEER_DISPLAY, hw_type=0xE1, contentMode=21),
+    ]
+
+
+async def _setup_with_options(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    mock_client: AsyncMock,
+    **options: object,
+) -> None:
+    hass.config_entries.async_update_entry(entry, options=options)
+    mock_client.set_tags(*_content_tags())
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_tags_with_ap_content_shown_by_default(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    ap_config_entry.add_to_hass(hass)
+    await _setup_with_options(hass, ap_config_entry, mock_client)
+
+    assert WEATHER_TAG in ap_config_entry.runtime_data.data
+
+
+async def test_hide_tags_with_ap_content(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """Only Home Assistant, Static image and Not configured are left, and displays."""
+    ap_config_entry.add_to_hass(hass)
+    await _setup_with_options(
+        hass, ap_config_entry, mock_client, hide_oepl_content_tags=True
+    )
+
+    assert set(ap_config_entry.runtime_data.data) == {
+        TAG_MAC,
+        STATIC_TAG,
+        NEW_TAG,
+        AP_DISPLAY,
+        PEER_DISPLAY,
+    }
+    device_registry = dr.async_get(hass)
+    assert not any(
+        WEATHER_TAG in identifier
+        for device in dr.async_entries_for_config_entry(
+            device_registry, ap_config_entry.entry_id
+        )
+        for _domain, identifier in device.identifiers
+    )
+
+
+async def test_hidden_tags_follow_their_content_mode(
+    hass: HomeAssistant, ap_config_entry: MockConfigEntry, mock_client: AsyncMock
+) -> None:
+    """A tag switched on the Access Point comes and goes without a reload."""
+    ap_config_entry.add_to_hass(hass)
+    await _setup_with_options(
+        hass, ap_config_entry, mock_client, hide_oepl_content_tags=True
+    )
+    coordinator = ap_config_entry.runtime_data
+
+    coordinator._handle_tag_update(make_tag(WEATHER_TAG, contentMode=25))
+    await hass.async_block_till_done()
+    assert WEATHER_TAG in coordinator.data
+    entity_registry = er.async_get(hass)
+    assert any(
+        WEATHER_TAG in entity.unique_id
+        for entity in er.async_entries_for_config_entry(
+            entity_registry, ap_config_entry.entry_id
+        )
+    )
+
+    coordinator._handle_tag_update(make_tag(TAG_MAC, contentMode=11))  # calendar
+    await hass.async_block_till_done()
+    assert TAG_MAC not in coordinator.data
