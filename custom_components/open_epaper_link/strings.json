@@ -480,6 +480,16 @@
       }
     }
   },
+  "issues": {
+    "deprecated_action": {
+      "title": "{action} is deprecated",
+      "description": "The {action} action does the same as one of the integration's button entities and will be removed in a future release.\n\nIn each automation or script that calls it, replace it with the `button.press` action targeting the matching button entity of the tag or Access Point. Target the button entities themselves: pressing every button of a device or area would also press its reboot buttons.\n\nThis issue goes away when Home Assistant restarts."
+    },
+    "deprecated_refresh_tag_types": {
+      "title": "{action} is no longer needed",
+      "description": "Tag hardware definitions are now fetched from the Access Point whenever one is missing, so the {action} action does nothing and will be removed in a future release.\n\nRemove it from each automation or script that calls it.\n\nThis issue goes away when Home Assistant restarts."
+    }
+  },
   "services": {
     "drawcustom": {
       "name": "Draw custom image",
@@ -582,33 +592,33 @@
       }
     },
     "clear_pending": {
-      "name": "Clear pending update",
-      "description": "Discards an update the tag has not collected yet.",
+      "name": "Clear pending update (deprecated)",
+      "description": "Deprecated: press the device's \"Clear pending updates\" button instead. Discards an update the tag has not collected yet.",
       "fields": {}
     },
     "force_refresh": {
-      "name": "Force refresh",
-      "description": "Makes the tag redraw its current image.",
+      "name": "Force refresh (deprecated)",
+      "description": "Deprecated: press the device's \"Force refresh content\" button instead. Makes the tag redraw its current image.",
       "fields": {}
     },
     "reboot_tag": {
-      "name": "Reboot tag",
-      "description": "Restarts the tag.",
+      "name": "Reboot tag (deprecated)",
+      "description": "Deprecated: press the device's \"Reboot\" button instead. Restarts the tag.",
       "fields": {}
     },
     "scan_channels": {
-      "name": "Scan channels",
-      "description": "Makes the tag search the radio channels again for an Access Point.",
+      "name": "Scan channels (deprecated)",
+      "description": "Deprecated: press the device's \"Scan channels\" button instead. Makes the tag search the radio channels again for an Access Point.",
       "fields": {}
     },
     "reboot_ap": {
-      "name": "Reboot Access Point",
-      "description": "Restarts the Access Point.",
+      "name": "Reboot Access Point (deprecated)",
+      "description": "Deprecated: press the device's \"Reboot\" button instead. Restarts the Access Point.",
       "fields": {}
     },
     "refresh_tag_types": {
-      "name": "Refresh tag types",
-      "description": "Reloads tag hardware definitions from the Access Point. Useful after it downloads one it did not previously hold.",
+      "name": "Refresh tag types (deprecated)",
+      "description": "Deprecated and does nothing: tag hardware definitions are fetched from the Access Point whenever one is missing.",
       "fields": {}
     }
   }
