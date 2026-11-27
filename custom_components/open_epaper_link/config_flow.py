@@ -41,6 +41,7 @@ from .const import (
     DOMAIN,
     OPT_BLACKLISTED_TAGS,
     OPT_BUTTON_DEBOUNCE,
+    OPT_HIDE_OEPL_CONTENT_TAGS,
     OPT_NFC_DEBOUNCE,
 )
 from .coordinator import APConfigEntry
@@ -378,6 +379,10 @@ class OpenEPaperLinkOptionsFlow(OptionsFlow):
                         OPT_BLACKLISTED_TAGS,
                         default=list(options.get(OPT_BLACKLISTED_TAGS, [])),
                     ): cv.multi_select(known_tags),
+                    vol.Optional(
+                        OPT_HIDE_OEPL_CONTENT_TAGS,
+                        default=options.get(OPT_HIDE_OEPL_CONTENT_TAGS, False),
+                    ): bool,
                     vol.Optional(
                         OPT_BUTTON_DEBOUNCE,
                         default=options.get(
