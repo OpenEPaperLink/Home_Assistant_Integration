@@ -34,6 +34,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service import async_extract_entity_ids
 from odl_renderer import SourceKind, SourceNotAllowedError, generate_image
@@ -49,9 +50,10 @@ from .coordinator import APCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# Commands that act on a single tag. Each was also a service before 4.0 and
-# stays one, because automations call them.
-TAG_COMMAND_SERVICES = {
+# Actions kept only so that pre-4.0 automations keep working. Each does what a
+# button entity does, and Home Assistant's own button.press reaches the same
+# targets, so calling one raises a repair issue pointing at its button.
+DEPRECATED_TAG_COMMANDS = {
     "clear_pending": TagCommand.CLEAR,
     "force_refresh": TagCommand.REFRESH,
     "reboot_tag": TagCommand.REBOOT,
@@ -422,7 +424,7 @@ async def _async_canvases(hass: HomeAssistant, call: ServiceCall) -> list[_Canva
         if isinstance(runtime, ATCRuntimeData):
             canvases.append(_atc_canvas(hass, entry, call))
         elif mac is not None and mac in runtime.data:
-            canvases.append(_tag_canvas(runtime, mac, call))
+            canvases.append(await _async_tag_canvas(runtime, mac, call))
 
     if not canvases:
         raise ServiceValidationError(
@@ -431,9 +433,11 @@ async def _async_canvases(hass: HomeAssistant, call: ServiceCall) -> list[_Canva
     return canvases
 
 
-def _tag_canvas(coordinator: APCoordinator, mac: str, call: ServiceCall) -> _Canvas:
+async def _async_tag_canvas(
+    coordinator: APCoordinator, mac: str, call: ServiceCall
+) -> _Canvas:
     """A tag behind an Access Point, which queues the image and delivers it."""
-    tag_type = coordinator.tag_type(mac)
+    tag_type = await coordinator.async_tag_type(mac)
     if tag_type is None:
         raise HomeAssistantError(
             translation_domain=DOMAIN,
@@ -581,12 +585,34 @@ async def _async_setled(call: ServiceCall) -> None:
         await coordinator.async_set_led(mac, pattern)
 
 
-def _make_tag_command_handler(
-    command: TagCommand,
+@callback
+def _async_raise_deprecated(hass: HomeAssistant, action: str) -> None:
+    """Point whoever calls a deprecated action at the button replacing it.
+
+    Each button has the key of the action it replaces.
+    """
+    _LOGGER.warning(
+        "%s.%s is deprecated; use button.press on its button instead", DOMAIN, action
+    )
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        f"deprecated_action_{action}",
+        is_fixable=False,
+        is_persistent=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="deprecated_action",
+        translation_placeholders={"action": f"{DOMAIN}.{action}"},
+    )
+
+
+def _make_deprecated_tag_command(
+    action: str, command: TagCommand
 ) -> Callable[[ServiceCall], Coroutine[Any, Any, None]]:
     """Return a handler that sends *command* to every targeted tag."""
 
     async def handler(call: ServiceCall) -> None:
+        _async_raise_deprecated(call.hass, action)
         for coordinator, mac in await _async_target_tags(call.hass, call):
             await coordinator.async_send_tag_command(mac, command)
 
@@ -612,17 +638,23 @@ async def _async_target_access_points(
 
 async def _async_reboot_ap(call: ServiceCall) -> None:
     """Reboot every targeted Access Point."""
+    _async_raise_deprecated(call.hass, "reboot_ap")
     for coordinator in await _async_target_access_points(call.hass, call):
         await coordinator.async_reboot_ap()
 
 
 async def _async_refresh_tag_types(call: ServiceCall) -> None:
-    """Reload tag type definitions from the Access Point.
-
-    Useful after it downloads a definition it did not previously hold.
-    """
-    for coordinator in await _async_target_access_points(call.hass, call):
-        await coordinator.async_refresh_tag_types()
+    """Do nothing: tag types are fetched from the AP whenever one is missing."""
+    ir.async_create_issue(
+        call.hass,
+        DOMAIN,
+        "deprecated_action_refresh_tag_types",
+        is_fixable=False,
+        is_persistent=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="deprecated_refresh_tag_types",
+        translation_placeholders={"action": f"{DOMAIN}.refresh_tag_types"},
+    )
 
 
 @callback
@@ -638,9 +670,12 @@ def async_register_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(DOMAIN, "setled", _async_setled, schema=SCHEMA_SETLED)
 
-    for name, command in TAG_COMMAND_SERVICES.items():
+    for name, command in DEPRECATED_TAG_COMMANDS.items():
         hass.services.async_register(
-            DOMAIN, name, _make_tag_command_handler(command), schema=SCHEMA_TARGET_ONLY
+            DOMAIN,
+            name,
+            _make_deprecated_tag_command(name, command),
+            schema=SCHEMA_TARGET_ONLY,
         )
 
     hass.services.async_register(

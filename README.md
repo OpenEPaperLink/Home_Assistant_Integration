@@ -91,12 +91,16 @@ Firmware updates show up under **Settings → Updates**, like any other device's
 | --- | --- |
 | `open_epaper_link.drawcustom` | Draw an image from a list of elements on one or more tags. |
 | `open_epaper_link.setled` | Flash the LED on tags that have one, in up to three colour groups. |
-| `open_epaper_link.force_refresh` | Make the tag redraw its current image. |
-| `open_epaper_link.clear_pending` | Discard an update the tag has not collected yet. |
-| `open_epaper_link.reboot_tag` | Restart the tag. |
-| `open_epaper_link.scan_channels` | Make the tag search the radio channels for an Access Point again. |
-| `open_epaper_link.reboot_ap` | Restart the Access Point. |
-| `open_epaper_link.refresh_tag_types` | Reload the tag hardware definitions from the Access Point. |
+
+To clear a pending update, force a refresh, reboot a tag or the Access Point, scan for channels or put a tag into deep sleep, press its button. In an automation, use the `button.press` action on that button:
+
+```yaml
+action: button.press
+target:
+  entity_id: button.kitchen_tag_force_refresh_content
+```
+
+The older `open_epaper_link.force_refresh`, `clear_pending`, `reboot_tag`, `scan_channels` and `reboot_ap` actions still work, but are deprecated and will be removed: calling one raises a repair issue in **Settings → Repairs** naming the action to replace. `open_epaper_link.refresh_tag_types` is no longer needed and does nothing, because tag hardware definitions are fetched from the Access Point whenever one is missing.
 
 ### drawcustom
 

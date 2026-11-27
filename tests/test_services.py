@@ -18,6 +18,7 @@ from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
 from oepl import LUT, LEDPattern
 from PIL import Image as PILImage
@@ -303,6 +304,36 @@ async def test_targeting_the_access_point_device(
     )
 
     mock_client.reboot_ap.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "action",
+    ["clear_pending", "force_refresh", "reboot_tag", "scan_channels", "reboot_ap"],
+)
+async def test_deprecated_actions_still_work_and_raise_a_repair(
+    hass: HomeAssistant, ap_config_entry, mock_client, action: str
+) -> None:
+    """Each duplicates a button, so calling it points at button.press.
+
+    It still acts, so that a pre-4.0 automation keeps working meanwhile.
+    """
+    device_id = await _tag_device_id(hass, ap_config_entry)
+    ap = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, f"{ap_config_entry.entry_id}_ap"), ap_config_entry.entry_id
+    )
+    assert ap is not None
+    target = ap.id if action == "reboot_ap" else device_id
+
+    await hass.services.async_call(
+        DOMAIN, action, {"device_id": [target]}, blocking=True
+    )
+
+    sent = mock_client.reboot_ap if action == "reboot_ap" else mock_client.send_tag_cmd
+    sent.assert_awaited_once()
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, f"deprecated_action_{action}")
+    assert issue is not None
+    assert issue.translation_key == "deprecated_action"
+    assert issue.translation_placeholders == {"action": f"{DOMAIN}.{action}"}
 
 
 async def test_targeting_nothing_is_an_error(

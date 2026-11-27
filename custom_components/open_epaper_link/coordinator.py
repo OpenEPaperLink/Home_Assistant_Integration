@@ -127,7 +127,11 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         self.ap_status: APStatus | None = None
         self.online = False
 
-        self._tag_types: dict[int, TagType | None] = {}
+        # Only definitions the AP actually served. A miss is not remembered,
+        # so the next lookup asks again rather than failing until a reload.
+        self._tag_types: dict[int, TagType] = {}
+        # Newly seen tags whose hardware type is still being fetched, by type.
+        self._awaiting_type: dict[int, dict[str, Tag]] = {}
         # Last image we rendered for a tag, kept until the tag reports having
         # rendered something itself.
         self._previews: dict[str, bytes] = {}
@@ -327,6 +331,38 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
             return
 
         previous = self.data.get(tag.mac)
+        if previous is None and tag.hw_type not in self._tag_types:
+            # Entities read the definition when they are built, so a tag of a
+            # type not seen before waits for it rather than appearing without.
+            waiting = self._awaiting_type.setdefault(tag.hw_type, {})
+            fetching = bool(waiting)
+            # Queued before the fetch starts: tasks start eagerly, and one
+            # answered from cache would otherwise finish without this tag.
+            waiting[tag.mac] = tag
+            if not fetching:
+                self.config_entry.async_create_background_task(
+                    self.hass,
+                    self._async_admit_new_type(tag.hw_type),
+                    f"{DOMAIN} tag type 0x{tag.hw_type:02X}",
+                )
+            return
+
+        self._async_apply_tag_update(tag, previous)
+
+    async def _async_admit_new_type(self, hw_type: int) -> None:
+        """Fetch a new hardware type, then let in the tags waiting on it.
+
+        They are let in whether or not the fetch succeeded: a tag without a
+        definition still reports, and drawing to it asks the AP again.
+        """
+        await self.async_get_tag_type(hw_type)
+        for tag in self._awaiting_type.pop(hw_type, {}).values():
+            if self._shows(tag):
+                self._async_apply_tag_update(tag, self.data.get(tag.mac))
+
+    @callback
+    def _async_apply_tag_update(self, tag: Tag, previous: Tag | None) -> None:
+        """Store a tag update and act on what changed."""
         self.data[tag.mac] = tag
 
         if previous is None:
@@ -673,21 +709,23 @@ class APCoordinator(DataUpdateCoordinator[dict[str, Tag]]):
         Served by the AP itself. The AP reads the same file to render to a tag
         at all, so a miss means a genuine fault rather than a coverage gap.
         """
-        if hw_type not in self._tag_types:
-            try:
-                self._tag_types[hw_type] = await self.client.get_tag_type(hw_type)
-            except OEPLError as err:
-                _LOGGER.warning("Could not load tag type 0x%02X: %s", hw_type, err)
-                return None
-            if self._tag_types[hw_type] is None:
-                _LOGGER.warning("AP has no tag type definition for 0x%02X", hw_type)
-        return self._tag_types[hw_type]
+        if (tag_type := self._tag_types.get(hw_type)) is not None:
+            return tag_type
+        try:
+            tag_type = await self.client.get_tag_type(hw_type)
+        except OEPLError as err:
+            _LOGGER.warning("Could not load tag type 0x%02X: %s", hw_type, err)
+            return None
+        if tag_type is None:
+            _LOGGER.warning("AP has no tag type definition for 0x%02X", hw_type)
+            return None
+        self._tag_types[hw_type] = tag_type
+        return tag_type
 
-    async def async_refresh_tag_types(self) -> None:
-        """Drop the cached tag types and reload them from the Access Point."""
-        self._tag_types.clear()
-        await self._async_prefetch_tag_types(self.data.values())
-        self.async_update_listeners()
+    async def async_tag_type(self, mac: str) -> TagType | None:
+        """Return the tag type for *mac*, asking the AP if it is not cached."""
+        tag = self.data.get(mac)
+        return await self.async_get_tag_type(tag.hw_type) if tag else None
 
     async def _async_prefetch_tag_types(self, tags: Iterable[Tag]) -> None:
         """Load the tag type for every distinct hardware type in *tags*."""
